@@ -65,8 +65,14 @@ public:
 	/** \brief Tests if this CC pattern embeds the rhs_cc.
 	 * @param rhc_cc a Component to test embed. It should not be a pattern.
 	 * @param root a pair (ag-pos in ptrn,ag-pos in rhs_cc) to start embedding.
-	 * @param vars the variables of the simulation. */
-	bool testEmbed(const Component& rhs_cc,two<small_id> root,const expressions::EvalArguments<true>& args) const;
+	 * @param vars the variables of the simulation.
+	 * @param emb an empty map to store and return the embedding. Can be omitted.*/
+	bool testEmbed(const Component& rhs_cc,two<small_id> root,
+			const expressions::EvalArguments<true>& args,map<small_id,small_id>& emb) const;
+	bool testEmbed(const Component& rhs_cc,two<small_id> root,const expressions::EvalArguments<true>& args) const {
+		map<small_id,small_id> emb;
+		return testEmbed(rhs_cc,root,args,emb);
+	}
 
 	void addRateDep(const simulation::Rule& dep,small_id cc);
 	/** \brief Returns a list of (Rule,cc-pos) where Rule's rate value

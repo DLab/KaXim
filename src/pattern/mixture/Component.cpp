@@ -102,9 +102,8 @@ bool Pattern::Component::operator==(const Component &c) const{
 	return true;
 }
 
-bool Pattern::Component::testEmbed(const Component& rhs_cc,
-		two<small_id> root,const expressions::EvalArguments<true>& args) const {
-	map<small_id,small_id> tested;
+bool Pattern::Component::testEmbed(const Component& rhs_cc,two<small_id> root,
+		const expressions::EvalArguments<true>& args,map<small_id,small_id> &tested) const {
 	list<ag_st_id> to_test{root};
 	list<small_id> sites_to_follow;
 	while(!to_test.empty()){
