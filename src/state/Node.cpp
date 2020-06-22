@@ -558,7 +558,9 @@ ValueState::~ValueState(){
 }
 
 InternalState* ValueState::clone(const map<Node*,Node*>& mask) const {
-	return new ValueState(*this);;
+	auto state = new ValueState();
+	state->value = value;
+	return state;
 }
 void ValueState::setValue(SomeValue val){
 #ifdef DEBUG

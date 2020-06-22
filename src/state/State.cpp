@@ -175,14 +175,14 @@ void State::positiveUpdate(const simulation::Rule::CandidateMap& wake_up){
 		auto info = key_info.second;
 		Node* node = ev.emb[info.emb_coords.first][info.emb_coords.second];
 		auto nulls = ev.null_actions.equal_range(node);//TODO can be optimized to only call once (candidate key doble mapping)
-		if(info.infl_by.size() && distance(nulls.first,nulls.second) == info.infl_by.size())
-			continue;	//every action applied to node is null
+		//if(info.infl_by.size() && distance(nulls.first,nulls.second) == info.infl_by.size())
+		//	continue;	//every action applied to node is null
 		map<int,matching::InjSet*> port_list;
 		auto inj_p = injections[key.cc->getId()]->emplace(*node,port_list,args,key.match_root.first);
-		for(;nulls.first != nulls.second;++nulls.first){
-			port_list.erase(nulls.first->second);
-		}
+
 		if(inj_p){
+			for(;nulls.first != nulls.second;++nulls.first)
+				port_list.erase(nulls.first->second);
 			if(port_list.empty())//TODO check cc.size()
 				node->addDep(inj_p);
 			else
@@ -250,7 +250,8 @@ void State::advanceUntil(FL_TYPE sync_t) {
 			counter.incNullEvents(ex.error);
 		}
 #ifdef DEBUG
-		this->print();
+		if(counter.getEvent() % 10 == 0)
+			this->print();
 #endif
 		WarningStack::getStack().show(false);
 		plot.fill(*this,env);

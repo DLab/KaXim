@@ -172,10 +172,10 @@ void InjRandSet::del(Injection* inj){
 #endif
 	if(inj->getAddress() < multiCount)
 		multiCount--;
-	//if(container.size() > 1){
+	if(container.size() > 1){
 		container.back()->alloc(inj->getAddress());
 		container[inj->getAddress()] = container.back();
-	//}
+	}
 	container.pop_back();
 	counter -= inj->count();
 }
@@ -197,7 +197,7 @@ CcInjection* InjRandSet::newInj() const{
 
 
 FL_TYPE InjRandSet::partialReactivity() const {
-	return count();
+	return counter;
 }
 
 /*FL_TYPE InjRandSet::sumInternal(const expressions::BaseExpression* aux_func,

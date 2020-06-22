@@ -50,6 +50,9 @@ protected:
 	friend class InjRandSet;
 	const pattern::Pattern& ptrn;
 	unsigned address;
+#ifdef DEBUG
+	int cc_id;
+#endif
 public:
 	/** \brief Constructs a new pattern based injection. */
 	Injection(const pattern::Pattern& ptrn);
@@ -155,7 +158,11 @@ public:
 
 static auto trshd = unsigned(-1);//TODO a global static?
 
-inline Injection::Injection(const pattern::Pattern& _ptrn) : ptrn(_ptrn),address(unsigned(-1)) {}
+inline Injection::Injection(const pattern::Pattern& _ptrn) : ptrn(_ptrn),address(unsigned(-1)) {
+#ifdef DEBUG
+	cc_id = ptrn.getId();
+#endif
+}
 
 inline Injection::~Injection() {}
 
