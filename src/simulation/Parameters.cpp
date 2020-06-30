@@ -52,7 +52,7 @@ void Parameters::evalOptions(int argc, char* argv[]){
 		notify(vm);
 	} catch(boost::program_options::error_with_option_name &e){
 		cerr << e.what() << endl;
-		cout << "Try PExKa --help for the list of valid program options." << endl;
+		cout << "Try KaXim --help for the list of valid program options." << endl;
 		exit(0);
 	}
 
@@ -64,7 +64,7 @@ void Parameters::evalOptions(int argc, char* argv[]){
 	if (vm.count("input-file"))
 		inputFiles = vm["input-file"].as<vector<string> >();
 	else {
-		cout << "Try PExKa --help for the list of valid program options." << endl;
+		cout << "Try KaXim --help for the list of valid program options." << endl;
 		exit(1);
 	}
 

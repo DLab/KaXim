@@ -86,7 +86,7 @@
 
 %type <Declaration>				variable_declaration
 %type <std::list<Id>>			variable_list
-%type <Expression*>				alg_expr bool_expr constant variable multiple where_expr
+%type <Expression*>				alg_expr bool_expr constant variable where_expr
 %type <bool>					rate_sep boolean join arrow
 %type <std::list<std::string>>			value_list
 %type <SiteState>				internal_state
@@ -192,7 +192,7 @@ instruction:
 
 
 init_declaration:
- multiple non_empty_mixture 
+ alg_expr non_empty_mixture 
 	{$$=Init(@$,$1,Mixture(@2,$2));}
 | ID LAR alg_expr
 	{$$=Init(@$,$3,Id(@1,$1));}
@@ -441,11 +441,11 @@ bool_expr:
 ;
 
 
-multiple:
+/*multiple:
   INT   {$$ = new Const(@$,$1);}
 | FLOAT	{$$ = new Const(@$,$1);}
 | LABEL {$$ = new Var(@$,Var::VAR,Id(@1,$1)); }
-;
+;*/
 
 
 constant:

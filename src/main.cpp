@@ -33,8 +33,8 @@ using namespace std;
 int main(int argc, char* argv[]){
 	const string version("2.0.06");
 	const string v_msg("KaXim "+version);
-	const string usage_msg("Simple usage is \n$ [mpirun* -np procs] "
-			"KaXim ([-i] kappa_file)+ [-e events] -t time [-p points] -sync-t tau");
+	const string usage_msg("Simple usage is \n$ "
+			"KaXim ([-i] kappa_file)+ -t time [-p points] [-r runs]");
 
 	auto t = time(nullptr);
 
