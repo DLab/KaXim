@@ -146,6 +146,19 @@ BaseExpression* AlgBinaryOperation::eval(const pattern::Environment& env,
 		const pattern::Mixture* mix) const{
 	BaseExpression* ex1 = exp1->eval(env,vars,deps,flags,mix);
 	BaseExpression* ex2 = exp2->eval(env,vars,deps,flags,mix);
+	if(op == BaseExpression::MULT){
+		if(*ex1 == *INF_EXPR){
+			delete ex1;
+			ex1 = MAX_FL_EXPR->clone();
+			ADD_WARN("Replacing [inf] expr for max-float in multiplication to avoid NaN (infinity times zero)",loc);
+		}
+		else if(*ex2 == *INF_EXPR){
+			delete ex2;
+			ex2 = MAX_FL_EXPR->clone();
+			ADD_WARN("Replacing [inf] expr for max-float in multiplication to avoid NaN (infinity times zero)",loc);
+		}
+	}
+
 
 	return BaseExpression::makeBinaryExpression<false>(ex1,ex2,op);
 }
