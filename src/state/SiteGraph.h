@@ -61,7 +61,7 @@ public:
 	size_t getPopulation() const;
 	void decPopulation(size_t pop = 1);
 
-	string toString(const pattern::Environment& env) const;
+	void print(const pattern::Environment& env) const;
 
 
 protected:

@@ -13,6 +13,7 @@
 #include "../pattern/Environment.h"
 #include "../pattern/mixture/Agent.h"
 #include "State.h"
+#include "../simulation/Parameters.h"
 
 
 namespace state {
@@ -148,8 +149,10 @@ void Node::removeFrom(State& state) {
 	InternalState::negativeUpdate(state.ev,state.injections,deps,state);
 	state.ev.side_effects.erase(this);
 #ifdef DEBUG
-	auto& ag_sign = state.getEnv().getSignature(signId);
-	cout << "[remove] " << ag_sign.getName() << "()\n";
+	if(simulation::Parameters::get().verbose > 2){
+		auto& ag_sign = state.getEnv().getSignature(signId);
+		cout << "[remove] " << ag_sign.getName() << "()\n";
+	}
 #endif
 	delete this;//TODO do not delete, reuse nodes
 }
@@ -159,6 +162,7 @@ void Node::changeIntState(State& state){
 	if(old_val == state.ev.act.new_label){
 		state.ev.null_actions.emplace(this,state.ev.act.trgt_st);
 #ifdef DEBUG
+	if(simulation::Parameters::get().verbose > 2)
 		cout << "[null-action] ";
 #endif
 	} else {
@@ -166,12 +170,14 @@ void Node::changeIntState(State& state){
 		interface[state.ev.act.trgt_st]->negativeUpdateByValue(state.ev,state.injections,state);
 	}
 #ifdef DEBUG
-	auto& agent = state.getEnv().getSignature(signId);
-	auto& site_sign = dynamic_cast<const pattern::Signature::LabelSite&>(
-			agent.getSite(state.ev.act.trgt_st));
-	cout << "[change] " << agent.getName() << "(" << site_sign.getName()
-			<< "~{ " << site_sign.getLabel(old_val)
-			<< " -> " << site_sign.getLabel(state.ev.act.new_label) << " })\n";
+	if(simulation::Parameters::get().verbose > 2){
+		auto& agent = state.getEnv().getSignature(signId);
+		auto& site_sign = dynamic_cast<const pattern::Signature::LabelSite&>(
+				agent.getSite(state.ev.act.trgt_st));
+		cout << "[change] " << agent.getName() << "(" << site_sign.getName()
+				<< "~{ " << site_sign.getLabel(old_val)
+				<< " -> " << site_sign.getLabel(state.ev.act.new_label) << " })\n";
+	}
 #endif
 }
 
@@ -181,17 +187,20 @@ void Node::assign(State& state){
 	if(old_val == val){
 		state.ev.null_actions.emplace(this,state.ev.act.trgt_st);
 #ifdef DEBUG
-		cout << "[null-action] ";
+		if(simulation::Parameters::get().verbose > 2)
+			cout << "[null-action] ";
 #endif
 	} else {
 		interface[state.ev.act.trgt_st]->setValue(val);
 		interface[state.ev.act.trgt_st]->negativeUpdateByValue(state.ev,state.injections,state);
 	}
 #ifdef DEBUG
-	auto& agent = state.getEnv().getSignature(signId);
-	auto& site_sign = agent.getSite(state.ev.act.trgt_st);
-	cout << "[assign] " << agent.getName() << "(" << site_sign.getName()
-			<< "~{ " << old_val	<< " -> " << val.valueAs<FL_TYPE>() << " })\n";
+	if(simulation::Parameters::get().verbose > 2){
+		auto& agent = state.getEnv().getSignature(signId);
+		auto& site_sign = agent.getSite(state.ev.act.trgt_st);
+		cout << "[assign] " << agent.getName() << "(" << site_sign.getName()
+				<< "~{ " << old_val	<< " -> " << val.valueAs<FL_TYPE>() << " })\n";
+	}
 #endif
 }
 
@@ -207,18 +216,21 @@ void Node::unbind(State& state){
 		//}
 		interface[state.ev.act.trgt_st]->setLink(nullptr,0);
 #ifdef DEBUG
-		auto& agent = state.getEnv().getSignature(signId);
-		auto& site_sign = agent.getSite(state.ev.act.trgt_st);
-		auto& trgt_ag = state.getEnv().getSignature(lnk.first->getId());
-		cout << "[unbind] " << agent.getName() << "." << site_sign.getName()
-				<< "!" << trgt_ag.getSite(lnk.second).getName() << "."
-				<< trgt_ag.getName() << "\n";
+		if(simulation::Parameters::get().verbose > 2){
+			auto& agent = state.getEnv().getSignature(signId);
+			auto& site_sign = agent.getSite(state.ev.act.trgt_st);
+			auto& trgt_ag = state.getEnv().getSignature(lnk.first->getId());
+			cout << "[unbind] " << agent.getName() << "." << site_sign.getName()
+					<< "!" << trgt_ag.getSite(lnk.second).getName() << "."
+					<< trgt_ag.getName() << "\n";
+		}
 #endif
 	}
 	else{//unbinding s? pattern
 		state.ev.null_actions.emplace(this,-int(state.ev.act.trgt_st)-1);
 #ifdef DEBUG
-		cout << "[unbind] null-action\n";
+		if(simulation::Parameters::get().verbose > 2)
+			cout << "[unbind] null-action\n";
 #endif
 	}
 }
@@ -233,6 +245,7 @@ void Node::bind(State& state){
 				state.ev.null_actions.emplace(this,-int(state.ev.act.trgt_st)-1);
 				state.ev.null_actions.emplace(lnk.first,-int(trgt_site)-1);
 #ifdef DEBUG
+			if(simulation::Parameters::get().verbose > 2)
 				cout << "[bind] null-action\n";
 #endif
 				return;
@@ -242,12 +255,14 @@ void Node::bind(State& state){
 		lnk.first->interface[lnk.second]->negativeUpdateByBind(state.ev,state.injections,state);
 		lnk.first->setInternalLink(lnk.second,nullptr,0);
 #ifdef DEBUG
-		auto& agent = state.getEnv().getSignature(signId);
-		auto& site_sign = agent.getSite(state.ev.act.trgt_st);
-		auto& trgt_ag = state.getEnv().getSignature(lnk.first->getId());
-		cout << "[unbind(bind-swap)] " << agent.getName() << "." << site_sign.getName()
-				<< "!" << trgt_ag.getSite(lnk.second).getName() << "."
-				<< trgt_ag.getName() << "\n";
+		if(simulation::Parameters::get().verbose > 2){
+			auto& agent = state.getEnv().getSignature(signId);
+			auto& site_sign = agent.getSite(state.ev.act.trgt_st);
+			auto& trgt_ag = state.getEnv().getSignature(lnk.first->getId());
+			cout << "[unbind(bind-swap)] " << agent.getName() << "." << site_sign.getName()
+					<< "!" << trgt_ag.getSite(lnk.second).getName() << "."
+					<< trgt_ag.getName() << "\n";
+		}
 #endif
 	}
 	interface[state.ev.act.trgt_st]->negativeUpdateByBind(state.ev,state.injections,state);
@@ -255,12 +270,14 @@ void Node::bind(State& state){
 	trgt_node->interface[trgt_site]->negativeUpdateByBind(state.ev,state.injections,state);
 	trgt_node->interface[trgt_site]->setLink(this,state.ev.act.trgt_st);
 #ifdef DEBUG
-	auto& agent = state.getEnv().getSignature(signId);
-	auto& site_sign = agent.getSite(state.ev.act.trgt_st);
-	auto& trgt_ag = state.getEnv().getSignature(trgt_node->getId());
-	cout << "[bind] " << agent.getName() << "." << site_sign.getName()
-			<< "_" << trgt_ag.getSite(trgt_site).getName() << "."
-			<< trgt_ag.getName() << "\n";
+	if(simulation::Parameters::get().verbose > 2){
+		auto& agent = state.getEnv().getSignature(signId);
+		auto& site_sign = agent.getSite(state.ev.act.trgt_st);
+		auto& trgt_ag = state.getEnv().getSignature(trgt_node->getId());
+		cout << "[bind] " << agent.getName() << "." << site_sign.getName()
+				<< "_" << trgt_ag.getSite(trgt_site).getName() << "."
+				<< trgt_ag.getName() << "\n";
+	}
 #endif
 }
 

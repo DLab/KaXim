@@ -250,8 +250,11 @@ void State::advanceUntil(FL_TYPE sync_t) {
 			counter.incNullEvents(ex.error);
 		}
 #ifdef DEBUG
-		if(counter.getEvent() % 10 == 0)
+		if(counter.getEvent() % 10 == 0 && simulation::Parameters::get().verbose > 1){
+			cout << "------------ volume-name[i] -----------------\n";
 			this->print();
+			cout << "---------------------------------------------\n";
+		}
 #endif
 		WarningStack::getStack().show(false);
 		plot.fill(*this,env);
@@ -384,17 +387,19 @@ int State::event() {
 	timePerts.clear();
 	tryPerturbate();//trying no-fixed-time perturbations
 
-	#ifdef DEBUG
+#ifdef DEBUG
+	if(simulation::Parameters::get().verbose > 1)
 		printf("Event %3lu | Time %.4f \t  act = %.4f",
 				counter.getEvent(),counter.getTime(),act);
-	#endif
+#endif
 	//EventInfo* ev = nullptr;
 	if(stop_t)
 		return 6;//NullEvent caused by perturbation
 	auto& rule = drawRule();
 	plot.fillBefore(*this,env);
 
-	#ifdef DEBUG
+#ifdef DEBUG
+	if(simulation::Parameters::get().verbose > 1){
 		printf( "  | Rule: %-11.11s",rule.getName().c_str());
 		cout << "  Root-node: ";
 		for(int i = 0; i < ev.cc_count; i++)
@@ -402,7 +407,8 @@ int State::event() {
 		cout << endl;
 		//printf("  Root-node: %03lu\n",(ev->cc_count ?
 		//		ev->emb[0][0]->getAddress() : -1L));
-	#endif
+	}
+#endif
 	apply(rule);
 	positiveUpdate(rule.getInfluences());
 
@@ -521,9 +527,6 @@ void State::initActTree() {
 	if(activityTree)
 		delete activityTree;
 	activityTree = new data_structs::MyMaskedBinaryRandomTree<stack>(env.size<simulation::Rule>(),rng);
-#ifdef DEBUG
-	cout << "[Initial activity tree]" << endl;
-#endif
 	list<const simulation::Rule*> rules;
 	for(auto& rule : env.getRules())
 		rules.emplace_back(&rule);
@@ -532,17 +535,25 @@ void State::initActTree() {
 		auto& rule = *rule_p;
 		auto act_pr = rates[rule.getId()]->evalActivity(args);
 		activityTree->add(rule.getId(),act_pr.first+act_pr.second);
-#ifdef DEBUG
-		printf("\t%s\t%.6f\n", rule.getName().c_str(),(act_pr.first+act_pr.second));
-#endif
 	}
+#ifdef DEBUG
+	if(simulation::Parameters::get().verbose <= 0)
+		return;
+	cout << "[Initial activity tree]" << endl;
+	for(auto rule_p : rules){
+		auto& rule = *rule_p;
+		auto act_pr = rates[rule.getId()]->evalActivity(args);
+		if(simulation::Parameters::get().verbose > 0)
+			printf("\t%s\t%.6f\n", rule.getName().c_str(),(act_pr.first+act_pr.second));
+	}
+	cout << endl;
+#endif
 }
 
 
 void State::print() const {
-	cout << "state with {SiteGraph.size() = " << graph.getPopulation();
-	//cout << "\n\tvolume = " << volume.getValue().valueAs<FL_TYPE>();
-	cout << "\n\tInjections {\n";
+	graph.print(env);
+	cout << "Injections\n";
 	int i = 0;
 	for(auto& cc : env.getComponents()){
 		if(injections[i]->count())
@@ -550,16 +561,15 @@ void State::print() const {
 			" injs of " << cc->toString(env) << endl;
 		i++;
 	}
-	cout << "\t}\n\tRules {\n";
+	cout << "Rules\n";
 	for(auto& r : env.getRules()){
 		auto act = rates[r.getId()]->evalActivity(args);
 		if(act.first || act.second)
 			cout << "\t(" << r.getId() << ")\t" << r.getName() << "\t("
 				<< act.first << " , " << act.second << ")" << endl;
 	}
-	cout << "\t}\n}\n";
+	cout << "\n";
 	cout << counter.toString() << endl;
-	cout << graph.toString(env) << endl;
 }
 
 } /* namespace ast */

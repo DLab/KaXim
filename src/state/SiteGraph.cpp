@@ -11,7 +11,9 @@
 #include "../pattern/mixture/Agent.h"
 #include "../pattern/mixture/Component.h"
 #include "../simulation/Parameters.h"
-//#include <cstring>
+
+#include <algorithm>
+//#include <a>
 
 namespace state {
 
@@ -132,30 +134,27 @@ vector<Node*>::const_iterator SiteGraph::end() const {
 	return container.cend();
 }
 
-string SiteGraph::toString(const pattern::Environment& env) const {
-	string ret;
-	if(container.size() - free.size()  < 300){//TODO free.size is linear
-		big_id i = 0;
-		for(auto node : container){
-			if(node){
-				cout << node->getAddress() << ": ";
-				cout << node->toString(env,true) << endl;
-				if(i != node->getAddress()){
-					cout <<  "ERROR!!!!!! i(" << i << ") != address(" <<
-							node->getAddress() << ")" << endl;
-					throw std::invalid_argument("bad allocation of node.");
-				}
-			}
-			i++;
-		}
+void SiteGraph::print(const pattern::Environment& env) const {
+	cout << getPopulation() << " agents";
+	big_id nodes_to_show = std::min<big_id>(simulation::Parameters::get().showNodes,container.size());
 
-	} else
-		for(big_id i = 0; i < subNodeCount; i++)
-			if(container[i]){
-				cout << container[i]->getAddress() << ": ";
-				cout << container[i]->toString(env,true) << endl;
-			}
-	return ret;
+	if(nodes_to_show)
+		cout << " -> Graph Nodes {\n";
+	else
+		cout << endl;
+	for(big_id i = 0; i < nodes_to_show; i++){
+		auto node = container[i];
+		if(!node)
+			continue;
+		cout << node->getAddress() << ": ";
+		if(node->getCount() > 1)
+			cout << node->getCount() << " ";
+		cout << node->toString(env,true) << endl;
+		if(i != node->getAddress())
+			throw std::invalid_argument("bad allocation of node.");
+	}
+	if(nodes_to_show)
+		cout << "}\n";
 }
 
 

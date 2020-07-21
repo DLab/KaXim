@@ -19,6 +19,7 @@ Simulation::Simulation(const Simulation& sim,int _id) : id(_id),env(sim.env),par
 		plot(env,_id),ccInjections(nullptr),mixInjections(nullptr),rng(params.seed+_id),done(false){}
 
 Simulation::~Simulation() {
+	cout << "Simulation[" << id << "] finished." << endl;
 	// TODO Auto-generated destructor stub
 	//delete[] ccInjections;
 	//delete[] mixInjections;
@@ -59,9 +60,13 @@ void Simulation::run(const Parameters& params){
 		for(auto& id_state : cells){
 			id_state.second.tryPerturbate();
 #ifdef DEBUG
-			id_state.second.print();
+			if(params.verbose > 0){
+				cout << "------ " << env.cellIdToString(id_state.first) << " (final-state) ------\n";
+				id_state.second.print();
+				cout << "------------------------------------\n";
+			}
 #else
-			id_state.second.print();//cout << id_state.second.getCounter().toString() << endl;
+			//id_state.second.print();//cout << id_state.second.getCounter().toString() << endl;
 #endif
 		}
 		counter.advanceTime(tau);
@@ -241,15 +246,18 @@ vector<list<unsigned int>> Simulation::allocCells( int n_cpus,
 	}
 
 	// showing P
-	cout << "showing assignment of vertex" << endl;
-	for( unsigned i = 0 ; i < P.size() ; i++ ) {
-		cout << "P[" << i << "] = { " ;
-		for ( auto p : P[i] ) {
-			cout << p << ",";
+#ifdef DEBUG
+	if(Parameters::get().verbose > 0){
+		cout << "Vertex Assignment:" << endl;
+		for( unsigned i = 0 ; i < P.size() ; i++ ) {
+			cout << "P[" << i << "] = { " ;
+			for ( auto p : P[i] ) {
+				cout << p << ",";
+			}
+			cout << " }" << endl;
 		}
-		cout << " }" << endl;
 	}
-	cout << "end showing" << endl;
+#endif
 
 	return P;
 }
@@ -312,10 +320,12 @@ bool Simulation::isDone() const {
 }
 
 void Simulation::print() const {
-	cout << cells.size() << " cells in this simulation object." << endl;
+	if(cells.size() > 1)
+		cout << cells.size() << " cells in this simulation object." << endl;
 	for(auto& id_state : cells){
-		cout << env.cellIdToString(id_state.first) << endl;
+		cout << "------- " << env.cellIdToString(id_state.first) << " (initial-state) ---------\n";
 		id_state.second.print();
+		cout << "-----------------------------------------\n";
 	}
 }
 

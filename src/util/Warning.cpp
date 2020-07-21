@@ -52,14 +52,17 @@ int WarningStack::add(int id,const std::string &msg,const yy::location &loc){
 }
 
 void WarningStack::show(bool show_nowarns) {
-	#pragma omp critical
-	{
-		for(auto& id_warn : *this){
-			std::cout << id_warn.what() << std::endl;
+	if(size()){
+		std::cout << "Warnings:\n";
+		#pragma omp critical
+		{
+			for(auto& id_warn : *this){
+				std::cout << id_warn.what() << std::endl;
+			}
+			clear();
 		}
-		clear();
 	}
-	if(size() == 0 && show_nowarns)
+	else if(show_nowarns)
 		std::cout << "No warnings." << std::endl;
 
 }

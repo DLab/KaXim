@@ -27,7 +27,6 @@ Plot::Plot(const pattern::Environment& env,int run_id) : nextPoint(0.),dT(0.) {
 			char file_name[400],buff[200];//big chars[] to avoid errors here
 			sprintf(buff,"%s/%%s-%%0%dd.%%s",params.outputDirectory.c_str(),int(log10(params.runs-1))+1);
 			sprintf(file_name,buff,params.outputFile.c_str(),run_id,params.outputFileType.c_str());
-			cout << file_name << endl;
 			file.open(file_name,ios::out);
 		}
 		else

@@ -105,10 +105,8 @@ int main(int argc, char* argv[]){
 
 
 
-#	ifdef DEBUG
-	env.show();
-	//sim.print();
-#	endif
+	if(params.verbose)//verbose > 0
+		env.show();
 
 
 	//auto sims = new simulation::Simulation*[params.runs];
@@ -147,24 +145,25 @@ int main(int argc, char* argv[]){
 			cout << "No rules to execute a simulation. Aborting." << endl;
 			exit(1);
 		}
-#		ifdef DEBUG
-		if(i == 0)
-			sim.print();
+		if(params.verbose > 0){//only print this if if verbose is set for init or more
+			if(i == 0){
+				cout << "Simulation[0]\t|\tInitial State:" << endl;
+				sim.print();
+			}
+			cout << difftime(time(nullptr),t) << " seconds loading initial state";
+			if(params.runs > 1)
+				cout << " of sim[" << i << "]";
+			cout << ".\n" << endl;
+		}
 
-#		endif
-		cout << difftime(time(nullptr),t) << " seconds loading initial state";
-		if(params.runs > 1)
-			cout << " of sim[" << i << "]";
-		cout << "." << endl;
-		//try{
+		try{
 			sim.run(params);
-		//}catch(exception &e){
-			//cerr << "An exception found when running simulation (" << i <<"):\n" << e.what() << endl;
-			//exit(1);
-		//}
+		}catch(exception &e){
+			cerr << "An exception found when running simulation (" << i <<"):\n" << e.what() << endl;
+			exit(1);
+		}
 	}
 
-	//sims[0]->print();
 	cout << "Total running time: " << difftime(time(nullptr),t)  << " seconds." << endl;
 
 	delete &env;

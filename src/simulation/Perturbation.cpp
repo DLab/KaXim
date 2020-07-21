@@ -131,7 +131,8 @@ FL_TYPE Perturbation::timeTest(const expressions::EvalArgs& args) const {
 
 void Perturbation::apply(state::State& state) const {
 #ifdef DEBUG
-	cout << "Applying effects of perturbation " << id << " at time " << state.getCounter().getTime() << endl;
+	if(Parameters::get().verbose > 1)
+		cout << "Applying perturbation " << id << " at time " << state.getCounter().getTime() << endl;
 #endif
 	for(auto eff : effects)
 		eff->apply(state);

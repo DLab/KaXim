@@ -65,6 +65,9 @@ public:
 
 	int runs;			//!< Number of simulations to run with the same model.
 
+	int verbose;		//!< Verbose level (0-3)
+	int showNodes;		//!< Showing nodes of graph.
+
 	~Parameters();
 	static const Parameters& get();	//!< Return the singleton instance of the class
 

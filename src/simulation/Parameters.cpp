@@ -17,7 +17,11 @@ Parameters Parameters::singleton;
 Parameters::Parameters() : options(nullptr),outputFile("sim"),outputFileType("tsv"),
 		outputDirectory("."),maxEvent(std::numeric_limits<UINT_TYPE>::max()),
 		maxTime(/*std::numeric_limits<FL_TYPE>::infinity()*/0),points(0),seed(0),
-		useMultiNode(false),runs(1){}
+		useMultiNode(false),runs(1),verbose(0),showNodes(0){
+#ifdef DEBUG
+	verbose = 3;
+#endif
+}
 
 void Parameters::makeOptions(const string &msg){
 	options = new options_description(msg);
@@ -37,6 +41,9 @@ void Parameters::makeOptions(const string &msg){
 		("multinode,n",value<bool>(),"If true, equal agents will be stored in one node. Default is false.")
 		("seed,s",value<int>(),"Seed for random number generation (default is chosen from time())")
 		("sync-t",value<float>(),"Synchronize compartments every 'arg' simulation-time units")
+		("verbose",value<int>(),"Set the std output verbose level (> 2 only in Debug mode)."
+				" (0: errors; 1: initialization; 2: events; 3: actions).")
+		("show-nodes",value<int>(),"Set the max number of nodes to show when printing state (negative to show full state).")
 		("version,v", "Print version string")
 		("help,h", "Produce help message")
 
@@ -113,8 +120,21 @@ void Parameters::evalOptions(int argc, char* argv[]){
 	if(vm.count("runs")){
 		runs = vm["runs"].as<int>();
 		if(runs < 1){
-			cout << "Not a valid value for -runs parameter." << endl;
+			cout << "Not a valid value for --runs parameter." << endl;
 			exit(1);
+		}
+	}
+	if(vm.count("verbose")){
+		verbose = vm["verbose"].as<int>();
+		if(verbose < 0 || verbose > 3){
+			cout << "Not a valid value for --verbose parameter." << endl;
+			exit(1);
+		}
+	}
+	if(vm.count("show-nodes")){
+		showNodes = vm["show-nodes"].as<int>();
+		if(showNodes){
+			showNodes = std::numeric_limits<int>::max();
 		}
 	}
 
