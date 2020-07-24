@@ -67,7 +67,7 @@ void MyMaskedBinaryRandomTree<Container>::add(int i,FL_TYPE val)
 	i=maskId(i);
 
 	//revisamos si el nuevo valor es infinito
-	if( std::isinf(val) || numeric_limits<FL_TYPE>::max() == val ) {
+	if( numeric_limits<FL_TYPE>::max() <= val ) {
 		//en caso afirmativo, agregamos el nodo (id_interna) a la lista
 		//de reglas con valor infinito
 		infList.emplace(i);

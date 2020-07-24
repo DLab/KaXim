@@ -328,7 +328,7 @@ const simulation::Rule& State::drawRule(){
 	if(alpha == 0.)
 		activityTree->add(rid_alpha.first,0.);
 
-	if(!std::isinf(alpha)){
+	if(alpha < numeric_limits<FL_TYPE>::max()){
 		if(alpha > rid_alpha.second){
 			//TODO if IntSet.mem rule_id state.silenced then (if !Parameter.debugModeOn then Debug.tag "Real activity is below approximation... but I knew it!") else invalid_arg "State.draw_rule: activity invariant violation"
 		}
@@ -536,7 +536,7 @@ void State::initActTree() {
 		auto act_pr = rates[rule.getId()]->evalActivity(args);
 		activityTree->add(rule.getId(),act_pr.first+act_pr.second);
 	}
-#ifdef DEBUG
+/*#ifdef DEBUG
 	if(simulation::Parameters::get().verbose <= 0)
 		return;
 	cout << "[Initial activity tree]" << endl;
@@ -547,7 +547,7 @@ void State::initActTree() {
 			printf("\t%s\t%.6f\n", rule.getName().c_str(),(act_pr.first+act_pr.second));
 	}
 	cout << endl;
-#endif
+#endif*/
 }
 
 
