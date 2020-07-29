@@ -34,6 +34,10 @@ void Simulation::setCells(const list<unsigned int>& _cells,const VarVector& vars
 	}
 }
 
+const state::State& Simulation::getCell(int id) const {
+	return cells.at(id);
+}
+
 void Simulation::initialize(){
 	for(auto& id_state : cells){
 		//env.buildInfluenceMap(id_state.second);

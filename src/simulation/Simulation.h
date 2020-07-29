@@ -56,6 +56,7 @@ public:
 	~Simulation();
 
 	void setCells(const list<unsigned int>& cells,const VarVector& vars);
+	const state::State& getCell(int id) const;
 
 	void initialize();
 	void run(const Parameters& params);

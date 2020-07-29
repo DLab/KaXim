@@ -256,7 +256,7 @@ void Init::eval(pattern::Environment &env,const VarVector &vars,
 		simulation::Simulation &sim){
 	auto& use_expr = env.getUseExpression(this->getUseId());
 	auto &cells = use_expr.getCells();//cells to distribute tokens/agents
-	expressions::EvalArgs args(nullptr,&vars);
+	expressions::EvalArgs args(&sim.getCell(0),&vars);
 	if(type){ //TOKEN
 		float n;
 		short tok_id;
