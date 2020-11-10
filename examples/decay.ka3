@@ -1,0 +1,22 @@
+#Params
+%param: 'pop' 10
+
+#Agent-signatures
+
+%agent: A()
+
+
+#Rules
+
+'decay'		A()	->		@ 1
+
+
+#init
+
+%init: 'pop' A()
+
+
+#Output
+
+%obs: 'A' A()
+
