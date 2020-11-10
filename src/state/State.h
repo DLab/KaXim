@@ -41,8 +41,8 @@ class State {
 	friend class RateVar;
 	friend class simulation::Rule::Rate;
 	friend class simulation::AuxDepRate;
-	friend class expressions::EvalArguments<false>;
-	friend class expressions::EvalArguments<true>;
+	friend class expressions::SimContext<false>;
+	friend class expressions::SimContext<true>;
 	friend class Node;
 	friend class SubNode;
 	friend class InternalState;

@@ -183,7 +183,7 @@ pattern::Signature::Site& Site::eval(pattern::Environment &env,const vector<stat
 		break;
 	case SiteState::RANGE:
 		try{
-			expressions::EvalArguments<true> args(0,&consts);
+			expressions::SimContext<true> args(0,&consts);
 			BaseExpression* range[3];
 			if(!stateInfo.evalRange(env,consts,range)){
 				site = &sign.addSite<pattern::Signature::RangeSite<FL_TYPE> >(name);
@@ -319,7 +319,7 @@ pattern::Mixture::Site* Site::eval(pattern::Environment &env,
 		else //LHS or pattern
 			values[1] = stateInfo.val->eval(env,consts,nullptr,Expression::CONST | ptrn_flag);
 		try{
-			expressions::EvalArguments<true> args(0,&consts);
+			expressions::SimContext<true> args(0,&consts);
 			//cout << agent.toString(env) << " loc = " << loc << endl;
 			auto val = values[1]->getValue(args);
 			if(! site_sign.isPossibleValue(val))

@@ -13,9 +13,10 @@
 #include <utility>  //std::pair
 
 #include "Statements.h"
-#include "../../simulation/Simulation.h"
 
 using namespace std;
+
+class simulation::Simulation;
 
 namespace grammar {
 
@@ -32,6 +33,7 @@ namespace ast {
 class KappaAst {
 
 	//AST structures
+	list<pair<Id,const Expression*>> params;
 	list<Declaration> variables,constants;
 	list<Agent> signatures;
 	list<Id> tokens;
@@ -50,6 +52,7 @@ public:
 	vector<float> evaluateTokens(pattern::Environment &env);
 	void evaluateSignatures(pattern::Environment &env,const vector<Variable*> &consts);
 	vector<Variable*> evaluateDeclarations(pattern::Environment &env,vector<Variable*> &vars,bool is_const = false);
+	void evaluateParams(pattern::Environment &env,VarVector& vars,const vector<float> &po_params);
 	void evaluateCompartments(pattern::Environment &env,const vector<Variable*>& vars);
 	void evaluateUseExpressions(pattern::Environment &env,const vector<Variable*>& consts);
 	void evaluateChannels(pattern::Environment &env,const vector<Variable*> &vars);
@@ -58,6 +61,7 @@ public:
 	void evaluatePerts(pattern::Environment &env,vector<Variable*> &vars);
 
 	//ADD functions
+	void add(const Id &name,const Expression* value);
 	void add(const Declaration &d);
 	void add(const Agent &a);
 	void add(const Compartment &c);

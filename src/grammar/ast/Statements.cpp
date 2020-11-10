@@ -9,6 +9,7 @@
 #include "../../util/Exceptions.h"
 #include "../../util/Warning.h"
 #include "../../pattern/mixture/Component.h"
+#include "../../simulation/Simulation.h"
 
 namespace grammar::ast {
 
@@ -102,14 +103,10 @@ Declaration::~Declaration(){
 Variable* Declaration::evalVar(pattern::Environment &env,
 		VarVector &vars) const{
 	Variable* var = nullptr;
-	short id = 0;
 	auto eval_name = name.evalLabel(env,vars);
-	try {
-		id = env.declareVariable(Id(name.loc,eval_name),type);
-	} catch(SemanticError &ex) {
-		ex.setLocation(this->loc);
-		throw ex;
-	}
+	short id = env.declareVariable(Id(name.loc,eval_name),type);
+	//if(id == -1)//var was declared before as a param. DEPRECATED
+	//	return nullptr;
 	if(type){
 		if(constant)
 			throw SemanticError("Constants cannot be Kappa Expressions.",loc);
@@ -153,13 +150,9 @@ Variable* Declaration::evalVar(pattern::Environment &env,
 Variable* Declaration::evalConst(pattern::Environment &env,
 		VarVector &vars) const{
 	Variable* var;
-	short id = 0;
-	try {
-		id = env.declareVariable(name,type);
-	} catch(SemanticError &ex) {
-		ex.setLocation(this->loc);
-		throw ex;
-	}
+	short id = env.declareVariable(name,type);
+	//if(id == -1)//var was declared before as a param. DEPRECATED
+	//	return nullptr;
 	if(type)
 		throw SemanticError("Constants can not depend on agent mixtures.",loc);
 	else {

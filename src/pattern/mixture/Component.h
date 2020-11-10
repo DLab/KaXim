@@ -68,8 +68,8 @@ public:
 	 * @param vars the variables of the simulation.
 	 * @param emb an empty map to store and return the embedding. Can be omitted.*/
 	bool testEmbed(const Component& rhs_cc,two<small_id> root,
-			const expressions::EvalArguments<true>& args,map<small_id,small_id>& emb) const;
-	bool testEmbed(const Component& rhs_cc,two<small_id> root,const expressions::EvalArguments<true>& args) const {
+			const expressions::SimContext<true>& args,map<small_id,small_id>& emb) const;
+	bool testEmbed(const Component& rhs_cc,two<small_id> root,const expressions::SimContext<true>& args) const {
 		map<small_id,small_id> emb;
 		return testEmbed(rhs_cc,root,args,emb);
 	}

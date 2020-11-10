@@ -72,8 +72,8 @@ public:
 	BaseExpression* reduce(VarVector& vars) override;
 	BaseExpression* clone() const override;
 
-	virtual T evaluate(const EvalArguments<true>& args) const override;
-	virtual T evaluate(const EvalArguments<false>& args) const override;
+	virtual T evaluate(const SimContext<true>& args) const override;
+	virtual T evaluate(const SimContext<false>& args) const override;
 
 	BaseExpression* makeVarLabel() const override;
 
@@ -113,8 +113,8 @@ public:
 	BaseExpression* reduce(VarVector &vars) override;
 	BaseExpression* clone() const override;
 
-	int evaluate(const EvalArguments<true>& args) const override;
-	int evaluate(const EvalArguments<false>& args) const override;
+	int evaluate(const SimContext<true>& args) const override;
+	int evaluate(const SimContext<false>& args) const override;
 
 	BaseExpression* makeVarLabel() const override;
 
@@ -144,8 +144,8 @@ public:
 	BaseExpression* reduce(VarVector &vars) override;
 	BaseExpression* clone() const override;
 
-	T evaluate(const EvalArguments<true>& args) const override;
-	T evaluate(const EvalArguments<false>& args) const override;
+	T evaluate(const SimContext<true>& args) const override;
+	T evaluate(const SimContext<false>& args) const override;
 
 	BaseExpression* makeVarLabel() const override;
 
@@ -176,8 +176,8 @@ class TokenVar: public AlgExpression<FL_TYPE> {
 	unsigned id;
 public:
 	TokenVar(unsigned _id);
-	FL_TYPE evaluate(const EvalArguments<true>& args) const override;
-	FL_TYPE evaluate(const EvalArguments<false>& args) const override;
+	FL_TYPE evaluate(const SimContext<true>& args) const override;
+	FL_TYPE evaluate(const SimContext<false>& args) const override;
 	FL_TYPE auxFactors(std::unordered_map<std::string, FL_TYPE> &factor) const
 			override;
 

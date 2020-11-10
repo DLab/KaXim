@@ -25,6 +25,7 @@
 	#include "../ast/Statements.h"
 	#include "../location.hh"
 	#include "../../util/Exceptions.h"
+	#include "../../simulation/Parameters.h"
 	#include <typeinfo>
 	
 	using namespace std;
@@ -58,7 +59,7 @@
  */
 
 %token END NEWLINE SEMICOLON
-%token SIGNATURE INIT LET CONST ASSIGN ASSIGN2 APPLY
+%token SIGNATURE INIT LET CONST PARAMS PARAM ASSIGN ASSIGN2 APPLY
 %token AT ATD FIX OP_CUR CL_CUR OP_PAR CL_PAR OP_BRA CL_BRA COMMA DOTS DOT TYPE LAR KAPPA_RAR JOIN FREE
 %token PERT DO UNTIL INTRO DELETE SET PLOT OBS TRACK CONFIG REPEAT DIFF PRINT PRINTF STOP SNAPSHOT
 %token KAPPA_WLD KAPPA_SEMI KAPPA_INTER KAPPA_VALUE 
@@ -168,6 +169,10 @@ instruction:
 	{}
 | INIT init_declaration 
 	{this->driver.getAst().add($2);}
+| PARAMS variable_list {
+	for(auto& elem : $2)
+		this->driver.getAst().add(elem,nullptr);
+}
 | LET variable_declaration 
 	{this->driver.getAst().add($2);}
 | LET error
@@ -176,6 +181,10 @@ instruction:
 	{$2.setConstant(true); this->driver.getAst().add($2);}
 | CONST error
 	{}
+| PARAM LABEL alg_expr 
+	{this->driver.getAst().add(Id(@2,$2),$3);}
+| PARAM error
+	{error(@2, "Bad parameter declaration");}
 | OBS variable_declaration
 	{$2.setObservable();this->driver.getAst().add($2);}
 | PLOT alg_expr 

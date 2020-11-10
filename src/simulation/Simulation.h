@@ -15,20 +15,20 @@
 #include <unordered_map>
 #include "Parameters.h"
 #include "Plot.h"
+#include "SimContext.h"
 #include "../state/State.h"
 #include "../pattern/Environment.h"
 #include "../pattern/RuleSet.h"
 #include "../matching/Injection.h"
+#include "../grammar/ast/KappaAst.h"
 
 namespace simulation {
 using namespace std;
 
-class Simulation {
-	int id;
-	const pattern::Environment& env;
-	//const vector<state::Variable*>& vars;
+class Simulation : public SimContext {
+	//int id;
+	pattern::Environment& env;
 	vector<state::State> states;//vector?
-	const Parameters& params;
 	pattern::RuleSet rules;
 	GlobalCounter counter;
 	Plot plot;
@@ -51,14 +51,14 @@ class Simulation {
 	vector<unsigned> allocAgents2(unsigned cells, unsigned ag_count, const list<float>* vol_ratios = nullptr);
 
 public:
-	Simulation(const pattern::Environment& env,int id = 0);
-	Simulation(const Simulation& sim,int _id);
+	Simulation(pattern::Environment& env,VarVector& vars,int id = 0);
+	Simulation(Simulation& sim,int _id);
 	~Simulation();
 
-	void setCells(const list<unsigned int>& cells,const VarVector& vars);
+	//void setCells(const list<unsigned int>& cells,const VarVector& vars);
 	const state::State& getCell(int id) const;
 
-	void initialize();
+	void initialize(const vector<list<unsigned int>>& _cells,grammar::ast::KappaAst&);
 	void run(const Parameters& params);
 
 	int getId() const;

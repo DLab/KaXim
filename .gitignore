@@ -32,3 +32,5 @@
 *.app
 /Release/KaXim
 /Debug/KaXim
+/Release/
+/Debug/

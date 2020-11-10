@@ -89,7 +89,7 @@ public:
 	bool operator==(const Site &s) const;
 
 	/** \brief Tests if this site-pattern may embed the rhs_site. */
-	bool testEmbed(const Site &rhs_site,const expressions::EvalArguments<true>& args) const;
+	bool testEmbed(const Site &rhs_site,const expressions::SimContext<true>& args) const;
 	//int compareLinkPtrn(ag_st_id ptrn) const;
 	//bool isEmptySite() const;
 	//bool isExpression() const;
@@ -99,7 +99,7 @@ public:
 	}*/
 	/** \brief tests if val can be matched in this site pattern. (no-optimized)*/
 	bool testValue(const expressions::SomeValue& val,
-			const expressions::EvalArguments<true>& args) const;
+			const expressions::SimContext<true>& args) const;
 	//bool testValueOpt(const expressions::SomeValue& val,
 	//		const state::State& state,
 	//		const expressions::AuxMap& aux_map) const;
@@ -113,7 +113,7 @@ public:
 	}
 
 	template <bool safe>
-	inline expressions::SomeValue getValue(const expressions::EvalArguments<safe>& args) const {
+	inline expressions::SomeValue getValue(const expressions::SimContext<safe>& args) const {
 		return value_type == LABEL? expressions::SomeValue(label) :
 				value_type == EQUAL? values[0]->getValue(args) :
 						throw invalid_argument("Pattern::Site::getValue(): not a valued site.");
@@ -210,8 +210,8 @@ public:
 
 	/** \brief Test if this agent-pattern embeds the rhs_site.
 	 * @param sites_to_test stores site-ids of every bind that will need to be tested. */
-	bool testEmbed(const Agent& rhs_ag,const expressions::EvalArguments<true>& args,list<small_id>& sites_to_test) const;
-	inline bool testEmbed(const Agent& rhs_ag,const expressions::EvalArguments<true>& args) const{
+	bool testEmbed(const Agent& rhs_ag,const expressions::SimContext<true>& args,list<small_id>& sites_to_test) const;
+	inline bool testEmbed(const Agent& rhs_ag,const expressions::SimContext<true>& args) const{
 		static list<small_id> empty_list;
 		return testEmbed(rhs_ag,args,empty_list);
 	}

@@ -18,8 +18,8 @@ class Constant: public AlgExpression<T> {
 public:
 	Constant(T v);
 	virtual ~Constant();
-	T evaluate(const EvalArguments<true>& args) const override;
-	T evaluate(const EvalArguments<false>& args) const override;
+	T evaluate(const SimContext<true>& args) const override;
+	T evaluate(const SimContext<false>& args) const override;
 	FL_TYPE auxFactors(std::unordered_map<std::string, FL_TYPE> &factor) const override;
 	BaseExpression::Reduction factorize(const std::map<std::string,small_id> &aux_cc) const override;
 	virtual BaseExpression* reduce(VarVector& vars) override;

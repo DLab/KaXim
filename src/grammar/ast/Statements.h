@@ -13,7 +13,9 @@
 #include "Dynamics.h"
 #include "Spatial.h"
 
-#include "../../simulation/Simulation.h"
+namespace simulation {
+	class Simulation;
+}
 
 namespace grammar {
 namespace ast {
@@ -62,6 +64,8 @@ public:
 	 * @returns a pointer to a state::Variable object.		*/
 	Variable* evalVar(pattern::Environment &env,
 				VarVector &vars) const;
+
+	const Id& getName() const;
 	bool isKappa() const;
 	bool isConstant() const;
 	void setConstant(bool b);

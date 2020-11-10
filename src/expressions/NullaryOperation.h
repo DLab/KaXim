@@ -25,8 +25,8 @@ class NullaryOperation: public AlgExpression<R> {
 	R (*func)(const state::State&);
 	const char op;
 public:
-	R evaluate(const EvalArguments<true>& args) const override;
-	R evaluate(const EvalArguments<false>& args) const override;
+	R evaluate(const SimContext<true>& args) const override;
+	R evaluate(const SimContext<false>& args) const override;
 	FL_TYPE auxFactors(std::unordered_map<std::string, FL_TYPE> &factor) const
 				override;
 	BaseExpression::Reduction factorize(const std::map<std::string,small_id> &aux_cc) const override;

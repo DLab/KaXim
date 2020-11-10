@@ -64,6 +64,7 @@ int main(int argc, char* argv[]){
 	pattern::Environment& env = *(new pattern::Environment());//just to delete vars after env
 	vector<state::Variable*> vars;
 	try{
+		ast.evaluateParams(env,vars,params.modelParams);
 		ast.evaluateDeclarations(env,vars,true);//constants
 		ast.evaluateCompartments(env,vars);
 		ast.evaluateUseExpressions(env,vars);
@@ -127,17 +128,15 @@ int main(int argc, char* argv[]){
 
 #	pragma omp parallel for
 	for(int i = 0; i < params.runs; i++){
-		simulation::Simulation sim(env,i);
-		sim.setCells(cells.at(0),vars);
+		simulation::Simulation sim(env,vars,i);
 		try{
-			ast.evaluateInits(env,vars,sim);
+			sim.initialize(cells,ast);
 		}
 		catch(const exception &e){
-			cerr << "An exception found on %init evaluation: " << e.what() << endl;
+			cerr << "An exception found on initialization of simulation["
+					<< i << "]: " << e.what() << endl;
 			exit(1);
 		}
-
-		sim.initialize();
 
 		if(i == 0)
 			WarningStack::getStack().show();

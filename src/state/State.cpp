@@ -454,6 +454,10 @@ void State::updateDeps(const pattern::Dependency& d){
 		//auto& dep = *deps.begin();
 		switch(dep_it->type){
 		case Deps::RULE:
+#ifdef DEBUG
+			if(simulation::Parameters::get().verbose > 0)
+				cout << "Updating '" << env.getRules()[dep_it->id].getName() << "' rule's rate." << endl;
+#endif
 			ev.rule_ids.emplace(dep_it->id);
 			break;
 		case Deps::KAPPA:

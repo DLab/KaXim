@@ -6,17 +6,19 @@
  */
 
 #include "Simulation.h"
+#include "../state/Variable.h"
 #include <set>
 #include <boost/random.hpp>
 
 namespace simulation {
 
-Simulation::Simulation(const pattern::Environment& _env,int _id) : id(_id),env(_env),
-		params(Parameters::get()), plot(env,_id),ccInjections(nullptr),mixInjections(nullptr),
-		rng(params.seed+_id),done(false){/****/}
+Simulation::Simulation(pattern::Environment& _env,VarVector& _vars,int _id) :
+		SimContext(_vars),id(_id),env(_env),plot(env,_id),ccInjections(nullptr),
+		mixInjections(nullptr),rng(Parameters::get().seed+_id),done(false){}
 
-Simulation::Simulation(const Simulation& sim,int _id) : id(_id),env(sim.env),params(Parameters::get()),
-		plot(env,_id),ccInjections(nullptr),mixInjections(nullptr),rng(params.seed+_id),done(false){}
+Simulation::Simulation(Simulation& sim,int _id) : SimContext(sim.getVars()),id(_id),env(sim.env),
+		plot(env,_id),ccInjections(nullptr),mixInjections(nullptr),
+		rng(Parameters::get().seed+_id),done(false){}
 
 Simulation::~Simulation() {
 	cout << "Simulation[" << id << "] finished." << endl;
@@ -25,20 +27,25 @@ Simulation::~Simulation() {
 	//delete[] mixInjections;
 }
 
-void Simulation::setCells(const list<unsigned int>& _cells,const VarVector& vars){
-	auto distr = uniform_int_distribution<int>();
-	for(auto cell_id : _cells){
-		cells.emplace(piecewise_construct,forward_as_tuple(cell_id),
-				forward_as_tuple(*this,vars,env.getCompartmentByCellId(cell_id).getVolume(),
-						plot,env,distr(rng)));
-	}
-}
+//void Simulation::setCells(const list<unsigned int>& _cells,const VarVector& vars){}
 
 const state::State& Simulation::getCell(int id) const {
 	return cells.at(id);
 }
 
-void Simulation::initialize(){
+void Simulation::initialize(const vector<list<unsigned int>>& _cells,grammar::ast::KappaAst& ast){
+	for(auto& param : env.getParams()){
+		auto var = getVars()[env.getVarId(param.first)];
+		if(var == nullptr)
+			var = new state::ConstantVar<FL_TYPE>();
+	}
+	auto distr = uniform_int_distribution<int>();
+	for(auto cell_id : _cells.at(0)){//TODO all cells
+		cells.emplace(piecewise_construct,forward_as_tuple(cell_id),
+				forward_as_tuple(*this,getVars(),env.getCompartmentByCellId(cell_id).getVolume(),
+						plot,env,distr(rng)));
+	}
+	ast.evaluateInits(env,getVars(),*this);
 	for(auto& id_state : cells){
 		//env.buildInfluenceMap(id_state.second);
 		//id_state.second.buildInfluenceMap();

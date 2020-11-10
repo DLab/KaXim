@@ -37,6 +37,8 @@ void Parameters::makeOptions(const string &msg){
 		("dir,d",value<string>(),"Specifies directory where output files should be stored")
 		("load-sim,l",value<string>(),"Load kappa model from 'arg' instead of kappa files")
 		("make-sim,m",value<string>(),"Save the kappa model 'arg' from kappa files")
+		("params",value<std::vector<float> >()->multitoken(),
+				"Set values for each model %param, in the same order they are read from kappa model.")
 		("implicit-signature","Parser will guess agent signatures automatically")
 		("multinode,n",value<bool>(),"If true, equal agents will be stored in one node. Default is false.")
 		("seed,s",value<int>(),"Seed for random number generation (default is chosen from time())")
@@ -103,6 +105,12 @@ void Parameters::evalOptions(int argc, char* argv[]){
 		points = vm["points"].as<int>();
 	else
 		cout << "No points to plot." << endl;
+
+	if (!vm["params"].empty() )
+		modelParams = vm["params"].as<vector<float> >();
+
+
+
 	if(vm.count("out")){
 		outputFile = vm["out"].as<string>();
 		auto last_dot = outputFile.find_last_of(".");
@@ -111,6 +119,7 @@ void Parameters::evalOptions(int argc, char* argv[]){
 			outputFile.resize(last_dot);
 		}
 	}
+
 	if(vm.count("dir"))
 		outputDirectory = vm["dir"].as<string>();
 

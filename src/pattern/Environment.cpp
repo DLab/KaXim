@@ -46,11 +46,32 @@ unsigned Environment::declareToken(const Id &name_loc){
 	tokenNames.push_back(name);
 	return id;
 }
+
+short Environment::declareParam(const AstId &name_loc,const expressions::BaseExpression* val){
+	auto name  = name_loc.getString();
+	short& id = varMap[name];
+	if(!paramVars.count(name)){//first param declaration
+		id = varNames.size();
+		varNames.push_back(name);
+	}
+	else if(paramVars[name])//param was declared with value before
+		ADD_WARN("Previous value of model parameter '"+name+"' overwritten.",name_loc.loc);
+	paramVars.emplace(name_loc.getString(),val);
+	return id;
+}
+
 short Environment::declareVariable(const Id &name_loc,bool is_kappa){
 	//if(this->exists(name,algMap) || this->exists(name,kappaMap))
 	const string& name = name_loc.getString();
-	if(this->exists(name,varMap))
+	//if var declared and not a param
+	if(this->exists(name,varMap)){
+		/*if(!paramVars.count(name))
+			if(paramVars.at(name)){
+				ADD_WARN("Ignoring value for parameter defined in higher level.",name_loc.loc);
+				return -1;
+			}*/
 		throw SemanticError("Label "+name+" already defined.",name_loc.loc);
+	}
 	short id;
 	id = varNames.size();
 	varMap[name] = id;
@@ -289,6 +310,9 @@ const vector<simulation::Perturbation*>& Environment::getPerts() const {
 }
 const list<state::Variable*>& Environment::getObservables() const {
 	return observables;
+}
+const map<string,const expressions::BaseExpression*>& Environment::getParams() const {
+	return paramVars;
 }
 
 

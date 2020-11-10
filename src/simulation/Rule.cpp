@@ -97,7 +97,7 @@ void Rule::difference(const Environment& env, const VarVector& consts){
 	matchCount = 0;
 	//modify nodes
 	//string s_i;
-	expressions::EvalArguments<true> args(0,&consts);
+	expressions::SimContext<true> args(0,&consts);
 
 	for(ag_pos = 0; ag_pos < lhs.size(); ag_pos++){//for each agent in LHS
 		auto& lhs_ag = lhs.getAgent(ag_pos);
@@ -284,7 +284,7 @@ void Rule::addAgentIncludes(CandidateMap &candidates,
 void Rule::checkInfluence(const Environment &env,const VarVector& vars) {
 	//we first check all candidates to avoid do complete evaluation of same CC twice
 	CandidateMap candidates;
-	expressions::EvalArguments<true> args(0,&vars);
+	expressions::SimContext<true> args(0,&vars);
 	list<Action> changes(script);
 	for(auto& act : changes){//for each action (applied to 1 site)
 		if(act.is_new)
@@ -366,7 +366,7 @@ const Rule::CandidateMap& Rule::getInfluences() const{
 
 /**** DEBUG ****/
 string Rule::toString(const pattern::Environment& env) const {
-	static string acts[] = {"CHANGE","ASSIGN","BIND","FREE","DELETE","CREATE","TRANSPORT"};
+	static string acts[] = {"CHANGE","ASSIGN","BIND","FREE","CREATE","DELETE","TRANSPORT"};
 	string s = name+"'s actions:";
 	for(auto nn : newNodes){
 		s += "\tINSERT agent "+nn->toString(env);

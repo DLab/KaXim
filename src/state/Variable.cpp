@@ -90,11 +90,11 @@ void AlgebraicVar<T>::update(SomeValue val){
 }
 
 template <typename T>
-T AlgebraicVar<T>::evaluate(const EvalArguments<true>& args) const{
+T AlgebraicVar<T>::evaluate(const SimContext<true>& args) const{
 	return expression->evaluate(args);
 }
 template <typename T>
-T AlgebraicVar<T>::evaluate(const EvalArguments<false>& args) const{
+T AlgebraicVar<T>::evaluate(const SimContext<false>& args) const{
 	return expression->evaluate(args);
 }
 template <typename T>
@@ -231,10 +231,10 @@ BaseExpression* KappaVar::makeVarLabel() const{
 BaseExpression* KappaVar::clone() const {
 	return new KappaVar(*this);
 }
-int KappaVar::evaluate(const EvalArguments<true>& args) const {
+int KappaVar::evaluate(const SimContext<true>& args) const {
 	return args.getState().mixInstances(*mixture);
 }
-int KappaVar::evaluate(const EvalArguments<false>& args) const {
+int KappaVar::evaluate(const SimContext<false>& args) const {
 	return args.getState().mixInstances(*mixture);
 }
 
@@ -307,14 +307,14 @@ BaseExpression* DistributionVar<T>::clone() const {
 	return new DistributionVar(id,name,isObservable,*mixture,make_pair(op,auxFunc->clone()));
 }
 template <typename T>
-T DistributionVar<T>::evaluate(const EvalArguments<true>& args) const {
+T DistributionVar<T>::evaluate(const SimContext<true>& args) const {
 	/*auto& state = args.getState();
 	return state.getInjContainer(mixture->getComponent(0).getId()).sumInternal(auxFunc,args)
 			/ (op? state.mixInstances(*mixture) : 1);*/
 	throw invalid_argument("DistributionVar::evaluate(): invalid");
 }
 template <typename T>
-T DistributionVar<T>::evaluate(const EvalArguments<false>& args) const {
+T DistributionVar<T>::evaluate(const SimContext<false>& args) const {
 	auto& state = args.getState();
 	return state.getInjContainer(mixture->getComponent(0).getId()).sumInternal(auxFunc,args)
 			/ (op? state.mixInstances(*mixture) : 1);
@@ -385,10 +385,10 @@ bool RateVar::operator ==(const BaseExpression& exp) const {
 TokenVar::TokenVar(unsigned _id) :
 		id(_id) {
 }
-FL_TYPE TokenVar::evaluate(const EvalArguments<true>& args) const {
+FL_TYPE TokenVar::evaluate(const SimContext<true>& args) const {
 	return args.getState().getTokenValue(id);
 }
-FL_TYPE TokenVar::evaluate(const EvalArguments<false>& args) const {
+FL_TYPE TokenVar::evaluate(const SimContext<false>& args) const {
 	return args.getState().getTokenValue(id);
 }
 FL_TYPE TokenVar::auxFactors(

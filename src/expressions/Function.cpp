@@ -184,7 +184,7 @@ Function<T>::~Function(){
 }
 
 template <typename T>
-T Function<T>::evaluate(const EvalArguments<true>& _args) const {
+T Function<T>::evaluate(const SimContext<true>& _args) const {
 	vector<SomeValue> v;
 	v.reserve(args.size());
 	for(auto arg : args)
@@ -192,7 +192,7 @@ T Function<T>::evaluate(const EvalArguments<true>& _args) const {
 	return func(v,_args.getState());
 }
 template <typename T>
-T Function<T>::evaluate(const EvalArguments<false>& _args) const {
+T Function<T>::evaluate(const SimContext<false>& _args) const {
 	vector<SomeValue> v;
 	v.reserve(args.size());
 	for(auto arg : args)

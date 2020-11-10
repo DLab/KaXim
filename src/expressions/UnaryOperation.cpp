@@ -38,12 +38,12 @@ R (*UnaryOperations<R, T>::funcs[])(T)= {
 };
 
 template<typename R, typename T>
-R UnaryOperation<R, T>::evaluate(const EvalArguments<true>& args) const {
+R UnaryOperation<R, T>::evaluate(const SimContext<true>& args) const {
 	auto a = exp->evaluate(args);
 	return func(a);
 }
 template<typename R, typename T>
-R UnaryOperation<R, T>::evaluate(const EvalArguments<false>& args) const {
+R UnaryOperation<R, T>::evaluate(const SimContext<false>& args) const {
 	auto a = exp->evaluate(args);
 	return func(a);
 }

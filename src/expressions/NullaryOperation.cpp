@@ -42,11 +42,11 @@ bool (*NullaryOperations<bool>::funcs[4])(const state::State& state)= {
 };
 
 template<typename R>
-R NullaryOperation<R>::evaluate(const EvalArguments<true>& args) const {
+R NullaryOperation<R>::evaluate(const SimContext<true>& args) const {
 	return func(args.getState());
 }
 template<typename R>
-R NullaryOperation<R>::evaluate(const EvalArguments<false>& args) const {
+R NullaryOperation<R>::evaluate(const SimContext<false>& args) const {
 	return func(args.getState());
 }
 

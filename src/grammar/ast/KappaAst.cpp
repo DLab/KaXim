@@ -6,6 +6,7 @@
  */
 
 #include "KappaAst.h"
+#include "../../simulation/Simulation.h"
 #include "../../pattern/Environment.h"
 #include "../../util/Warning.h"
 
@@ -63,18 +64,44 @@ vector<Variable*> KappaAst::evaluateDeclarations(pattern::Environment &env,vecto
 	auto vars = is_const ? constants : variables;
 	for(list<Declaration>::iterator it = vars.begin();it != vars.end(); it++){
 		//delete &(*it);
-		Variable* var;
+		Variable* var = nullptr;
 		if(is_const)
 			var = it->evalConst(env,var_vector);
 		else
 			var = it->evalVar(env,var_vector);
-		var_vector.push_back(var);
+		if(var)//var is not a param. DEPRECATED
+			var_vector.push_back(var);
 		if(it->isObservable())
 			env.declareObservable(var);
 	}
 	return var_vector;
 }
-
+/** evaluate "%param(s):" kappa statements.
+ * %params: allows to declare a list of parameter names with no values associated.
+ *     The simulation cannot run if param values are still null.
+ * %param: allows to declare and associate a param name with a value.
+ *     Can be used several times in model to overwrite previous values.
+ * --params: allows to associate values to model params at command line.
+ *     Each float value will be associated to a parameter in the same order that
+ *     they were declared in the model. This overwrite every previous value. */
+void KappaAst::evaluateParams(pattern::Environment &env,VarVector& vars,const vector<float>& po_params){
+	if(params.size() > po_params.size())
+		throw invalid_argument("Too many parameters given as command line argument.");
+	int i = 0;
+	for(auto& param : params){
+		auto val = param.second->eval(env,vars);
+		unsigned id;
+		if(i < po_params.size())
+			id = env.declareParam(param.first,new expressions::Constant<FL_TYPE>(po_params[i]));
+		else
+			id = env.declareParam(param.first,val);
+		if(id == vars.size())
+			vars.push_back(nullptr);
+		else if(id > vars.size())
+			throw invalid_argument("Unexpected param id.");
+		i++;
+	}
+}
 
 void KappaAst::evaluateInits(pattern::Environment &env,const vector<Variable*> &vars,simulation::Simulation &sim){
 	for(auto& init : inits){
@@ -93,6 +120,22 @@ void KappaAst::evaluatePerts(pattern::Environment &env,vector<Variable*> &vars){
 		p->eval(env,vars);
 }
 
+void KappaAst::add(const Id &name_loc,const Expression* value) {
+	auto name = name_loc.getString();
+	for(auto& param : params)
+		if(name == param.first.getString()){
+			if(value == nullptr)
+				throw SemanticError("Redeclaration of model parameter "+name,name_loc.loc);
+			else if(param.second != nullptr){
+				ADD_WARN("Previous value of model parameter '"+name+"' overwritten.",value->loc);
+			}
+			delete param.second;
+			param.second = value;
+			return;
+		}
+
+	params.emplace_back(name_loc,value);
+}
 void KappaAst::add(const Declaration &d){
 	if(d.isConstant())
 		constants.push_back(d);

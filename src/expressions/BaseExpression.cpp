@@ -23,40 +23,40 @@ template<> struct BaseExpression::EnumType<bool> {
 };
 
 template <bool safe>
-EvalArguments<safe>::EvalArguments(const state::State* state,const VarVector* vars,
+SimContext<safe>::SimContext(const state::State* state,const VarVector* vars,
 		const AuxMap* auxValues,const AuxValueMap<int>* auxIntValues):
 			state(state),vars(vars),auxMap(auxValues),auxIntMap(auxIntValues){};
 template <bool safe>
-EvalArguments<safe>::EvalArguments(state::State* state) : state(state),
+SimContext<safe>::SimContext(state::State* state) : state(state),
 	vars(&state->vars),auxMap(&state->args.getAuxMap()),auxIntMap(nullptr){};
 
 template <>
-const state::State& EvalArguments<true>::getState() const {
+const state::State& SimContext<true>::getState() const {
 	if(!state)
 		throw std::out_of_range("EvalArgs::getState(): attribute is null.");
 	return *state;
 }
 template <>
-const VarVector& EvalArguments<true>::getVars() const {
+const VarVector& SimContext<true>::getVars() const {
 	if(!vars)
 		throw std::out_of_range("EvalArgs::getVars(): attribute is null.");
 	return *vars;
 }
 template <>
-const AuxMap& EvalArguments<true>::getAuxMap() const {
+const AuxMap& SimContext<true>::getAuxMap() const {
 	if(auxMap == nullptr)
 		throw std::out_of_range("EvalArgs::getAuxMap(): attribute is null.");
 	return *auxMap;
 }
 template <>
-const AuxValueMap<int>& EvalArguments<true>::getAuxIntMap() const {
+const AuxValueMap<int>& SimContext<true>::getAuxIntMap() const {
 	if(!auxIntMap)
 		throw std::out_of_range("EvalArgs::getAuxIntMap(): attribute is null.");
 	return *auxIntMap;
 }
 
-template class EvalArguments<true>;
-template class EvalArguments<false>;
+template class SimContext<true>;
+template class SimContext<false>;
 
 BaseExpression::Reduction::Reduction() : factor(nullptr) {}
 

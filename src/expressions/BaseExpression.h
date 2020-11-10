@@ -28,29 +28,18 @@ namespace expressions {
 
 template <typename T> class Auxiliar;
 
-/** \brief Class used to map aux to values in different ways */
-template <typename T>
-class AuxValueMap {
-public:
-	virtual ~AuxValueMap();
-	virtual T& operator[](const Auxiliar<T>& a) = 0;
-	virtual T at(const Auxiliar<T>& a) const = 0;
-	virtual void clear() = 0;
-	virtual size_t size() const = 0;
-};
 
-typedef AuxValueMap<FL_TYPE> AuxMap;
 
-template <bool safe = false>
-class EvalArguments {
+template <bool safe>
+class SimContext {
 	const state::State* state;
 	const VarVector* vars;
 	const AuxMap* auxMap;
 	const AuxValueMap<int>* auxIntMap;
 public:
-	EvalArguments(const state::State* state = nullptr,const VarVector* vars = nullptr,
+	SimContext(const state::State* state = nullptr,const VarVector* vars = nullptr,
 			const AuxMap* auxValues = nullptr,const AuxValueMap<int>* auxIntValues = nullptr);
-	EvalArguments(state::State* state);
+	SimContext(state::State* state);
 
 	inline const state::State& getState() const;
 	inline const VarVector& getVars() const;
@@ -58,7 +47,7 @@ public:
 	inline const AuxValueMap<int>& getAuxIntMap() const;
 };
 
-using EvalArgs = EvalArguments<false>;
+using SimContext = simulation::SimContext;
 
 
 /** \brief Base class for algebraic and boolean expressions. */
@@ -122,8 +111,8 @@ public:
 	//		const std::unordered_map<std::string, int> *aux_values = nullptr) const = 0;
 
 	/** \brief Returns the value of this expression. */
-	virtual SomeValue getValue(const EvalArguments<true>& args) const = 0;
-	virtual SomeValue getValue(const EvalArguments<false>& args) const = 0;
+	virtual SomeValue getValue(const SimContext<true>& args) const = 0;
+	virtual SomeValue getValue(const SimContext<false>& args) const = 0;
 
 	/** \brief Returns the value of this expression using only the State of the
 	 * simulation. It cannot contain auxiliary variables. */
@@ -180,7 +169,7 @@ protected:
 
 
 template <>
-inline const state::State& EvalArguments<false>::getState() const {
+inline const state::State& SimContext<false>::getState() const {
 #ifdef DEBUG
 	if(!state)
 		throw std::invalid_argument("EvalArgs::getState(): attribute is null.");
@@ -188,7 +177,7 @@ inline const state::State& EvalArguments<false>::getState() const {
 	return *state;
 }
 template <>
-inline const VarVector& EvalArguments<false>::getVars() const {
+inline const VarVector& SimContext<false>::getVars() const {
 #ifdef DEBUG
 	if(!vars)
 		throw std::invalid_argument("EvalArgs::getVars(): attribute is null.");
@@ -196,7 +185,7 @@ inline const VarVector& EvalArguments<false>::getVars() const {
 	return *vars;
 }
 template <>
-inline const AuxMap& EvalArguments<false>::getAuxMap() const {
+inline const AuxMap& SimContext<false>::getAuxMap() const {
 #ifdef DEBUG
 	if(!auxMap)
 		throw std::invalid_argument("EvalArgs::getAuxMap(): attribute is null.");
@@ -204,7 +193,7 @@ inline const AuxMap& EvalArguments<false>::getAuxMap() const {
 	return *auxMap;
 }
 template <>
-inline const AuxValueMap<int>& EvalArguments<false>::getAuxIntMap() const {
+inline const AuxValueMap<int>& SimContext<false>::getAuxIntMap() const {
 #ifdef DEBUG
 	if(!auxIntMap)
 		throw std::invalid_argument("EvalArgs::getAuxIntMap(): attribute is null.");

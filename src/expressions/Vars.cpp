@@ -30,7 +30,7 @@ template<typename R>
 Auxiliar<R>::~Auxiliar() {}
 
 template<typename R>
-R Auxiliar<R>::evaluate(const EvalArguments<true>& args) const {
+R Auxiliar<R>::evaluate(const SimContext<true>& args) const {
 #ifdef DEBUG
 	try {
 #endif
@@ -43,7 +43,7 @@ R Auxiliar<R>::evaluate(const EvalArguments<true>& args) const {
 #endif
 }
 template<typename R>
-R Auxiliar<R>::evaluate(const EvalArguments<false>& args) const {
+R Auxiliar<R>::evaluate(const SimContext<false>& args) const {
 #ifdef DEBUG
 	try {
 #endif
@@ -57,7 +57,7 @@ R Auxiliar<R>::evaluate(const EvalArguments<false>& args) const {
 }
 
 template <>
-int Auxiliar<int>::evaluate(const EvalArguments<true>& args) const {
+int Auxiliar<int>::evaluate(const SimContext<true>& args) const {
 #ifdef DEBUG
 	try {
 #endif
@@ -70,7 +70,7 @@ int Auxiliar<int>::evaluate(const EvalArguments<true>& args) const {
 #endif
 }
 template <>
-int Auxiliar<int>::evaluate(const EvalArguments<false>& args) const {
+int Auxiliar<int>::evaluate(const SimContext<false>& args) const {
 #ifdef DEBUG
 	try {
 #endif
@@ -147,12 +147,12 @@ VarLabel<R>::VarLabel(int id,const string &_name) :
 		varId(id),name(_name) {}
 
 template<typename R>
-R VarLabel<R>::evaluate(const EvalArguments<true>& args) const {
+R VarLabel<R>::evaluate(const SimContext<true>& args) const {
 	//throw std::invalid_argument("This should never been used");
 	return args.getVars()[varId]->getValue(args).valueAs<R>();
 }
 template<typename R>
-R VarLabel<R>::evaluate(const EvalArguments<false>& args) const {
+R VarLabel<R>::evaluate(const SimContext<false>& args) const {
 	//throw std::invalid_argument("This should never been used");
 	return args.getVars()[varId]->getValue(args).valueAs<R>();
 }

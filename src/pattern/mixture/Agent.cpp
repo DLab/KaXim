@@ -82,7 +82,7 @@ bool Pattern::Agent::operator ==(const Agent &a) const {
 }
 
 bool Pattern::Agent::testEmbed(const Agent &rhs_ag,
-		const expressions::EvalArguments<true>& args,list<small_id>& sites_to_test) const {
+		const expressions::SimContext<true>& args,list<small_id>& sites_to_test) const {
 	if(this == &rhs_ag)
 		return true;
 	if(signId != rhs_ag.signId)
@@ -263,7 +263,7 @@ bool Mixture::Site::isExpression() const{
 }*/
 
 //test if mix_site match with value or inequation
-bool Pattern::Site::testValue(const state::SomeValue& val,const expressions::EvalArguments<true>& args) const {
+bool Pattern::Site::testValue(const state::SomeValue& val,const expressions::SimContext<true>& args) const {
 	//TODO ignore vars when using for check influence
 	if(val.t == NONE)
 		return true;
@@ -373,7 +373,7 @@ bool Pattern::Site::operator ==(const Site &s) const{
 }
 
 /*test if this site-pattern may embed the rhs_site*/
-bool Pattern::Site::testEmbed(const Site &rhs_site,const expressions::EvalArguments<true>& args) const{
+bool Pattern::Site::testEmbed(const Site &rhs_site,const expressions::SimContext<true>& args) const{
 	try{
 		switch(rhs_site.value_type){//the possible values of an RHS site
 		case EQUAL:

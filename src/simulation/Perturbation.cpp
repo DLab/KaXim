@@ -131,7 +131,7 @@ FL_TYPE Perturbation::timeTest(const expressions::EvalArgs& args) const {
 
 void Perturbation::apply(state::State& state) const {
 #ifdef DEBUG
-	if(Parameters::get().verbose > 1)
+	if(Parameters::get().verbose > 0)
 		cout << "Applying perturbation " << id << " at time " << state.getCounter().getTime() << endl;
 #endif
 	for(auto eff : effects)
@@ -212,7 +212,7 @@ int Intro::addInfluences(int current,Rule::CandidateMap& map,
 				Rule::CandidateKey key{cc_root.first,{cc_root.second,ag_pos}};
 				Rule::CandidateInfo info{{0,ag_pos},true};
 				if(cc_root.first->testEmbed(mix->getComponent(ag_coords.first),
-						key.match_root,expressions::EvalArguments<true>(0,&vars)))
+						key.match_root,expressions::SimContext<true>(0,&vars)))
 					map.emplace(key,info);;
 			}
 	}

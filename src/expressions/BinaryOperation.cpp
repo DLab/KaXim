@@ -51,13 +51,13 @@ R (*BinaryOperations<R, T1, T2>::funcs[10])(T1, T2)= {
 	};
 
 template<typename R, typename T1, typename T2>
-R BinaryOperation<R, T1, T2>::evaluate(const  EvalArguments<true>& args) const {
+R BinaryOperation<R, T1, T2>::evaluate(const  SimContext<true>& args) const {
 	auto a = exp1->evaluate(args);
 	auto b = exp2->evaluate(args);
 	return func(a, b);
 }
 template<typename R, typename T1, typename T2>
-R BinaryOperation<R, T1, T2>::evaluate(const  EvalArguments<false>& args) const {
+R BinaryOperation<R, T1, T2>::evaluate(const  SimContext<false>& args) const {
 	auto a = exp1->evaluate(args);
 	auto b = exp2->evaluate(args);
 	return func(a, b);

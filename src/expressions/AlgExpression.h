@@ -24,12 +24,12 @@ class AlgExpression: public virtual BaseExpression {
 public:
 	AlgExpression();
 	virtual ~AlgExpression() = 0;
-	virtual T evaluate(const EvalArguments<true>& args) const = 0;
-	virtual T evaluate(const EvalArguments<false>& args) const = 0;
+	virtual T evaluate(const SimContext<true>& args) const = 0;
+	virtual T evaluate(const SimContext<false>& args) const = 0;
 	virtual FL_TYPE auxFactors(
 			std::unordered_map<std::string, FL_TYPE> &factor) const override = 0;
-	virtual SomeValue getValue(const EvalArguments<true>& args) const override;
-	virtual SomeValue getValue(const EvalArguments<false>& args) const override;
+	virtual SomeValue getValue(const SimContext<true>& args) const override;
+	virtual SomeValue getValue(const SimContext<false>& args) const override;
 	virtual bool operator==(const BaseExpression& exp) const override = 0;
 
 	//virtual void getNeutralAuxMap(
