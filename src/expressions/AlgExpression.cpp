@@ -37,19 +37,6 @@ AlgExpression<T>::AlgExpression() {
 template<typename T>
 AlgExpression<T>::~AlgExpression() {}
 
-template<typename T>
-SomeValue AlgExpression<T>::getValue(const SimContext<true>& args) const {
-	return SomeValue(this->evaluate(args));
-}
-template<typename T>
-SomeValue AlgExpression<T>::getValue(const SimContext<false>& args) const {
-	return SomeValue(this->evaluate(args));
-}
-
-template class AlgExpression<FL_TYPE> ;
-template class AlgExpression<int> ;
-template class AlgExpression<bool> ;
-
 
 
 

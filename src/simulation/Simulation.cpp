@@ -12,14 +12,21 @@
 
 namespace simulation {
 
-Simulation::Simulation(pattern::Environment& _env,VarVector& _vars,int _id) :
-		SimContext(_vars),id(_id),env(_env),plot(env,_id),ccInjections(nullptr),
-		mixInjections(nullptr),rng(Parameters::get().seed+_id),done(false){}
+/*Simulation::Simulation(pattern::Environment& _env,VarVector& _vars,int _id) :
+		SimContext(_id,Parameters::get().seed+_id),env(_env),plot(env,_id),
+		ccInjections(nullptr),mixInjections(nullptr),done(false){}*/
 
-Simulation::Simulation(Simulation& sim,int _id) : SimContext(sim.getVars()),id(_id),env(sim.env),
+Simulation::Simulation(SimContext& context,int _id) :
+		SimContext(_id,&context),
 		plot(env,_id),ccInjections(nullptr),mixInjections(nullptr),
-		rng(Parameters::get().seed+_id),done(false){}
+		done(false){//,vars(context.getVars()){
+	//vars = context.getVars();
+}
 
+/*Simulation::Simulation() : SimContext(0,Parameters::get().seed),
+		plot(*env,0),ccInjections(nullptr),mixInjections(nullptr),
+		done(false) {}
+*/
 Simulation::~Simulation() {
 	cout << "Simulation[" << id << "] finished." << endl;
 	// TODO Auto-generated destructor stub
@@ -36,16 +43,34 @@ const state::State& Simulation::getCell(int id) const {
 void Simulation::initialize(const vector<list<unsigned int>>& _cells,grammar::ast::KappaAst& ast){
 	for(auto& param : env.getParams()){
 		auto var = getVars()[env.getVarId(param.first)];
-		if(var == nullptr)
-			var = new state::ConstantVar<FL_TYPE>();
+		//if(var == nullptr)
+		//	var = new state::ConstantVar<FL_TYPE>(0.0);
+	}
+	for(auto var : parent->getVars()){
+		//todo set sim-vars
 	}
 	auto distr = uniform_int_distribution<int>();
 	for(auto cell_id : _cells.at(0)){//TODO all cells
 		cells.emplace(piecewise_construct,forward_as_tuple(cell_id),
-				forward_as_tuple(*this,getVars(),env.getCompartmentByCellId(cell_id).getVolume(),
-						plot,env,distr(rng)));
+				forward_as_tuple((int)cell_id,*this,env.getCompartmentByCellId(cell_id).getVolume(),
+						plot));
 	}
-	ast.evaluateInits(env,getVars(),*this);
+	for(auto& init : env.getInits()){
+		auto &cells = env.getUseExpression(init.use_id).getCells();
+		auto n_value = init.n->getValueSafe(*this);
+		if(init.mix){
+			int n;
+			if(n_value.t == Type::FLOAT){
+				n = round(n_value.fVal);
+				ADD_WARN_NOLOC("Making approximation of a float value in agent initialization to "+to_string(n));
+			}
+			else
+				n = n_value.valueAs<int>();
+			addAgents(cells,n,*init.mix);
+		}
+		else
+			addTokens(cells,n_value.valueAs<FL_TYPE>(),init.tok_id);
+	}
 	for(auto& id_state : cells){
 		//env.buildInfluenceMap(id_state.second);
 		//id_state.second.buildInfluenceMap();
@@ -152,12 +177,12 @@ void Simulation::addTokens(const Range<int,Args...> &cell_ids,float count,short 
 		try{
 			cells.at(id).addTokens(count/cell_ids.size(),token_id);
 		}
-		catch(std::out_of_range &e){
+		catch(out_of_range &e){
 			//other mpi_process will add this tokens.
 		}
 	}
 }
-template void Simulation::addTokens(const std::set<int> &cell_ids,float count,short token_id);
+template void Simulation::addTokens(const set<int> &cell_ids,float count,short token_id);
 
 
 template <template<typename,typename...> class Range,typename... Args>
@@ -170,13 +195,13 @@ void Simulation::addAgents(const Range<int,Args...> &cell_ids,unsigned count,con
 		try{
 			cells.at(*ids_it).initNodes(n,mix);
 		}
-		catch(std::out_of_range &e){
+		catch(out_of_range &e){
 			//other mpi_process will add this tokens.
 		}
 		ids_it++;
 	}
 }
-template void Simulation::addAgents(const std::set<int> &cell_ids,unsigned count,const pattern::Mixture &mix);
+template void Simulation::addAgents(const set<int> &cell_ids,unsigned count,const pattern::Mixture &mix);
 
 
 /** \brief Return a way to allocate cells among cpu's.

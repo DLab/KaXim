@@ -27,10 +27,10 @@ using namespace std;
 
 class Simulation : public SimContext {
 	//int id;
-	pattern::Environment& env;
+	//pattern::Environment env;
 	vector<state::State> states;//vector?
 	pattern::RuleSet rules;
-	GlobalCounter counter;
+	//GlobalCounter counter;
 	Plot plot;
 
 	set<matching::Injection*> *ccInjections;//[cc_env_id].at(node_id)
@@ -38,7 +38,6 @@ class Simulation : public SimContext {
 
 
 	unordered_map<unsigned int,state::State> cells;
-	RNG rng;
 
 	bool done;
 
@@ -51,8 +50,9 @@ class Simulation : public SimContext {
 	vector<unsigned> allocAgents2(unsigned cells, unsigned ag_count, const list<float>* vol_ratios = nullptr);
 
 public:
-	Simulation(pattern::Environment& env,VarVector& vars,int id = 0);
-	Simulation(Simulation& sim,int _id);
+	//Simulation(pattern::Environment& env,VarVector& vars,int id = 0);
+	//Simulation();
+	Simulation(SimContext& sim,int _id);
 	~Simulation();
 
 	//void setCells(const list<unsigned int>& cells,const VarVector& vars);
@@ -75,6 +75,10 @@ public:
 	bool isDone() const;
 
 	void print() const;
+
+
+	//TODO matching::InjRandContainer& getInjContainer(int cc_id);
+	//TODO const matching::InjRandContainer& getInjContainer(int cc_id) const;
 
 private:
 	static vector<pair<pair<int,int>,double>> sortEdgesByWeidht( const map<pair<int,int>,double> &w_edges );

@@ -16,7 +16,7 @@
 
 using namespace std;
 
-class simulation::Simulation;
+//class simulation::Simulation;
 
 namespace grammar {
 
@@ -50,15 +50,15 @@ public:
 
 	// evaluation of AST nodes
 	vector<float> evaluateTokens(pattern::Environment &env);
-	void evaluateSignatures(pattern::Environment &env,const vector<Variable*> &consts);
-	vector<Variable*> evaluateDeclarations(pattern::Environment &env,vector<Variable*> &vars,bool is_const = false);
-	void evaluateParams(pattern::Environment &env,VarVector& vars,const vector<float> &po_params);
-	void evaluateCompartments(pattern::Environment &env,const vector<Variable*>& vars);
-	void evaluateUseExpressions(pattern::Environment &env,const vector<Variable*>& consts);
-	void evaluateChannels(pattern::Environment &env,const vector<Variable*> &vars);
-	void evaluateInits(pattern::Environment &env,const vector<Variable*> &,simulation::Simulation &sim);
-	void evaluateRules(pattern::Environment &env,vector<Variable*> &vars);
-	void evaluatePerts(pattern::Environment &env,vector<Variable*> &vars);
+	void evaluateSignatures(pattern::Environment &env,const SimContext &context);
+	vector<Variable*> evaluateDeclarations(pattern::Environment &env,SimContext &context,bool is_const = false);
+	void evaluateParams(pattern::Environment &env,SimContext &context,const vector<float> &po_params);
+	void evaluateCompartments(pattern::Environment &env,const SimContext &context);
+	void evaluateUseExpressions(pattern::Environment &env,const SimContext &context);
+	void evaluateChannels(pattern::Environment &env,const SimContext &context);
+	void evaluateInits(pattern::Environment &env,SimContext &sim);
+	void evaluateRules(pattern::Environment &env,SimContext &context);
+	void evaluatePerts(pattern::Environment &env,SimContext &context);
 
 	//ADD functions
 	void add(const Id &name,const Expression* value);

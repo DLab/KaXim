@@ -66,7 +66,7 @@ void Const::show( string tabs ) const {
 }
 
 BaseExpression* Const::eval(const pattern::Environment& env,
-		const VarVector &vars,pattern::DepSet* deps,const char flags,
+		const simulation::SimContext& context,pattern::DepSet* deps,const char flags,
 		const pattern::Mixture* mix) const{
 	BaseExpression* cons = nullptr;
 	switch(type){
@@ -109,10 +109,10 @@ BoolBinaryOperation::~BoolBinaryOperation(){
 }
 
 BaseExpression* BoolBinaryOperation::eval(const pattern::Environment& env,
-		const VarVector &vars,pattern::DepSet* deps,const char flags,
+		const simulation::SimContext& context,pattern::DepSet* deps,const char flags,
 		const pattern::Mixture* mix) const{
-	BaseExpression* ex1 = exp1->eval(env,vars,deps,flags,mix);
-	BaseExpression* ex2 = exp2->eval(env,vars,deps,flags,mix);
+	BaseExpression* ex1 = exp1->eval(env,context,deps,flags,mix);
+	BaseExpression* ex2 = exp2->eval(env,context,deps,flags,mix);
 
 	return BaseExpression::makeBinaryExpression<true>(ex1,ex2,op);
 }
@@ -142,10 +142,10 @@ AlgBinaryOperation::~AlgBinaryOperation(){
 }
 
 BaseExpression* AlgBinaryOperation::eval(const pattern::Environment& env,
-		const VarVector &vars,pattern::DepSet* deps,const char flags,
+		const simulation::SimContext& context,pattern::DepSet* deps,const char flags,
 		const pattern::Mixture* mix) const{
-	BaseExpression* ex1 = exp1->eval(env,vars,deps,flags,mix);
-	BaseExpression* ex2 = exp2->eval(env,vars,deps,flags,mix);
+	BaseExpression* ex1 = exp1->eval(env,context,deps,flags,mix);
+	BaseExpression* ex2 = exp2->eval(env,context,deps,flags,mix);
 	if(op == BaseExpression::MULT){
 		if(*ex1 == *INF_EXPR){
 			delete ex1;
@@ -187,9 +187,9 @@ UnaryOperation::~UnaryOperation(){
 }
 
 BaseExpression* UnaryOperation::eval(const pattern::Environment& env,
-		const VarVector &vars,pattern::DepSet* deps,const char flags,
+		const simulation::SimContext& context,pattern::DepSet* deps,const char flags,
 		const pattern::Mixture* mix) const{
-	BaseExpression* ex = exp->eval(env,vars,deps,flags,mix);
+	BaseExpression* ex = exp->eval(env,context,deps,flags,mix);
 	return BaseExpression::makeUnaryExpression(ex, func);
 }
 UnaryOperation* UnaryOperation::clone() const{
@@ -208,7 +208,7 @@ void UnaryOperation::show( string tabs ) const {
 
 /****** Class NullaryOperation ******/
 BaseExpression* NullaryOperation::eval(const pattern::Environment& env,
-		const VarVector &vars,pattern::DepSet* deps,const char flags,
+		const simulation::SimContext& context,pattern::DepSet* deps,const char flags,
 		const pattern::Mixture* mix) const{
 	switch(func){
 	case BaseExpression::Nullary::SIM_TIME:
@@ -249,12 +249,13 @@ Var::Var(const location &l,const VarType &t,const Id &label):
 	Expression(l),name(label),type(t){};
 
 BaseExpression* Var::eval(const pattern::Environment& env,
-		const vector<state::Variable*> &vars,pattern::DepSet* deps,const char flags,
+		const simulation::SimContext& context,pattern::DepSet* deps,const char flags,
 		const pattern::Mixture* mix) const {
 	BaseExpression* expr =nullptr;
+	auto& vars  = context.getVars();
 	switch(type){
 	case VAR:{
-		unsigned id = env.getVarId(Id(name.loc,name.evalLabel(env,vars)));
+		unsigned id = env.getVarId(Id(name.loc,name.evalLabel(env,context)));
 		expr = vars[id]->makeVarLabel();
 		if(deps){
 			auto* kappa = dynamic_cast<state::KappaVar*>(vars[id]);
@@ -327,13 +328,13 @@ Func::~Func(){
 
 
 BaseExpression* Func::eval(const pattern::Environment& env,
-		const VarVector &vars,pattern::DepSet* deps,const char flags,
+		const simulation::SimContext& context,pattern::DepSet* deps,const char flags,
 		const pattern::Mixture* mix) const {
 	BaseExpression* expr =nullptr;
 	list<BaseExpression*> expr_list;
 	for(auto arg : args)
-		expr_list.push_back(arg->eval(env,vars,deps,flags,mix));
-	expr = new expressions::Function<FL_TYPE>(type,expr_list);
+		expr_list.push_back(arg->eval(env,context,deps,flags,mix));
+	expr = new Function<FL_TYPE>(type,expr_list);
 	return expr;
 }
 Func* Func::clone() const{

@@ -175,6 +175,13 @@ void Environment::declarePert(simulation::Perturbation* pert){
 	perts.push_back(pert);
 }
 
+void Environment::declareMixInit(int use_id,expressions::BaseExpression* n,Mixture* mix){
+	inits.emplace_back(use_id,n,mix,-1);
+}
+void Environment::declareTokInit(int use_id,expressions::BaseExpression* n,int tok_id){
+	inits.emplace_back(use_id,n,nullptr,tok_id);
+}
+
 /*
 void Environment::declareAux(const Id& name,Mixture& mix,small_id site_id){
 	auto& aux_name = name.getString();
@@ -219,9 +226,9 @@ void Environment::declareObservable(state::Variable* var){
 	observables.emplace_back(var);
 }
 
-void Environment::buildInfluenceMap(const VarVector& vars){
+void Environment::buildInfluenceMap(const simulation::SimContext &context){
 	for(auto& r : rules)
-		r.checkInfluence(*this,vars);
+		r.checkInfluence(*this,context);
 }
 void Environment::buildFreeSiteCC() {
 	for(auto ag_class : agentPatterns){
@@ -307,6 +314,9 @@ const vector<simulation::Rule>& Environment::getRules() const {
 }
 const vector<simulation::Perturbation*>& Environment::getPerts() const {
 	return perts;
+}
+const list<Environment::Init>& Environment::getInits() const{
+	return inits;
 }
 const list<state::Variable*>& Environment::getObservables() const {
 	return observables;
@@ -402,7 +412,7 @@ std::string Environment::cellIdToString(unsigned int cell_id) const {
 
 }
 
-void Environment::show() const {
+void Environment::show(const simulation::SimContext& context) const {
 	//try{
 		cout << "This is the environment content" << endl;
 		cout << "\t\tCompartments[" << compartments.size() << "]" << endl;
@@ -422,7 +432,7 @@ void Environment::show() const {
 			cout << (i+1) << ") ";
 			for(list<Channel>::const_iterator it = channels[i].cbegin();it != channels[i].cend();it++){
 				cout << it->toString() << endl;
-				list< list<int> > l = it->getConnections();
+				list< list<int> > l = it->getConnections(context);
 				it->printConnections(l);
 			}
 		}

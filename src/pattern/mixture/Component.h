@@ -14,6 +14,8 @@
 
 namespace pattern {
 
+class Environment;
+
 using namespace std;
 /** \brief Defines a set of agents that are explicitly connected by sites.
  * Class Mixture is initialized empty and then filled with agents and binds.
@@ -68,10 +70,10 @@ public:
 	 * @param vars the variables of the simulation.
 	 * @param emb an empty map to store and return the embedding. Can be omitted.*/
 	bool testEmbed(const Component& rhs_cc,two<small_id> root,
-			const expressions::SimContext<true>& args,map<small_id,small_id>& emb) const;
-	bool testEmbed(const Component& rhs_cc,two<small_id> root,const expressions::SimContext<true>& args) const {
+			const simulation::SimContext &context,map<small_id,small_id>& emb) const;
+	bool testEmbed(const Component& rhs_cc,two<small_id> root,const simulation::SimContext &context) const {
 		map<small_id,small_id> emb;
-		return testEmbed(rhs_cc,root,args,emb);
+		return testEmbed(rhs_cc,root,context,emb);
 	}
 
 	void addRateDep(const simulation::Rule& dep,small_id cc);

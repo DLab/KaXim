@@ -25,13 +25,13 @@
 
 namespace simulation {
 
-Perturbation::Perturbation(BaseExpression* cond,BaseExpression* unt,const yy::location& loc) : id(-1),
+Perturbation::Perturbation(BaseExpression* cond,BaseExpression* unt,
+		const yy::location& loc,const simulation::SimContext &context) : id(-1),
 		condition(cond),until(unt),introCount(0),nextStop(-1.0),incStep(0.0),applies(0),isCopy(false){
 #ifdef DEBUG
 	if(condition == nullptr)
 		throw invalid_argument("Perturbation: condition cannot be null.");
 #endif
-	expressions::EvalArgs args;
 	if(cond->getVarDeps() & BaseExpression::TIME){
 		const BaseExpression *expr1 = nullptr,*expr2 = nullptr,*expr3 = nullptr;
 		char op1,op2;
@@ -50,7 +50,7 @@ Perturbation::Perturbation(BaseExpression* cond,BaseExpression* unt,const yy::lo
 			}
 		}
 		if(expr1 && op1 == BaseExpression::EQUAL){
-			float val1 = expr2->getValue(args).valueAs<FL_TYPE>();
+			float val1 = expr2->getValueSafe(context).valueAs<FL_TYPE>();
 			auto time_expr = dynamic_cast<const NullaryOperation<FL_TYPE>*>(expr1);
 			if(time_expr && (time_expr->getVarDeps() & BaseExpression::TIME) && op1 != BaseExpression::EQUAL ){
 				nextStop = val1;
@@ -70,7 +70,7 @@ Perturbation::Perturbation(BaseExpression* cond,BaseExpression* unt,const yy::lo
 					}
 				}
 				if(expr3 && op2 == BaseExpression::MODULO){//option ([t] % expr3) = expr2
-					auto val2 = expr3->getValue(args).valueAs<FL_TYPE>();
+					auto val2 = expr3->getValueSafe(context).valueAs<FL_TYPE>();
 					if(val1 < 0)
 						throw SemanticError("Comparing time with negative values will generate unexpected behavior.",loc);
 					nextStop = std::signbit(val1) ? val1 : val2;
@@ -117,16 +117,16 @@ int Perturbation::getId() const {
 	return id;
 }
 
-bool Perturbation::test(const expressions::EvalArgs& args) const {
-	return condition->getValue(args).valueAs<bool>();
+bool Perturbation::test(const SimContext& context) const {
+	return condition->getValue(context).valueAs<bool>();
 }
 
-FL_TYPE Perturbation::timeTest(const expressions::EvalArgs& args) const {
+FL_TYPE Perturbation::timeTest(const SimContext& context) const {
 	static const FL_TYPE min_inc = numeric_limits<FL_TYPE>::epsilon();
 	if(nextStop >= 0)
-		return nextStop > args.getState().getCounter().getTime() ? 0.0 : nextStop+min_inc;
+		return nextStop > context.getCounter().getTime() ? 0.0 : nextStop+min_inc;
 	else
-		return condition->getValue(args).valueAs<bool>() ? -1.0 : 0.0;
+		return condition->getValue(context).valueAs<bool>() ? -1.0 : 0.0;
 }
 
 void Perturbation::apply(state::State& state) const {
@@ -140,28 +140,28 @@ void Perturbation::apply(state::State& state) const {
 	applies++;
 }
 
-bool Perturbation::testAbort(const expressions::EvalArgs& args,bool just_applied){
+bool Perturbation::testAbort(const SimContext& context,bool just_applied){
 	bool abort = false;
 	if(until){
-		abort = until->getValue(args).valueAs<bool>();
+		abort = until->getValue(context).valueAs<bool>();
 	}
 	else{
 		abort = just_applied;
 	}
-	while(incStep && nextStop <= args.getState().getCounter().getTime())
+	while(incStep && nextStop <= context.getCounter().getTime())
 		nextStop += incStep;
 #ifdef DEBUG
 	if(abort && !applies)
 		ADD_WARN_NOLOC("Perturbation "+to_string(id)+" was aborted at time "+
-				to_string(args.getState().getCounter().getTime())+" and never applied.");
+				to_string(context.getCounter().getTime())+" and never applied.");
 #endif
 	return abort;
 }
 
 void Perturbation::addEffect(Effect* eff,
-		const VarVector& vars,const Environment &env) {
+		const simulation::SimContext &context,const Environment &env) {
 	effects.push_back(eff);
-	introCount += eff->addInfluences(introCount,influence,vars,env);
+	introCount += eff->addInfluences(introCount,influence,context,env);
 }
 
 float Perturbation::nextStopTime() const {
@@ -180,7 +180,7 @@ string Perturbation::toString(const state::State& state) const {
 Perturbation::Effect::~Effect(){}
 
 int Perturbation::Effect::addInfluences(int current,Rule::CandidateMap& map,
-		const VarVector& vars,const Environment& env) const {
+		const SimContext &context,const Environment& env) const {
 	return 0;
 }
 
@@ -194,7 +194,7 @@ Intro::~Intro(){
 }
 
 void Intro::apply(state::State& state) const {
-	auto nn = n->getValue(expressions::EvalArgs(&state)).valueAs<int>();
+	auto nn = n->getValue(state).valueAs<int>();
 	if(nn < 0)
 		throw invalid_argument("A perturbation is trying to add a negative number of Agents.");
 	state.addNodes(nn, *mix);//no neg update
@@ -202,7 +202,7 @@ void Intro::apply(state::State& state) const {
 
 
 int Intro::addInfluences(int current,Rule::CandidateMap& map,
-		const VarVector& vars,const Environment &env) const {
+		const SimContext &context,const Environment &env) const {
 	//expressions::AuxMap aux_map;
 	for(unsigned ag_pos = 0; ag_pos < mix->size(); ag_pos++){
 		auto& new_ag = mix->getAgent(ag_pos);
@@ -212,8 +212,8 @@ int Intro::addInfluences(int current,Rule::CandidateMap& map,
 				Rule::CandidateKey key{cc_root.first,{cc_root.second,ag_pos}};
 				Rule::CandidateInfo info{{0,ag_pos},true};
 				if(cc_root.first->testEmbed(mix->getComponent(ag_coords.first),
-						key.match_root,expressions::SimContext<true>(0,&vars)))
-					map.emplace(key,info);;
+						key.match_root,context))
+					map.emplace(key,info);
 			}
 	}
 	return mix->size();
@@ -232,8 +232,7 @@ Delete::~Delete(){
 void Delete::apply(state::State& state) const {
 	auto& inj_cont = state.getInjContainer(mix.getId());
 	auto total = inj_cont.count();
-	expressions::EvalArgs args(&state);
-	auto some_del = n->getValue(args);
+	auto some_del = n->getValue(state);
 	size_t del;
 	if(some_del.t == Type::FLOAT){
 		if(some_del.fVal == numeric_limits<FL_TYPE>::infinity())
@@ -376,7 +375,7 @@ void Histogram::apply(state::State& state) const {
 	if(Parameters::get().runs > 1)
 		sprintf(file_name,("%s/%s(%s-%0"+to_string(int(log10(params.runs-1)+1))+"d).%s").c_str(),
 				params.outputDirectory.c_str(),prefix.c_str(),params.outputFile.c_str(),
-				state.getSim().getId(),params.outputFileType.c_str());
+				state.getParentContext().getId(),params.outputFileType.c_str());
 	else
 		sprintf(file_name,"%s/%s(%s).%s",params.outputDirectory.c_str(),prefix.c_str(),
 				params.outputFile.c_str(),params.outputFileType.c_str());
@@ -392,6 +391,8 @@ void Histogram::apply(state::State& state) const {
 		newLim = false;
 	}
 
+	CcEmbMap<expressions::Auxiliar,FL_TYPE,state::Node> cc_map;
+	state.setAuxMap(&cc_map);
 	for(auto kappa : kappaList){
 		auto& mix = kappa->getMix();
 		auto& cc = mix.getComponent(0);
@@ -407,9 +408,8 @@ void Histogram::apply(state::State& state) const {
 			max = -numeric_limits<float>::infinity();
 			min = -max;
 			function<void (const matching::Injection*)> f = [&](const matching::Injection* inj) -> void {
-				expressions::AuxCcEmb aux_map(inj->getEmbedding());
-				expressions::EvalArgs args(&state,&state.getVars(),&aux_map);
-				auto val = func->getValue(args).valueAs<FL_TYPE>();
+				cc_map.setEmb(inj->getEmbedding());
+				auto val = func->getValue(state).valueAs<FL_TYPE>();
 				if(val < min)
 					min = val;
 				if(val > max)
@@ -428,9 +428,8 @@ void Histogram::apply(state::State& state) const {
 		}
 		else{
 			function<void (const matching::Injection*)> f = [&](const matching::Injection* inj) -> void {
-				expressions::AuxCcEmb aux_map(inj->getEmbedding());
-				expressions::EvalArgs args(&state,&state.getVars(),&aux_map);
-				auto val = func->getValue(args).valueAs<FL_TYPE>();
+				cc_map.setEmb(inj->getEmbedding());
+				auto val = func->getValue(state).valueAs<FL_TYPE>();
 				if(!fixedLim && !isinf(val)){
 					if(val < min){
 						min = val;newLim = true;

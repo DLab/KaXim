@@ -69,11 +69,11 @@ public:
 	virtual FL_TYPE auxFactors(std::unordered_map<std::string,FL_TYPE> &factor) const override;
 
 	BaseExpression::Reduction factorize(const std::map<std::string,small_id> &aux_cc) const override;
-	BaseExpression* reduce(VarVector& vars) override;
+	BaseExpression* reduce(SimContext& context) override;
 	BaseExpression* clone() const override;
 
-	virtual T evaluate(const SimContext<true>& args) const override;
-	virtual T evaluate(const SimContext<false>& args) const override;
+	virtual T evaluate(const SimContext& args) const override;
+	virtual T evaluateSafe(const SimContext& args) const override;
 
 	BaseExpression* makeVarLabel() const override;
 
@@ -88,7 +88,7 @@ public:
 
 	bool isConst() const override;
 
-	BaseExpression* reduce(VarVector &vars) override;
+	BaseExpression* reduce(SimContext& context) override;
 	BaseExpression* clone()  const override;
 
 	BaseExpression* makeVarLabel() const override;
@@ -110,11 +110,11 @@ public:
 	FL_TYPE auxFactors(std::unordered_map<std::string,FL_TYPE> &factor) const override;
 
 	BaseExpression::Reduction factorize(const std::map<std::string,small_id> &aux_cc) const override;
-	BaseExpression* reduce(VarVector &vars) override;
+	BaseExpression* reduce(SimContext& context) override;
 	BaseExpression* clone() const override;
 
-	int evaluate(const SimContext<true>& args) const override;
-	int evaluate(const SimContext<false>& args) const override;
+	int evaluate(const SimContext& args) const override;
+	int evaluateSafe(const SimContext& args) const override;
 
 	BaseExpression* makeVarLabel() const override;
 
@@ -141,11 +141,11 @@ public:
 	FL_TYPE auxFactors(std::unordered_map<std::string,FL_TYPE> &factor) const override;
 
 	BaseExpression::Reduction factorize(const std::map<std::string,small_id> &aux_cc) const override;
-	BaseExpression* reduce(VarVector &vars) override;
+	BaseExpression* reduce(SimContext& context) override;
 	BaseExpression* clone() const override;
 
-	T evaluate(const SimContext<true>& args) const override;
-	T evaluate(const SimContext<false>& args) const override;
+	T evaluate(const SimContext& args) const override;
+	T evaluateSafe(const SimContext& args) const override;
 
 	BaseExpression* makeVarLabel() const override;
 
@@ -176,15 +176,15 @@ class TokenVar: public AlgExpression<FL_TYPE> {
 	unsigned id;
 public:
 	TokenVar(unsigned _id);
-	FL_TYPE evaluate(const SimContext<true>& args) const override;
-	FL_TYPE evaluate(const SimContext<false>& args) const override;
+	FL_TYPE evaluate(const SimContext& args) const override;
+	FL_TYPE evaluateSafe(const SimContext& args) const override;
 	FL_TYPE auxFactors(std::unordered_map<std::string, FL_TYPE> &factor) const
 			override;
 
 	bool operator==(const BaseExpression& exp) const override;
 
 	BaseExpression::Reduction factorize(const std::map<std::string,small_id> &aux_cc) const override;
-	BaseExpression* reduce(VarVector& vars) override;
+	BaseExpression* reduce(SimContext& context) override;
 	BaseExpression* clone() const override;
 
 	//virtual void getNeutralAuxMap(

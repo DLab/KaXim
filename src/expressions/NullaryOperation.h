@@ -16,21 +16,21 @@ namespace expressions {
 
 template<typename R>
 struct NullaryOperations {
-	static R (*funcs[])(const state::State&);
+	static R (*funcs[])(const SimContext&);
 };
 
 
 template<typename R>
 class NullaryOperation: public AlgExpression<R> {
-	R (*func)(const state::State&);
+	R (*func)(const SimContext&);
 	const char op;
 public:
-	R evaluate(const SimContext<true>& args) const override;
-	R evaluate(const SimContext<false>& args) const override;
+	R evaluate(const SimContext& args) const override;
+	R evaluateSafe(const SimContext& args) const override;
 	FL_TYPE auxFactors(std::unordered_map<std::string, FL_TYPE> &factor) const
 				override;
 	BaseExpression::Reduction factorize(const std::map<std::string,small_id> &aux_cc) const override;
-	BaseExpression* reduce(VarVector &vars) override;
+	BaseExpression* reduce(SimContext& context) override;
 	BaseExpression* clone() const override;
 	//std::set<std::string> getAuxiliars() const override;
 	bool operator==(const BaseExpression& exp) const override;

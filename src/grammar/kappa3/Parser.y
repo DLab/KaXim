@@ -3,7 +3,7 @@
 %defines
 %define parse.assert
 %define api.namespace { grammar::kappa3 }
-%define parser_class_name { Parser }
+%define api.parser.class { Parser }
 %define api.value.type variant
 %define api.token.constructor
 %define parse.error verbose
@@ -28,9 +28,10 @@
 	#include "../../simulation/Parameters.h"
 	#include <typeinfo>
 	
+	namespace grammar::kappa3 {
 	using namespace std;
 	using namespace grammar::ast;
-	
+	}
 	namespace yy {
 		class KappaLexer;
 	}

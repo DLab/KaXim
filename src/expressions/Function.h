@@ -10,36 +10,37 @@
 
 #include "AlgExpression.h"
 
-//#include <vector>
-//#include <list>
+#include <vector>
+#include <list>
 
 
 namespace expressions {
 
+using namespace std;
 
 template<typename T>
 struct FunctionPointers {
-	static T (*funcs[])(const std::vector<SomeValue>&,const state::State& state);
+	static T (*funcs[])(const vector<SomeValue>&,const simulation::SimContext&);
 };
 
 
 template <typename T>
 class Function : public AlgExpression<T> {
 	BaseExpression::Funcs f_name;
-	T (*func) (const std::vector<SomeValue>&,const state::State& state);
-	std::list<BaseExpression*> args;
+	T (*func) (const vector<SomeValue>&,const simulation::SimContext& context);
+	list<BaseExpression*> args;
 public:
-	Function(BaseExpression::Funcs f,const std::list<BaseExpression*>& l);
+	Function(BaseExpression::Funcs f,const list<BaseExpression*>& l);
 	virtual ~Function();
 
-	T evaluate(const SimContext<true>& args) const override;
-	T evaluate(const SimContext<false>& args) const override;
+	T evaluate(const SimContext& args) const override;
+	T evaluateSafe(const SimContext& args) const override;
 	FL_TYPE auxFactors(std::unordered_map<std::string, FL_TYPE> &factor) const
 			override;
 	BaseExpression::Reduction factorize(const std::map<std::string,small_id> &aux_cc) const override;
 	BaseExpression* clone() const override;
 
-	BaseExpression* reduce(VarVector& vars);
+	BaseExpression* reduce(SimContext& context);
 
 	//std::set<std::string> getAuxiliars() const override;
 	bool operator==(const BaseExpression& exp) const override;
@@ -47,7 +48,7 @@ public:
 	//return a flag of VarDep
 	char getVarDeps() const override;
 
-	std::string toString() const override;
+	string toString() const override;
 
 };
 

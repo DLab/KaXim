@@ -100,7 +100,7 @@ public:
 	virtual ~Node();
 
 	void copyDeps(const Node& node,EventInfo& ev,matching::InjRandContainer** injs,
-			const expressions::EvalArgs& args);//unsafe
+			const State& state);//unsafe
 	void alloc(big_id addr);
 	big_id getAddress() const;
 
@@ -269,7 +269,8 @@ struct EventInfo {
 	//mask for new injections, nullptr are erased injs
 	map<matching::Injection*,matching::Injection*> inj_mask;
 	//aux_values
-	AuxMixEmb aux_map;
+	//AuxMixEmb aux_map;
+	MixEmbMap<expressions::Auxiliar,FL_TYPE,Node> mix_map;
 
 	set<const pattern::Pattern*> to_update;
 	set<small_id> rule_ids;

@@ -68,7 +68,7 @@ public:
 		Rate(const Rule& r,state::State& state);
 		virtual ~Rate();
 
-		virtual two<FL_TYPE> evalActivity(const expressions::EvalArgs& args) const = 0;
+		virtual two<FL_TYPE> evalActivity(const SimContext &context) const = 0;
 		virtual const BaseExpression* getExpression(small_id cc_index = 0) const;
 		//CandidateMap influence;
 	};
@@ -136,7 +136,7 @@ public:
 	 * @param rhs_order initial order of RHS agents.
 	 * @param consts to evaluate const-expressions.
 	 */
-	void difference(const Environment& env,const VarVector& consts);
+	void difference(const Environment& env,const SimContext &context);
 
 	void addTokenChange(pair<unsigned,const BaseExpression*> tok);
 
@@ -147,7 +147,7 @@ public:
 		const Pattern::Agent& ag,small_id rhs_ag_pos,CandidateInfo info);
 
 
-	void checkInfluence(const Environment &env,const VarVector& vars);
+	void checkInfluence(const Environment &env,const SimContext &context);
 	void initialize(const state::State& state,VarVector& vars);
 
 
@@ -161,7 +161,7 @@ public:
 	NormalRate(const Rule& r,state::State& state);
 	virtual ~NormalRate();
 
-	two<FL_TYPE> evalActivity(const expressions::EvalArgs& args) const override;
+	two<FL_TYPE> evalActivity(const SimContext &context) const override;
 };
 
 class SamePtrnRate : public virtual Rule::Rate {
@@ -171,7 +171,7 @@ public:
 	SamePtrnRate(const Rule& r,state::State& state,bool normalize = false);
 	virtual ~SamePtrnRate();
 
-	two<FL_TYPE> evalActivity(const expressions::EvalArgs& args) const override;
+	two<FL_TYPE> evalActivity(const SimContext &context) const override;
 };
 
 class AuxDepRate : public virtual Rule::Rate {
@@ -182,7 +182,7 @@ public:
 	virtual ~AuxDepRate();
 
 	virtual const BaseExpression* getExpression(small_id cc_index = 0) const override;
-	virtual two<FL_TYPE> evalActivity(const expressions::EvalArgs& args) const override;
+	virtual two<FL_TYPE> evalActivity(const SimContext &context) const override;
 };
 
 class SameAuxDepRate : public SamePtrnRate,public AuxDepRate {
@@ -190,7 +190,7 @@ public:
 	SameAuxDepRate(const Rule& r,state::State& state,bool normalize);
 	virtual ~SameAuxDepRate();
 
-	virtual two<FL_TYPE> evalActivity(const expressions::EvalArgs& args) const override;
+	virtual two<FL_TYPE> evalActivity(const SimContext &context) const override;
 };
 
 

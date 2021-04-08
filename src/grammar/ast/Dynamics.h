@@ -104,7 +104,7 @@ public:
 	 *
 	 * @returns true if this is an int range, false if float and
 	 * raise an exception if other.	 */
-	bool evalRange(pattern::Environment &env,const vector<state::Variable*> &consts,
+	bool evalRange(pattern::Environment &env,const simulation::SimContext& context,
 			expressions::BaseExpression** expr_values) const;
 
 	void show( string tabs = "" ) const;
@@ -119,7 +119,7 @@ public:
 
 	/** \brief Evaluate a site of an agent signature. */
 	pattern::Signature::Site& eval(pattern::Environment &env,
-			const vector<state::Variable*> &consts,pattern::Signature &agent) const;
+			const simulation::SimContext& context,pattern::Signature &agent) const;
 
 	/** \brief Evaluate the site AST of an agent pattern or init instance.
 	 * This agent belongs to a Mixture.
@@ -131,7 +131,7 @@ public:
 	 * Expression::Info.
 	 * @returns the pattern::Site. 			*/
 	pattern::Mixture::Site* eval(pattern::Environment &env,
-			const vector<state::Variable*> &consts,pattern::Mixture& mix,
+			const SimContext &context,pattern::Mixture& mix,
 			char ptrn_flag = 0) const;
 	//const Link& getLink();
 	void show( string tabs = "" ) const;
@@ -153,7 +153,7 @@ public:
 	static set<two<string>> binding_sites;
 
 	/** \brief Evaluate an agent signature. */
-	void eval(pattern::Environment &env,const vector<state::Variable*> &consts) const;
+	void eval(pattern::Environment &env,const SimContext &context) const;
 
 	/** \brief Evaluate an agent pattern or instance.
 	 * A new pattern::Agent object is constructed and added to the mixture mix.
@@ -166,7 +166,7 @@ public:
 	 * Expression::Info.
 	 * @returns a Mixture::Agent object pointer. The agent is declared to the environment
 	 * if flag PTRN was set.																*/
-	pattern::Mixture::Agent* eval(pattern::Environment &env,const vector<state::Variable*> &consts,
+	pattern::Mixture::Agent* eval(pattern::Environment &env,const SimContext &context,
 			pattern::Mixture &mix, char ptrn_flag) const;
 
 	void show( string tabs = "" ) const;
@@ -195,7 +195,7 @@ public:
 	 * @param Flag-Byte with context information. See Expression::Info.
 	 * @returns the (declared) mixture. 								*/
 	pattern::Mixture* eval(pattern::Environment &env,
-			const vector<Variable*> &vars,char ptrn_flag = 0) const;
+			const SimContext &context,char ptrn_flag = 0) const;
 	void show(string tabs = "") const;
 	virtual ~Mixture();
 };
@@ -238,7 +238,7 @@ public:
 	//Effect& operator=(const Effect& eff);
 
 	simulation::Perturbation::Effect* eval(pattern::Environment& env,
-			const vector<state::Variable*> &vars) const;
+			const SimContext &context) const;
 
 	void show(string tabs = "") const;
 
@@ -271,7 +271,7 @@ public:
 	void show(string tabs = "") const;
 	~Pert();
 
-	void eval(pattern::Environment& env,const vector<state::Variable*>& vars) const;
+	void eval(pattern::Environment& env,const SimContext &context) const;
 protected:
 	const Expression *condition,*until;
 	list<Effect> effects;
@@ -303,7 +303,7 @@ public:
 	Rate(const location &l,const Expression *def,const bool fix,const Radius *un);
 	Rate(const location &l,const Expression *def,const bool fix,const Expression *op);
 	const state::BaseExpression* eval(const pattern::Environment& env,simulation::Rule& r,
-			const vector<state::Variable*> &vars,two<pattern::DepSet>& deps,
+			const SimContext &context,two<pattern::DepSet>& deps,
 			bool is_bi = false) const;
 	~Rate();
 };
@@ -315,7 +315,7 @@ public:
 	Token();
 	Token(const location &l,const Expression *e,const Id &id);
 	pair<unsigned,const BaseExpression*> eval(const pattern::Environment& env,
-			const vector<state::Variable*> &vars,bool neg = false) const;
+			const SimContext& args,bool neg = false) const;
 };
 
 /** \brief The AST to store Agents and Tokens that are part of
@@ -349,7 +349,7 @@ public:
 	Rule(const Rule& rule);
 	Rule& operator=(const Rule& rule);
 
-	void eval(pattern::Environment& env,const vector<state::Variable*>& vars) const;
+	void eval(pattern::Environment& env,const SimContext &context) const;
 
 	static size_t getCount();
 

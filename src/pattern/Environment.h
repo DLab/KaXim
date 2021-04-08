@@ -74,6 +74,20 @@ protected:
 	map<const Mixture*,list<expressions::Auxiliar<FL_TYPE>*>> auxExpressions;
 	mutable Dependencies deps;//mutable because [] accessing
 
+	struct Init {
+		int use_id;
+		expressions::BaseExpression* n;
+		Mixture* mix;
+		int tok_id;
+
+		Init(int id, expressions::BaseExpression* expr,
+				Mixture* m, int tok) : use_id(id),n(expr),mix(m),tok_id(tok) {}
+		~Init(){
+			delete n;delete mix;
+		}
+	};
+	list<Init> inits;
+
 	//(ag_id,site) -> list { (cc,ag_id) } map to every freeSite for side-effect events?
 	unordered_map<int,list<pair<const Pattern::Component*,small_id> > > freeSiteCC;
 
@@ -110,9 +124,12 @@ public:
 			const yy::location& loc);
 	void declarePert(simulation::Perturbation* pert);
 
+	void declareMixInit(int use_id,expressions::BaseExpression* n,Mixture* mix);
+	void declareTokInit(int use_id,expressions::BaseExpression* n,int tok_id);
+
 	void declareObservable(state::Variable* obs);
 
-	void buildInfluenceMap(const VarVector& vars);
+	void buildInfluenceMap(const simulation::SimContext &context);
 	void buildFreeSiteCC();
 	const list<pair<const Mixture::Component*,small_id> >& getFreeSiteCC(small_id ag,small_id site) const;
 
@@ -130,6 +147,7 @@ public:
 	const list<Mixture::Agent*>& getAgentPatterns(small_id id) const;
 	const vector<simulation::Rule>& getRules() const;
 	const vector<simulation::Perturbation*>& getPerts() const;
+	const list<Init>& getInits() const;
 	const list<state::Variable*>& getObservables() const;
 	const map<string,const expressions::BaseExpression*>& getParams() const;
 
@@ -158,7 +176,7 @@ public:
 
 	//DEBUG methods
 	std::string cellIdToString(unsigned int cell_id) const;
-	void show() const;
+	void show(const simulation::SimContext& context) const;
 
 };
 

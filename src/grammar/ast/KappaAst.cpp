@@ -27,17 +27,17 @@ KappaAst::~KappaAst() {
 			delete use;
 }
 
-void KappaAst::evaluateSignatures(pattern::Environment &env,const vector<Variable*> &consts){
+void KappaAst::evaluateSignatures(pattern::Environment &env,const SimContext &context){
 	env.reserve<pattern::Signature>(signatures.size());
 	env.reserve<pattern::Mixture::Agent>(signatures.size());
 	for(list<Agent>::iterator it = signatures.begin();it != signatures.end(); it++){
-		it->eval(env,consts);
+		it->eval(env,context);
 	}
 	for(auto it = tokens.begin();it != tokens.end(); it++)
 		env.declareToken(*it);
 }
 
-void KappaAst::evaluateCompartments(pattern::Environment &env,const vector<Variable*> &vars){
+void KappaAst::evaluateCompartments(pattern::Environment &env,const SimContext &context){
 	if(compartments.size() == 0){
 		ADD_WARN("No compartment declared. Declaring default compartment 'volume'.",yy::location());
 		env.declareCompartment(Id(yy::location(),"volume"));
@@ -45,30 +45,32 @@ void KappaAst::evaluateCompartments(pattern::Environment &env,const vector<Varia
 	}
 	env.reserve<pattern::Compartment>(compartments.size());
 	for(list<Compartment>::iterator it = compartments.begin();it != compartments.end(); it++){
-		it->eval(env,vars);
+		it->eval(env,context);
 	}
 }
-void KappaAst::evaluateUseExpressions(pattern::Environment &env,const vector<Variable*> &consts){
+void KappaAst::evaluateUseExpressions(pattern::Environment &env,const SimContext &context){
 	env.reserve<pattern::UseExpression>(useExpressions.size());
 	for(auto use : useExpressions){
-		use->eval(env,consts);
+		use->eval(env,context);
 	}
 }
-void KappaAst::evaluateChannels(pattern::Environment &env,const vector<Variable*> &vars){
+void KappaAst::evaluateChannels(pattern::Environment &env,const SimContext &context){
 	for(list<Channel>::iterator it = channels.begin();it != channels.end(); it++){
-		it->eval(env,vars);
+		it->eval(env,context);
 	}
 }
 
-vector<Variable*> KappaAst::evaluateDeclarations(pattern::Environment &env,vector<Variable*> &var_vector, bool is_const){
+vector<Variable*> KappaAst::evaluateDeclarations(pattern::Environment &env,SimContext &context, bool is_const){
 	auto vars = is_const ? constants : variables;
+	auto& var_vector = context.getVars();
 	for(list<Declaration>::iterator it = vars.begin();it != vars.end(); it++){
 		//delete &(*it);
 		Variable* var = nullptr;
 		if(is_const)
-			var = it->evalConst(env,var_vector);
+			var = it->evalConst(env,context);
 		else
-			var = it->evalVar(env,var_vector);
+			var = it->evalVar(env,context);
+
 		if(var)//var is not a param. DEPRECATED
 			var_vector.push_back(var);
 		if(it->isObservable())
@@ -84,17 +86,18 @@ vector<Variable*> KappaAst::evaluateDeclarations(pattern::Environment &env,vecto
  * --params: allows to associate values to model params at command line.
  *     Each float value will be associated to a parameter in the same order that
  *     they were declared in the model. This overwrite every previous value. */
-void KappaAst::evaluateParams(pattern::Environment &env,VarVector& vars,const vector<float>& po_params){
+void KappaAst::evaluateParams(pattern::Environment &env,SimContext &context,const vector<float>& po_params){
 	if(params.size() > po_params.size())
 		throw invalid_argument("Too many parameters given as command line argument.");
 	int i = 0;
+	auto& vars = context.getVars();
 	for(auto& param : params){
-		auto val = param.second->eval(env,vars);
+		auto p_expr = param.second->eval(env,context);
 		unsigned id;
 		if(i < po_params.size())
 			id = env.declareParam(param.first,new expressions::Constant<FL_TYPE>(po_params[i]));
 		else
-			id = env.declareParam(param.first,val);
+			id = env.declareParam(param.first,p_expr);
 		if(id == vars.size())
 			vars.push_back(nullptr);
 		else if(id > vars.size())
@@ -103,21 +106,21 @@ void KappaAst::evaluateParams(pattern::Environment &env,VarVector& vars,const ve
 	}
 }
 
-void KappaAst::evaluateInits(pattern::Environment &env,const vector<Variable*> &vars,simulation::Simulation &sim){
+void KappaAst::evaluateInits(pattern::Environment &env,simulation::SimContext &sim){
 	for(auto& init : inits){
-		init.eval(env,vars,sim);
+		init.eval(env,sim);
 	}
 }
 
-void KappaAst::evaluateRules(pattern::Environment &env,vector<Variable*> &vars){
+void KappaAst::evaluateRules(pattern::Environment &env,SimContext &context){
 	env.reserve<simulation::Rule>(Rule::getCount());
 	for(auto& r : rules)
-		r.eval(env,vars);
+		r.eval(env,context);
 }
-void KappaAst::evaluatePerts(pattern::Environment &env,vector<Variable*> &vars){
+void KappaAst::evaluatePerts(pattern::Environment &env,SimContext &context){
 	env.reserve<simulation::Perturbation>(perturbations.size());
 	for(auto p : perturbations)
-		p->eval(env,vars);
+		p->eval(env,context);
 }
 
 void KappaAst::add(const Id &name_loc,const Expression* value) {

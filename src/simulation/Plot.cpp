@@ -51,12 +51,12 @@ Plot::~Plot() {
 
 void Plot::fill(const state::State& state,const pattern::Environment& env) {
 	auto t = min(state.getCounter().getTime(),state.getCounter().next_sync_at);
-	AuxMixEmb aux_map;
+	//AuxMixEmb aux_map;
 	while(t >= nextPoint){
 		file << nextPoint;
 		//cout << state.getSim().getId() <<"]\t" << nextPoint;
 		for(auto var : env.getObservables()){
-			file << "\t" << state.getVarValue(var->getId(), aux_map);
+			file << "\t" << state.getVarValue(var->getId());
 			//cout << "\t" << state.getVarValue(var->getId(), aux_map);
 		}
 		file << endl;
@@ -67,12 +67,12 @@ void Plot::fill(const state::State& state,const pattern::Environment& env) {
 
 void Plot::fillBefore(const state::State& state,const pattern::Environment& env) {
 	auto t = min(std::nextafter(state.getCounter().getTime(),0.),state.getCounter().next_sync_at);
-	AuxMixEmb aux_map;
+	//AuxMixEmb aux_map;
 	while(t >= nextPoint){
 		file << nextPoint;
 		//cout << state.getSim().getId() <<"]\t" << nextPoint;
 		for(auto var : env.getObservables()){
-			file << "\t" << state.getVarValue(var->getId(), aux_map);
+			file << "\t" << state.getVarValue(var->getId());
 			//cout << "\t" << state.getVarValue(var->getId(), aux_map);
 		}
 		file << endl;

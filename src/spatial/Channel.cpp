@@ -37,9 +37,9 @@ const std::string& Channel::getName() const {
 }
 
 
-std::list< std::list< int > > Channel::getConnections() const{
+std::list< std::list< int > > Channel::getConnections(const simulation::SimContext& context) const{
 	std::vector<short> cell_index(source->getCompartment().getDimensions().size());
-	expressions::AuxNames<int> var_map;
+	AuxNames var_map;
 	std::list< std::list<int> > ret;
 	//TODO optimize when source is just a cell.
 	do{
@@ -55,7 +55,7 @@ std::list< std::list< int > > Channel::getConnections() const{
 		}
 		//for(auto &elem : var_map)
 		//	std::cout << elem.first << " -> " << elem.second << std::endl;
-		auto l2 = target->getCells(var_map);
+		auto l2 = target->getCells(var_map,context);
 		if(l2.size() == 0)
 			continue;
 		l.insert(l.end(),l2.begin(),l2.end());

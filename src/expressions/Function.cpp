@@ -5,6 +5,11 @@
  *      Author: naxo100
  */
 
+
+#include <iostream>
+#include <sstream>
+#include <string>
+
 #include "Function.h"
 #include "Constant.h"
 #include "../state/State.h"
@@ -12,15 +17,6 @@
 #include <random>
 #include <boost/math/special_functions/beta.hpp>
 
-using namespace std;
-
-namespace expressions {
-
-
-
-#include <iostream>
-#include <sstream>
-#include <string>
 
 namespace sftrabbit {
 
@@ -155,17 +151,19 @@ namespace sftrabbit {
 
 
 
+namespace expressions {
 
+using namespace std;
 
 template<typename T>
-T (*FunctionPointers<T>::funcs[1])(const std::vector<SomeValue>&,const state::State&)= {
-	[](const std::vector<SomeValue>& args,const state::State& state) {
+T (*FunctionPointers<T>::funcs[1])(const vector<SomeValue>&,const SimContext&)= {
+	[](const vector<SomeValue>& args,const SimContext& context) {
 		//static std::uniform_real_distribution<double> unif(0,1);
 		//double p = unif(state.getRandomGenerator());
 		//return boost::math::ibeta_inv(args[0].valueAs<FL_TYPE>(), args[1].valueAs<FL_TYPE>(), p);
 		sftrabbit::beta_distribution<> beta(args[0].valueAs<FL_TYPE>(), args[1].valueAs<FL_TYPE>());
 		//std::cout << beta << endl;
-		return beta(state.getRandomGenerator());
+		return beta(context.getRandomGenerator());
 	}, // Beta
 };
 
@@ -184,34 +182,34 @@ Function<T>::~Function(){
 }
 
 template <typename T>
-T Function<T>::evaluate(const SimContext<true>& _args) const {
+T Function<T>::evaluate(const SimContext& context) const {
 	vector<SomeValue> v;
 	v.reserve(args.size());
 	for(auto arg : args)
-		v.push_back(arg->getValue(_args));
-	return func(v,_args.getState());
+		v.push_back(arg->getValue(context));
+	return func(v,context);
 }
 template <typename T>
-T Function<T>::evaluate(const SimContext<false>& _args) const {
+T Function<T>::evaluateSafe(const SimContext& context) const {
 	vector<SomeValue> v;
 	v.reserve(args.size());
 	for(auto arg : args)
-		v.push_back(arg->getValue(_args));
-	return func(v,_args.getState());
+		v.push_back(arg->getValue(context));
+	return func(v,context);
 }
 
 template <typename T>
-FL_TYPE Function<T>::auxFactors(std::unordered_map<std::string, FL_TYPE> &factor) const{
+FL_TYPE Function<T>::auxFactors(unordered_map<string, FL_TYPE> &factor) const{
 	return 0.0;
 }
 
 template <typename T>
-BaseExpression::Reduction Function<T>::factorize(const std::map<std::string,small_id> &aux_cc) const{
+BaseExpression::Reduction Function<T>::factorize(const map<string,small_id> &aux_cc) const{
 	using Unfactorizable = BaseExpression::Unfactorizable;
-	auto VARDEP = BaseExpression::VarDep::VARDEP;
-	auto MULT = BaseExpression::AlgebraicOp::MULT;
-	auto make_binary = BaseExpression::makeBinaryExpression<false>;
-	auto make_unary = BaseExpression::makeUnaryExpression;
+	//auto VARDEP = BaseExpression::VarDep::VARDEP;
+	//auto MULT = BaseExpression::AlgebraicOp::MULT;
+	//auto make_binary = BaseExpression::makeBinaryExpression<false>;
+	//auto make_unary = BaseExpression::makeUnaryExpression;
 	BaseExpression::Reduction res;
 
 	list<BaseExpression*> clones;
@@ -248,11 +246,11 @@ BaseExpression* Function<T>::clone() const{
 }
 
 template <typename T>
-BaseExpression* Function<T>::reduce(VarVector& vars){
+BaseExpression* Function<T>::reduce(SimContext& context){
 	switch(f_name){
 	case BaseExpression::BETA:
 		for(auto& arg : args){
-			auto r = arg->reduce(vars);
+			auto r = arg->reduce(context);
 			if(r != arg)
 				delete arg;
 			arg = r;
@@ -270,7 +268,7 @@ bool Function<T>::operator==(const BaseExpression& expr) const{
 		if (f.f_name == f_name){
 			return f.args == args;
 		}
-	} catch (std::bad_cast &ex) {
+	} catch (bad_cast &ex) {
 	}
 	return false;
 }
@@ -291,8 +289,8 @@ char Function<T>::getVarDeps() const{
 }
 
 template <typename T>
-std::string Function<T>::toString() const{
-	return std::string("function TODO!!");
+string Function<T>::toString() const{
+	return string("function TODO!!");
 }
 
 

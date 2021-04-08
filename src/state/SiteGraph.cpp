@@ -31,16 +31,16 @@ SiteGraph::~SiteGraph() {
 #define MAX_CC_SIZE 10	//TODO
 #define MULTINODE_LIM 500 //TODO
 void SiteGraph::addComponents(unsigned n,const pattern::Mixture::Component& cc,
-		const expressions::EvalArgs& args,vector<Node*>& buff_nodes) {
+		const State &context,vector<Node*>& buff_nodes) {
 	unsigned i = 0;
 	if(!simulation::Parameters::get().useMultiNode || n < MULTINODE_LIM) {//=> n = 1
 		for(unsigned j = 0; j < n; j++){
 			i = 0;
 			for(auto p_ag : cc){
-				auto node = new Node(args.getState().getEnv().getSignature(p_ag->getId()));
+				auto node = new Node(context.getEnv().getSignature(p_ag->getId()));
 				//node->setCount(n);
 				for(auto& site : *p_ag)
-					node->setInternalValue(site.getId(),site.getValue(args));
+					node->setInternalValue(site.getId(),site.getValue(context));
 				this->allocate(node);
 				buff_nodes[i] = node;
 				i++;
@@ -52,9 +52,9 @@ void SiteGraph::addComponents(unsigned n,const pattern::Mixture::Component& cc,
 	} else {
 		auto multi = new MultiNode(cc.size(),n);
 		for(auto p_ag : cc){
-			auto node = new SubNode(args.getState().getEnv().getSignature(p_ag->getId()),*multi);
+			auto node = new SubNode(context.getEnv().getSignature(p_ag->getId()),*multi);
 			for(auto& site : *p_ag)
-				node->setInternalValue(site.getId(),site.getValue(args));
+				node->setInternalValue(site.getId(),site.getValue(context));
 			this->allocate(node);
 			buff_nodes[i] = node;
 			i++;

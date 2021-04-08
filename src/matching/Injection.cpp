@@ -27,7 +27,7 @@ CcInjection::CcInjection(const pattern::Pattern::Component& _cc)
 }
 
 bool CcInjection::reuse(const pattern::Pattern::Component& _cc,Node& node,
-		map<int,InjSet*>& port_list, const expressions::EvalArgs& args,small_id root) {
+		map<int,InjSet*>& port_list, const simulation::SimContext& context,small_id root) {
 	//ccAgToNode.clear();
 	for(auto& n : ccAgToNode)
 		n = nullptr;
@@ -45,7 +45,7 @@ bool CcInjection::reuse(const pattern::Pattern::Component& _cc,Node& node,
 			return false;
 		for(auto& site : *ag){
 			auto curr_int_state = curr_node->getInternalState(site.getId());
-			next_node.second = site.testMatch(curr_int_state,port_list,args);
+			next_node.second = site.testMatch(curr_int_state,port_list,context);
 			if(next_node.second == nullptr)
 				return false;
 			if(next_node.second->getId() != short_id(-1)){//compare different pointers

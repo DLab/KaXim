@@ -32,15 +32,15 @@ Id::Id(const location &l,const string &s): Node(l),id(s){};
 Id::~Id(){};
 
 
-string Id::evalLabel(const pattern::Environment &env, const VarVector& vars) const {
+string Id::evalLabel(const pattern::Environment &env, const simulation::SimContext& context) const {
 	string ret,s;
 	smatch m;
 	std::regex r("(\")([^\"]+)(\")");
 	s = id;
-	expressions::EvalArgs args(nullptr,&vars);
 	try {
+		auto& vars = context.getVars();
 		while(regex_search(s,m,r)){
-			ret += m.prefix().str() + vars[env.getVarId(m[2].str())]->getValue(args).toString();
+			ret += m.prefix().str() + vars[env.getVarId(m[2].str())]->getValue(context).toString();
 			s = m.suffix().str();
 		}
 		ret += s;
@@ -102,10 +102,9 @@ StringExpression::StringExpression(const location &l,const string s):
 StringExpression::StringExpression(const location &l,const Expression *e):
 	Node(l),t(ALG),alg(e),str() {};
 
-string StringExpression::evalConst(const pattern::Environment &env,const VarVector& vars) const {
-	expressions::EvalArgs args(0,&vars);
+string StringExpression::evalConst(const pattern::Environment &env,const simulation::SimContext& args) const {
 	if(t)
-		return alg->eval(env, vars, nullptr, Expression::CONST)->getValue(args).toString();
+		return alg->eval(env, args, nullptr, Expression::CONST)->getValue(args).toString();
 	else
 		return str;
 }

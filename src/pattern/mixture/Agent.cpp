@@ -82,7 +82,7 @@ bool Pattern::Agent::operator ==(const Agent &a) const {
 }
 
 bool Pattern::Agent::testEmbed(const Agent &rhs_ag,
-		const expressions::SimContext<true>& args,list<small_id>& sites_to_test) const {
+		const simulation::SimContext &context,list<small_id>& sites_to_test) const {
 	if(this == &rhs_ag)
 		return true;
 	if(signId != rhs_ag.signId)
@@ -91,7 +91,7 @@ bool Pattern::Agent::testEmbed(const Agent &rhs_ag,
 	set<small_id> already_done;
 	for(auto &site : rhs_ag.interface){
 		auto& lhs_site = getSiteSafe(site.getId());
-		if(lhs_site.testEmbed(site,args)){
+		if(lhs_site.testEmbed(site,context)){
 			if(site.getLinkType() == BND &&
 					lhs_site.getLinkType() == BND )
 				sites_to_test.emplace_back(site.getId());
@@ -263,7 +263,7 @@ bool Mixture::Site::isExpression() const{
 }*/
 
 //test if mix_site match with value or inequation
-bool Pattern::Site::testValue(const state::SomeValue& val,const expressions::SimContext<true>& args) const {
+bool Pattern::Site::testValue(const state::SomeValue& val,const simulation::SimContext &context) const {
 	//TODO ignore vars when using for check influence
 	if(val.t == NONE)
 		return true;
@@ -278,7 +278,7 @@ bool Pattern::Site::testValue(const state::SomeValue& val,const expressions::Sim
 		break;
 	case EQUAL:
 		try {
-			return values[0]->getValue(args) == val;
+			return values[0]->getValueSafe(context) == val;
 		}
 		//cannot evaluate so may be true
 		catch(std::exception &e){/*invalid_argument,out_of_range*/}
@@ -287,12 +287,12 @@ bool Pattern::Site::testValue(const state::SomeValue& val,const expressions::Sim
 		auto fl_val = val.valueAs<FL_TYPE>();
 		try {
 			if(values[0])
-				if(values[0]->getValue(args).valueAs<FL_TYPE>() > fl_val)
+				if(values[0]->getValueSafe(context).valueAs<FL_TYPE>() > fl_val)
 					return false;
 		}catch(std::exception &e){/*invalid_argument,out_of_range*/}
 		try {
 			if(values[1])
-				if(values[1]->getValue(args).valueAs<FL_TYPE>() < fl_val)
+				if(values[1]->getValueSafe(context).valueAs<FL_TYPE>() < fl_val)
 					return false;
 		} catch(std::exception &e){/*invalid_argument,out_of_range*/}
 		return true;
@@ -373,15 +373,15 @@ bool Pattern::Site::operator ==(const Site &s) const{
 }
 
 /*test if this site-pattern may embed the rhs_site*/
-bool Pattern::Site::testEmbed(const Site &rhs_site,const expressions::SimContext<true>& args) const{
+bool Pattern::Site::testEmbed(const Site &rhs_site,const simulation::SimContext &context) const{
 	try{
 		switch(rhs_site.value_type){//the possible values of an RHS site
 		case EQUAL:
-			if(!testValue(rhs_site.values[0]->getValue(args),args))
+			if(!testValue(rhs_site.values[0]->getValueSafe(context),context))
 				return false;
 			break;
 		case LABEL:
-			if(!testValue(SomeValue(rhs_site.label),args))
+			if(!testValue(SomeValue(rhs_site.label),context))
 				return false;
 			break;
 		case EMPTY:
@@ -524,20 +524,20 @@ list<Pattern::Site::Diff> Pattern::Site::difference(const Pattern::Site& rhs) co
 	if(st->getValue().smallVal != label) return nullptr; \
 	ADD_DEP(id,first)
 #define TEST_EQUAL \
-	if(values[0]->getValue(args).valueAs<FL_TYPE>() != st->getValue().valueAs<FL_TYPE>()) \
+	if(values[0]->getValueSafe(context).valueAs<FL_TYPE>() != st->getValue().valueAs<FL_TYPE>()) \
 		return nullptr; \
 	ADD_DEP(id,first)
 #define TEST_GREATER \
-	if(values[0]->getValue(args).valueAs<FL_TYPE>() > st->getValue().valueAs<FL_TYPE>()) \
+	if(values[0]->getValueSafe(context).valueAs<FL_TYPE>() > st->getValue().valueAs<FL_TYPE>()) \
 		return nullptr; \
 	ADD_DEP(id,first)
 #define TEST_SMALLER \
-	if(values[1]->getValue(args).valueAs<FL_TYPE>() < st->getValue().valueAs<FL_TYPE>()) \
+	if(values[1]->getValueSafe(context).valueAs<FL_TYPE>() < st->getValue().valueAs<FL_TYPE>()) \
 		return nullptr; \
 	ADD_DEP(id,first)
 #define TEST_BETWEEN \
-	if(values[0]->getValue(args).valueAs<FL_TYPE>() > st->getValue().valueAs<FL_TYPE>() || \
-			values[1]->getValue(args).valueAs<FL_TYPE>() < st->getValue().valueAs<FL_TYPE>()) \
+	if(values[0]->getValueSafe(context).valueAs<FL_TYPE>() > st->getValue().valueAs<FL_TYPE>() || \
+			values[1]->getValueSafe(context).valueAs<FL_TYPE>() < st->getValue().valueAs<FL_TYPE>()) \
 		return nullptr; \
 	ADD_DEP(id,first)
 
@@ -566,7 +566,7 @@ state::Node* empty_node = new state::Node();
 template <>																	\
 state::Node* Pattern::Site::testMatchOpt<Pattern::VT,Pattern::LT>	\
 		(const state::InternalState* st,map<int,InjSet*>& port_list,			\
-		const expressions::EvalArgs& args) const							\
+		const simulation::SimContext &context) const							\
 	{ TEST_##VT;TEST_##LT;return empty_node; }
 
 
@@ -620,7 +620,6 @@ TEST_EMBED_OPT(BETWEEN,BND_ANY)
 
 void Pattern::Site::setMatchFunction(){
 	set<InjSet*> s;
-	expressions::EvalArgs args;
 	switch(value_type){
 		CASE(EMPTY)
 		CASE(LABEL)

@@ -47,13 +47,13 @@ protected:
 	int lnk_id;
 
 	state::Node* (Site::*testMatchFunc) (const state::InternalState*,map<int,InjSet*>&,
-			const expressions::EvalArgs&) const;
+			const simulation::SimContext &context) const;
 
 	void setMatchFunction();
 
 	template <ValueType vt,LinkType lt>
 	state::Node* testMatchOpt(const state::InternalState*,
-			map<int,InjSet*>&,const expressions::EvalArgs&) const;
+			map<int,InjSet*>&,const simulation::SimContext &) const;
 	//template <ValueType vt>
 	//expressions::SomeValue getValue(const expressions::EvalArgs& args) const;
 	/*template <ValueType vt>
@@ -89,7 +89,7 @@ public:
 	bool operator==(const Site &s) const;
 
 	/** \brief Tests if this site-pattern may embed the rhs_site. */
-	bool testEmbed(const Site &rhs_site,const expressions::SimContext<true>& args) const;
+	bool testEmbed(const Site &rhs_site,const simulation::SimContext &context) const;
 	//int compareLinkPtrn(ag_st_id ptrn) const;
 	//bool isEmptySite() const;
 	//bool isExpression() const;
@@ -99,7 +99,7 @@ public:
 	}*/
 	/** \brief tests if val can be matched in this site pattern. (no-optimized)*/
 	bool testValue(const expressions::SomeValue& val,
-			const expressions::SimContext<true>& args) const;
+			const simulation::SimContext &context) const;
 	//bool testValueOpt(const expressions::SomeValue& val,
 	//		const state::State& state,
 	//		const expressions::AuxMap& aux_map) const;
@@ -112,10 +112,10 @@ public:
 		return link_type;
 	}
 
-	template <bool safe>
-	inline expressions::SomeValue getValue(const expressions::SimContext<safe>& args) const {
+	//template <bool safe = true>
+	inline expressions::SomeValue getValue(const simulation::SimContext &context) const {
 		return value_type == LABEL? expressions::SomeValue(label) :
-				value_type == EQUAL? values[0]->getValue(args) :
+				value_type == EQUAL? values[0]->getValueSafe(context) :
 						throw invalid_argument("Pattern::Site::getValue(): not a valued site.");
 	}
 
@@ -131,8 +131,8 @@ public:
 	 * @returns nullptr if no match, a node to follow if there is a Bind,
 	 * and an invalid node (signId = -1) elsewhere. */
 	inline state::Node* testMatch(const state::InternalState* st,
-			map<int,InjSet*> &port_list,const expressions::EvalArgs& args) const {
-		return (this->*testMatchFunc)(st,port_list,args);
+			map<int,InjSet*> &port_list,const simulation::SimContext &context) const {
+		return (this->*testMatchFunc)(st,port_list,context);
 	}
 
 	/** \brief Optimized function to remove injection deps based on site pattern */
@@ -210,10 +210,10 @@ public:
 
 	/** \brief Test if this agent-pattern embeds the rhs_site.
 	 * @param sites_to_test stores site-ids of every bind that will need to be tested. */
-	bool testEmbed(const Agent& rhs_ag,const expressions::SimContext<true>& args,list<small_id>& sites_to_test) const;
-	inline bool testEmbed(const Agent& rhs_ag,const expressions::SimContext<true>& args) const{
+	bool testEmbed(const Agent& rhs_ag,const simulation::SimContext &context,list<small_id>& sites_to_test) const;
+	inline bool testEmbed(const Agent& rhs_ag,const simulation::SimContext &context) const{
 		static list<small_id> empty_list;
-		return testEmbed(rhs_ag,args,empty_list);
+		return testEmbed(rhs_ag,context,empty_list);
 	}
 
 	/** \brief Set this RHS-pattern to auto fill missing sites. */

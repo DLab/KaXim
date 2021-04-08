@@ -13,6 +13,7 @@
 #include <random>
 #include "Variable.h"
 #include "SiteGraph.h"
+#include "../simulation/SimContext.h"
 #include "../simulation/Counter.h"
 #include "../simulation/Rule.h"
 #include "../simulation/Perturbation.h"
@@ -37,32 +38,29 @@ struct EventInfo;
  * and all variables, rules and perturbations declared with
  * Kappa.
  */
-class State {
+class State : public SimContext {
 	friend class RateVar;
 	friend class simulation::Rule::Rate;
 	friend class simulation::AuxDepRate;
-	friend class expressions::SimContext<false>;
-	friend class expressions::SimContext<true>;
+	//friend class expressions::SimContext<false>;
+	//friend class expressions::SimContext<true>;
 	friend class Node;
 	friend class SubNode;
 	friend class InternalState;
 
-	const simulation::Simulation& sim;
-	const pattern::Environment& env;
+	//const pattern::Environment& env;
 	SiteGraph graph;
 	const state::BaseExpression& volume;
-	std::vector<Variable*> vars;
+	//std::vector<Variable*> vars;
 	vector<simulation::Rule::Rate*> rates;
-	float* tokens;
+	FL_TYPE* tokens;
 
 	data_structs::RandomTree* activityTree;
 	matching::InjRandContainer** injections;
 
-	mutable RNG rng;
 	simulation::LocalCounter counter;
 	simulation::Plot& plot;
 	mutable EventInfo ev;
-	expressions::EvalArgs args;
 	mutable unordered_map<small_id,simulation::Perturbation> perts;
 	mutable pattern::Dependencies activeDeps;
 	mutable list<small_id> pertIds;//maybe part of event-info?
@@ -90,10 +88,9 @@ public:
 	 * @param _vars the variable vector.
 	 * @param vol the volume of this state.
 	 */
-	State(const simulation::Simulation& sim,
-			const std::vector<Variable*>& _vars,
-			const BaseExpression& vol,simulation::Plot& plot,
-			const pattern::Environment& env,int seed);
+	State(int id,simulation::Simulation& sim,
+			const BaseExpression& vol,
+			simulation::Plot& plot);
 	~State();
 
 
@@ -107,21 +104,19 @@ public:
 	 */
 	void addTokens(float n,unsigned tok_id);
 
-	float getTokenValue(unsigned tok_id) const;
-
 	const simulation::Rule::Rate& getRuleRate(int id) const;
-	SomeValue getVarValue(short_id var_id,const AuxMap& aux_values) const;
-	const VarVector& getVars() const{
-		return vars;
-	}
+	SomeValue getVarValue(short_id var_id) const;
+	//const VarVector& getVars() const{
+	//	return vars;
+	//}
 
 
 	void positiveUpdate(const simulation::Rule::CandidateMap& wake_up);
 
 	FL_TYPE getTotalActivity() const;
-	RNG& getRandomGenerator() const;
-	matching::InjRandContainer& getInjContainer(int cc_id);
-	const matching::InjRandContainer& getInjContainer(int cc_id) const;
+	matching::InjRandContainer& getInjContainer(int cc_id) override;
+	const matching::InjRandContainer& getInjContainer(int cc_id) const override;
+	FL_TYPE getTokenValue(unsigned tok_id) const override;
 
 	/** \brief Add nodes to the SiteGraph using a fully described mixture.
 	 * @param n count of copies of the mixture.
@@ -160,8 +155,8 @@ public:
 	void initInjections();
 	void initActTree();
 
-	const pattern::Environment& getEnv() const;
-	const simulation::Simulation& getSim() const;
+	//const pattern::Environment& getEnv() const;
+	//const simulation::Simulation& getSim() const;
 
 	/** \brief Print the state for debugging purposes.
 	 **/
@@ -171,34 +166,26 @@ public:
 };
 
 
-
-
-inline const pattern::Environment& State::getEnv() const{
-	return env;
-}
-inline const simulation::Simulation& State::getSim() const {
+/*inline const simulation::Simulation& State::getSim() const {
 	return sim;
-}
+}*/
 inline const simulation::Counter& State::getCounter() const {
 	return counter;
 }
 inline void State::addTokens(float n,unsigned tok_id){
 	tokens[tok_id] += n;
 }
-inline float State::getTokenValue(unsigned tok_id) const{
+inline FL_TYPE State::getTokenValue(unsigned tok_id) const{
 	return tokens[tok_id];
 }
 inline const simulation::Rule::Rate& State::getRuleRate(int _id) const {
 	return *(rates[_id]);
 }
-inline SomeValue State::getVarValue(short_id var_id, const AuxMap& aux_values) const {
-	return vars[var_id]->getValue(args);
+inline SomeValue State::getVarValue(short_id var_id) const {
+	return vars[var_id]->getValue(*this);
 }
 inline FL_TYPE State::getTotalActivity() const {
 	return activityTree->total();
-}
-inline RNG& State::getRandomGenerator() const{
-	return rng;
 }
 inline const matching::InjRandContainer& State::getInjContainer(int cc_id) const{
 	return *(injections[cc_id]);

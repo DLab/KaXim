@@ -90,12 +90,12 @@ void AlgebraicVar<T>::update(SomeValue val){
 }
 
 template <typename T>
-T AlgebraicVar<T>::evaluate(const SimContext<true>& args) const{
-	return expression->evaluate(args);
+T AlgebraicVar<T>::evaluate(const SimContext& context) const{
+	return expression->evaluate(context);
 }
 template <typename T>
-T AlgebraicVar<T>::evaluate(const SimContext<false>& args) const{
-	return expression->evaluate(args);
+T AlgebraicVar<T>::evaluateSafe(const SimContext& context) const{
+	return expression->evaluateSafe(context);
 }
 template <typename T>
 FL_TYPE AlgebraicVar<T>::auxFactors(std::unordered_map<std::string,FL_TYPE> &aux_values) const{
@@ -109,8 +109,8 @@ BaseExpression::Reduction AlgebraicVar<T>::factorize(const std::map<std::string,
 }
 
 template <typename T>
-BaseExpression* AlgebraicVar<T>::reduce(VarVector &vars) {
-	auto r = expression->reduce(vars);
+BaseExpression* AlgebraicVar<T>::reduce(SimContext& context) {
+	auto r = expression->reduce(context);
 	if(expression != r)
 		delete expression;
 	expression = dynamic_cast<AlgExpression<T>*>(r);
@@ -154,7 +154,7 @@ bool ConstantVar<T>::isConst() const {
 }
 
 template <typename T>
-BaseExpression* ConstantVar<T>::reduce(VarVector &vars) {
+BaseExpression* ConstantVar<T>::reduce(SimContext& context) {
 	return this;
 }
 template <typename T>
@@ -220,7 +220,7 @@ BaseExpression::Reduction KappaVar::factorize(const std::map<std::string,small_i
 	return r;
 }
 
-BaseExpression* KappaVar::reduce(VarVector &vars) {
+BaseExpression* KappaVar::reduce(SimContext& context) {
 	return this;
 }
 
@@ -231,11 +231,11 @@ BaseExpression* KappaVar::makeVarLabel() const{
 BaseExpression* KappaVar::clone() const {
 	return new KappaVar(*this);
 }
-int KappaVar::evaluate(const SimContext<true>& args) const {
-	return args.getState().mixInstances(*mixture);
+int KappaVar::evaluate(const SimContext& context) const {
+	return context.getInjContainer(mixture->getId()).count();
 }
-int KappaVar::evaluate(const SimContext<false>& args) const {
-	return args.getState().mixInstances(*mixture);
+int KappaVar::evaluateSafe(const SimContext& context) const {
+	return context.getInjContainer(mixture->getId()).count();
 }
 
 const pattern::Mixture& KappaVar::getMix() const {
@@ -298,7 +298,7 @@ BaseExpression::Reduction DistributionVar<T>::factorize(const std::map<std::stri
 }
 
 template <typename T>
-BaseExpression* DistributionVar<T>::reduce(VarVector &vars) {
+BaseExpression* DistributionVar<T>::reduce(SimContext& context) {
 	return this;
 }
 
@@ -307,17 +307,17 @@ BaseExpression* DistributionVar<T>::clone() const {
 	return new DistributionVar(id,name,isObservable,*mixture,make_pair(op,auxFunc->clone()));
 }
 template <typename T>
-T DistributionVar<T>::evaluate(const SimContext<true>& args) const {
-	/*auto& state = args.getState();
-	return state.getInjContainer(mixture->getComponent(0).getId()).sumInternal(auxFunc,args)
-			/ (op? state.mixInstances(*mixture) : 1);*/
-	throw invalid_argument("DistributionVar::evaluate(): invalid");
+T DistributionVar<T>::evaluate(const SimContext& context) const {
+	auto& injs = context.getInjContainer(mixture->getComponent(0).getId());
+	return injs.sumInternal(auxFunc,context)
+			/ (op? injs.count() : 1);
+	//throw invalid_argument("DistributionVar::evaluate(): invalid");
 }
 template <typename T>
-T DistributionVar<T>::evaluate(const SimContext<false>& args) const {
-	auto& state = args.getState();
-	return state.getInjContainer(mixture->getComponent(0).getId()).sumInternal(auxFunc,args)
-			/ (op? state.mixInstances(*mixture) : 1);
+T DistributionVar<T>::evaluateSafe(const SimContext& context) const {
+	auto& injs = context.getInjContainer(mixture->getComponent(0).getId());
+	return injs.sumInternal(auxFunc,context)
+			/ (op? injs.count() : 1);
 }
 
 template <typename T>
@@ -385,15 +385,17 @@ bool RateVar::operator ==(const BaseExpression& exp) const {
 TokenVar::TokenVar(unsigned _id) :
 		id(_id) {
 }
-FL_TYPE TokenVar::evaluate(const SimContext<true>& args) const {
-	return args.getState().getTokenValue(id);
+FL_TYPE TokenVar::evaluate(const SimContext& args) const {
+	//throw invalid_argument("todo: TokenVar::evaluate");
+	return args.getTokenValue(id);
 }
-FL_TYPE TokenVar::evaluate(const SimContext<false>& args) const {
-	return args.getState().getTokenValue(id);
+FL_TYPE TokenVar::evaluateSafe(const SimContext& args) const {
+	return args.getTokenValue(id);
+	//throw invalid_argument("todo: TokenVar::evaluate");
 }
 FL_TYPE TokenVar::auxFactors(
 		std::unordered_map<std::string, FL_TYPE> &factor) const {
-	throw std::invalid_argument("Cannot use tokens in this expression.");
+	throw std::invalid_argument("TokenVar::auxFactors():Cannot use tokens in this expression.");
 }
 
 bool TokenVar::operator==(const BaseExpression& exp) const {
@@ -411,7 +413,7 @@ BaseExpression::Reduction TokenVar::factorize(const std::map<std::string,small_i
 	return r;
 }
 
-BaseExpression* TokenVar::reduce(VarVector &vars) {
+BaseExpression* TokenVar::reduce(SimContext& context) {
 	return this;
 }
 

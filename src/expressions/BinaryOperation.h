@@ -21,11 +21,13 @@ namespace expressions {
 template<typename R, typename T1, typename T2>
 struct BinaryOperations {
 	static R (*funcs[])(T1, T2);
+	static R (*funcs_safe[])(T1, T2);
 };
 
 template<typename T1, typename T2>
 struct BinaryOperations<bool, T1, T2> {
 	static bool (*funcs[])(T1, T2);
+	static bool (*funcs_safe[])(T1, T2);
 };
 
 
@@ -41,14 +43,14 @@ class BinaryOperation: public AlgExpression<R> {
 
 	friend class simulation::Perturbation;
 public:
-	R evaluate(const  SimContext<true>& args) const override;
-	R evaluate(const  SimContext<false>& args) const override;
+	R evaluate(const SimContext& args) const override;
+	R evaluateSafe(const SimContext& args) const override;
 	FL_TYPE auxFactors(std::unordered_map<std::string, FL_TYPE> &factor) const
 			override;
 	BaseExpression::Reduction factorize(const std::map<std::string,small_id> &aux_cc) const override;
 	BaseExpression* clone() const override;
 
-	BaseExpression* reduce(VarVector& vars);
+	BaseExpression* reduce(SimContext& args);
 
 	//std::set<std::string> getAuxiliars() const override;
 	bool operator==(const BaseExpression& exp) const override;

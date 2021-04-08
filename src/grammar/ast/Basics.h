@@ -14,6 +14,7 @@
 #include "../../state/Variable.h"
 #include "../../pattern/Environment.h"
 #include "../../pattern/Dependencies.h"
+#include "../../simulation/SimContext.h"
 
 //#define DEBUG
 
@@ -54,7 +55,7 @@ public:
 	Id(const location &l,const string &s);
 	~Id();
 
-	string evalLabel(const pattern::Environment& env,const VarVector &vars) const;
+	string evalLabel(const pattern::Environment& env,const simulation::SimContext& context) const;
 
 	const string& getString() const;
 	void show( string tabs = "" ) const;
@@ -91,7 +92,7 @@ public:
 	 *  @param mix the mixture associated with this aux expression, null if no mix.
 	 *  @returns A pointer to a expressions::BaseExpression object.							*/
 	virtual expressions::BaseExpression* eval(const pattern::Environment& env,
-			const VarVector &vars,pattern::DepSet* deps = nullptr,const char flags = 0,
+			const simulation::SimContext &context,pattern::DepSet* deps = nullptr,const char flags = 0,
 			const pattern::Mixture* mix = nullptr) const = 0;
 
 	/** \brief Returns true only if the expression is a Const. */
@@ -125,7 +126,7 @@ public:
 
 	void show(string tabs = "") const;
 
-	string evalConst(const pattern::Environment& env,const VarVector& vars) const;
+	string evalConst(const pattern::Environment& env,const simulation::SimContext& context) const;
 
 	~StringExpression();
 

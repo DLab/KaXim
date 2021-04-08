@@ -101,9 +101,10 @@ Declaration::~Declaration(){
 };
 
 Variable* Declaration::evalVar(pattern::Environment &env,
-		VarVector &vars) const{
+		SimContext &context) const{
 	Variable* var = nullptr;
-	auto eval_name = name.evalLabel(env,vars);
+	auto& vars = context.getVars();
+	auto eval_name = name.evalLabel(env,context);
 	short id = env.declareVariable(Id(name.loc,eval_name),type);
 	//if(id == -1)//var was declared before as a param. DEPRECATED
 	//	return nullptr;
@@ -111,12 +112,12 @@ Variable* Declaration::evalVar(pattern::Environment &env,
 		if(constant)
 			throw SemanticError("Constants cannot be Kappa Expressions.",loc);
 		char flag = Expression::AUX_ALLOW | Expression::PATTERN;
-		auto mix = mixture->eval(env,vars,flag);
+		auto mix = mixture->eval(env,context,flag);
 		map<string,tuple<int,small_id,small_id>> aux_map;
 		if(type == KAPPA)
 			var = new state::KappaVar(id,eval_name,observable,*mix);
 		else if(type == AUX_EXPR){
-			BaseExpression* b_expr = expr->eval(env,vars,nullptr,flag,mix);
+			BaseExpression* b_expr = expr->eval(env,context,nullptr,flag,mix);
 			if(mix->compsCount() != 1)
 				throw SemanticError("Distribution expressions can't have more than one Connected Component.",loc);
 			//if(op == BaseExpression::SUMATORY && ) //TODO maybe make DistrVar<int> if expr is int?
@@ -126,7 +127,7 @@ Variable* Declaration::evalVar(pattern::Environment &env,
 	}
 	else {
 		char flag = constant ? Expression::CONST : 0;
-		BaseExpression* b_expr = expr->eval(env,vars,nullptr,flag);
+		BaseExpression* b_expr = expr->eval(env,context,nullptr,flag);
 		switch(b_expr->getType()){
 		case FLOAT:
 			var = new state::AlgebraicVar<FL_TYPE>(id,eval_name,observable,
@@ -148,7 +149,7 @@ Variable* Declaration::evalVar(pattern::Environment &env,
 }
 
 Variable* Declaration::evalConst(pattern::Environment &env,
-		VarVector &vars) const{
+		SimContext &context) const{
 	Variable* var;
 	short id = env.declareVariable(name,type);
 	//if(id == -1)//var was declared before as a param. DEPRECATED
@@ -157,20 +158,19 @@ Variable* Declaration::evalConst(pattern::Environment &env,
 		throw SemanticError("Constants can not depend on agent mixtures.",loc);
 	else {
 		char flag = constant ? Expression::CONST : 0;
-		BaseExpression* b_expr = expr->eval(env,vars,nullptr,flag);
-		expressions::EvalArgs args(nullptr,&vars);
+		BaseExpression* b_expr = expr->eval(env,context,nullptr,flag);
 		switch(b_expr->getType()){
 		case FLOAT:
 			var = new state::ConstantVar<FL_TYPE>(id,name.getString(),
-				b_expr->getValue(args).valueAs<FL_TYPE>());
+				b_expr->getValue(context).valueAs<FL_TYPE>());
 			break;
 		case INT:
 			var = new state::ConstantVar<int>(id,name.getString(),
-					b_expr->getValue(args).valueAs<int>());
+					b_expr->getValue(context).valueAs<int>());
 			break;
 		case BOOL:
 			var = new state::ConstantVar<bool>(id,name.getString(),
-					b_expr->getValue(args).valueAs<bool>());
+					b_expr->getValue(context).valueAs<bool>());
 			break;
 		default:
 			throw invalid_argument("Declaration::evalVar(): Cannot return None value.");
@@ -245,37 +245,23 @@ Init& Init::operator=(const Init &init) {
 	return *this;
 }
 
-void Init::eval(pattern::Environment &env,const VarVector &vars,
-		simulation::Simulation &sim){
+void Init::eval(pattern::Environment &env,simulation::SimContext &sim){
 	auto& use_expr = env.getUseExpression(this->getUseId());
 	auto &cells = use_expr.getCells();//cells to distribute tokens/agents
-	expressions::EvalArgs args(&sim.getCell(0),&vars);
 	if(type){ //TOKEN
-		float n;
 		short tok_id;
 		if(alg == nullptr)
 			throw std::invalid_argument("Null value for token init.");
-		else//TODO check if vars is only consts
-			n = alg->eval(env,vars,nullptr,Expression::CONST)->getValue(args).valueAs<FL_TYPE>();
+		auto expr = alg->eval(env,sim,nullptr,Expression::CONST);
 		tok_id = env.getTokenId(token.getString());
-		sim.addTokens(cells,n,tok_id);
+		env.declareTokInit(this->getUseId(),expr,tok_id);
 	}
 	else { //MIX
-		int n;
 		if(alg == nullptr)
 			throw std::invalid_argument("Null value for mix init.");
-		else{
-			auto n_value = alg->eval(env,vars,nullptr,Expression::CONST)->getValue(args);
-			if(n_value.t == Type::FLOAT){
-				n = round(n_value.fVal);
-				ADD_WARN("Making approximation of a float value in agent initialization to "+to_string(n),loc);
-			}
-			else
-				n = n_value.valueAs<int>();
-		}
-		auto mix = mixture.eval(env,vars,false);
-		sim.addAgents(cells,n,*mix);
-		delete mix;
+		auto expr = alg->eval(env,sim,nullptr,Expression::CONST);
+		auto mix = mixture.eval(env,sim,false);
+		env.declareMixInit(this->getUseId(),expr,mix);
 	}
 }
 

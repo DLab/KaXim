@@ -32,7 +32,7 @@ public:
 	 *
 	 * @param env,vars,deps,flags,aux_map All params ignored.
 	 * @returns an expression::Constant pointer (as a Expression). 					*/
-	BaseExpression* eval(const pattern::Environment& env,const VarVector &vars,
+	BaseExpression* eval(const pattern::Environment& env,const simulation::SimContext& context,
 			pattern::DepSet* deps = nullptr,const char flags = 0,
 			const pattern::Mixture* mix = nullptr) const override;
 	bool isConstant();
@@ -53,7 +53,7 @@ public:
 
 	/** \brief Return the expressions::BinaryExpression from this AST.
 	 *  */
-	BaseExpression* eval(const pattern::Environment& env,const VarVector &vars,
+	BaseExpression* eval(const pattern::Environment& env,const simulation::SimContext& context,
 			pattern::DepSet* deps = nullptr,const char flags = 0,
 			const pattern::Mixture* mix = nullptr) const override;
 	BoolBinaryOperation* clone() const override;
@@ -71,7 +71,7 @@ public:
 	AlgBinaryOperation(const location &loc,const Expression *e1,
 			const Expression *e2,BaseExpression::AlgebraicOp o);
 	~AlgBinaryOperation();
-	BaseExpression* eval(const pattern::Environment& env,const VarVector &vars,
+	BaseExpression* eval(const pattern::Environment& env,const simulation::SimContext& context,
 			pattern::DepSet* deps = nullptr,const char flags = 0,
 			const pattern::Mixture* mix = nullptr) const override;
 	AlgBinaryOperation* clone() const override;
@@ -91,7 +91,7 @@ public:
 	UnaryOperation(const location &loc,const Expression *e,
 			const BaseExpression::Unary f);
 	~UnaryOperation();
-	BaseExpression* eval(const pattern::Environment& env,const VarVector &vars,
+	BaseExpression* eval(const pattern::Environment& env,const simulation::SimContext& context,
 			pattern::DepSet* deps = nullptr,const char flags = 0,
 			const pattern::Mixture* mix = nullptr) const override;
 	UnaryOperation* clone() const override;
@@ -107,7 +107,7 @@ protected:
 class NullaryOperation: public Expression {
 public:
 	BaseExpression::Nullary func;
-	BaseExpression* eval(const pattern::Environment& env,const VarVector &vars,
+	BaseExpression* eval(const pattern::Environment& env,const simulation::SimContext& context,
 			pattern::DepSet* deps = nullptr,const char flags = 0,
 			const pattern::Mixture* mix = nullptr) const override;
 	NullaryOperation* clone() const override;
@@ -122,7 +122,7 @@ class Var : public Expression {
 public:
 	enum VarType {VAR,TOKEN,AUX};
 	Var(const location &loc,const VarType &t,const Id &label=Id());
-	BaseExpression* eval(const pattern::Environment& env,const vector<state::Variable*> &vars,
+	BaseExpression* eval(const pattern::Environment& env,const simulation::SimContext& context,
 			pattern::DepSet* deps = nullptr,const char flags = 0,
 			const pattern::Mixture* mix = nullptr) const override;
 	Var* clone() const override;
@@ -140,7 +140,7 @@ class Func : public Expression {
 public:
 	Func(const location &loc,BaseExpression::Funcs f,const list<Expression*>& args);
 	~Func();
-	BaseExpression* eval(const pattern::Environment& env,const VarVector &vars,
+	BaseExpression* eval(const pattern::Environment& env,const simulation::SimContext& context,
 			pattern::DepSet* deps = nullptr,const char flags = 0,
 			const pattern::Mixture* mix = nullptr) const override;
 	Func* clone() const override;

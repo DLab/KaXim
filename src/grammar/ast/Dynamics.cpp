@@ -121,16 +121,16 @@ void SiteState::evalLabels(pattern::Signature::LabelSite& site) const{
 	return;
 }
 
-bool SiteState::evalRange(pattern::Environment &env,const vector<state::Variable*> &consts,
+bool SiteState::evalRange(pattern::Environment &env,const simulation::SimContext& context,
 		expressions::BaseExpression** expr_values) const{
 	//using ast::Expression::VAR;
 	//using ast::Expression::FLAGS;
-	expr_values[0] = range[0]->eval(env,consts,nullptr,
+	expr_values[0] = range[0]->eval(env,context,nullptr,
 			Expression::FORCE | Expression::CONST);
-	expr_values[2] = range[2]->eval(env,consts,nullptr,
+	expr_values[2] = range[2]->eval(env,context,nullptr,
 			Expression::FORCE | Expression::CONST);
 	if(range[1] != nullptr)
-		expr_values[1] = range[1]->eval(env,consts,nullptr,
+		expr_values[1] = range[1]->eval(env,context,nullptr,
 					Expression::FORCE | Expression::CONST);
 	else
 		expr_values[1] = expr_values[0];
@@ -165,7 +165,7 @@ Site::Site(const location &l,const Id &id) : Node(l), name(id){}
 Site::Site(const location &l,const Id &id,const SiteState &s,const Link &lnk):
 	Node(l), name(id), stateInfo(s), link(lnk) {};
 
-pattern::Signature::Site& Site::eval(pattern::Environment &env,const vector<state::Variable*> &consts,
+pattern::Signature::Site& Site::eval(pattern::Environment &env,const simulation::SimContext& context,
 		pattern::Signature &sign) const{
 	if(name.getString() == "...")
 		throw SemanticError("Auto complete site pattern (...) can only be used in RHS.",loc);
@@ -183,19 +183,18 @@ pattern::Signature::Site& Site::eval(pattern::Environment &env,const vector<stat
 		break;
 	case SiteState::RANGE:
 		try{
-			expressions::SimContext<true> args(0,&consts);
 			BaseExpression* range[3];
-			if(!stateInfo.evalRange(env,consts,range)){
+			if(!stateInfo.evalRange(env,context,range)){
 				site = &sign.addSite<pattern::Signature::RangeSite<FL_TYPE> >(name);
 				static_cast<pattern::Signature::RangeSite<FL_TYPE>*>
-					(site)->setBoundaries(range[0]->getValue(args).valueAs<FL_TYPE>(),
-						range[2]->getValue(args).valueAs<FL_TYPE>(),range[1]->getValue(args).valueAs<FL_TYPE>());
+					(site)->setBoundaries(range[0]->getValueSafe(context).valueAs<FL_TYPE>(),
+						range[2]->getValueSafe(context).valueAs<FL_TYPE>(),range[1]->getValueSafe(context).valueAs<FL_TYPE>());
 			}
 			else{
 				site = &sign.addSite<pattern::Signature::RangeSite<int> >(name);
 				static_cast<pattern::Signature::RangeSite<int>*>
-					(site)->setBoundaries(range[0]->getValue(args).valueAs<int>(),
-						range[2]->getValue(args).valueAs<int>(),range[1]->getValue(args).valueAs<int>());
+					(site)->setBoundaries(range[0]->getValueSafe(context).valueAs<int>(),
+						range[2]->getValueSafe(context).valueAs<int>(),range[1]->getValueSafe(context).valueAs<int>());
 			}
 		}
 		catch(std::out_of_range &e){
@@ -209,7 +208,7 @@ pattern::Signature::Site& Site::eval(pattern::Environment &env,const vector<stat
 }
 
 pattern::Mixture::Site* Site::eval(pattern::Environment &env,
-		const vector<Variable*> &consts,pattern::Mixture& mix,
+		const SimContext &context,pattern::Mixture& mix,
 		char ptrn_flag) const{
 	const pattern::Signature* sign;
 	short ag_pos = mix.size()-1,site_id;//mix.size() gives the actual agent-id.
@@ -281,18 +280,18 @@ pattern::Mixture::Site* Site::eval(pattern::Environment &env,
 		}
 		if(stateInfo.range[0]){//TODO infinity expressions
 			if(stateInfo.flag & SiteState::MIN_EQUAL)
-				values[0] = stateInfo.range[0]->eval(env, consts, nullptr, ptrn_flag,&mix);//TODO reduce these expressions
+				values[0] = stateInfo.range[0]->eval(env, context, nullptr, ptrn_flag,&mix);//TODO reduce these expressions
 			else
 				values[0] = BaseExpression::makeUnaryExpression(
-						stateInfo.range[0]->eval(env, consts, nullptr, ptrn_flag,&mix),
+						stateInfo.range[0]->eval(env, context, nullptr, ptrn_flag,&mix),
 						BaseExpression::PREV);
 		}
 		if(stateInfo.range[2]){
 			if(stateInfo.flag & SiteState::MAX_EQUAL)
-				values[2] = stateInfo.range[2]->eval(env, consts, nullptr, ptrn_flag,&mix);
+				values[2] = stateInfo.range[2]->eval(env, context, nullptr, ptrn_flag,&mix);
 			else
 				values[2] = BaseExpression::makeUnaryExpression(
-						stateInfo.range[2]->eval(env, consts, nullptr, ptrn_flag,&mix),
+						stateInfo.range[2]->eval(env, context, nullptr, ptrn_flag,&mix),
 						BaseExpression::PREV);
 		}
 		if(!mix.addAuxCoords(stateInfo.aux.getString(),ag_pos,site_id))
@@ -303,7 +302,7 @@ pattern::Mixture::Site* Site::eval(pattern::Environment &env,
 			if(values[0] || values[2])
 				throw invalid_argument("Site::eval(): cannot declare 'equality' and 'inequality' patterns.");
 			values[1] = stateInfo.range[1]->eval
-					(env,consts,nullptr,ptrn_flag|Expression::FORCE,&mix);
+					(env,context,nullptr,ptrn_flag|Expression::FORCE,&mix);
 		}
 		//If values[1] && values[0|2] throw...
 		mix_site->setValuePattern(values);
@@ -315,13 +314,12 @@ pattern::Mixture::Site* Site::eval(pattern::Environment &env,
 			throw SemanticError("Only valued sites can assign expressions.",stateInfo.loc);
 		}
 		if(ptrn_flag & Mixture::Info::RHS)
-			values[1] = stateInfo.val->eval(env,consts,nullptr,ptrn_flag);
+			values[1] = stateInfo.val->eval(env,context,nullptr,ptrn_flag);
 		else //LHS or pattern
-			values[1] = stateInfo.val->eval(env,consts,nullptr,Expression::CONST | ptrn_flag);
+			values[1] = stateInfo.val->eval(env,context,nullptr,Expression::CONST | ptrn_flag);
 		try{
-			expressions::SimContext<true> args(0,&consts);
 			//cout << agent.toString(env) << " loc = " << loc << endl;
-			auto val = values[1]->getValue(args);
+			auto val = values[1]->getValueSafe(context);
 			if(! site_sign.isPossibleValue(val))
 				throw SemanticError("The value "+val.toString()+
 						" is out of the site's bounds.",loc);
@@ -357,13 +355,13 @@ Agent::Agent(const location &l,const Id &id,const list<Site> s):
 	}
 };
 
-void Agent::eval(pattern::Environment &env,const vector<state::Variable*> &consts) const{
+void Agent::eval(pattern::Environment &env,const SimContext &context) const{
 	//using namespace pattern;
 	pattern::Signature& sign = env.declareSignature(name);
 	//sign.setId(id);
 
 	for(auto& site : sites){
-		auto& site_sign = site.eval(env,consts,sign);
+		auto& site_sign = site.eval(env,context,sign);
 		if(binding_sites.count(make_pair(name.getString(),site.name.getString())))
 			site_sign.enableBinding();
 	}
@@ -371,7 +369,7 @@ void Agent::eval(pattern::Environment &env,const vector<state::Variable*> &const
 }
 
 pattern::Mixture::Agent* Agent::eval(pattern::Environment &env,
-		const vector<state::Variable*> &consts,pattern::Mixture &mix,
+		const SimContext &context,pattern::Mixture &mix,
 		char ptrn_flag) const {
 	short sign_id;
 	try{
@@ -384,7 +382,7 @@ pattern::Mixture::Agent* Agent::eval(pattern::Environment &env,
 	pattern::Mixture::Agent* agent = new pattern::Mixture::Agent(sign_id);
 	mix.addAgent(agent);
 	for(auto &ast_site : sites){
-		auto site = ast_site.eval(env,consts,mix,ptrn_flag);
+		auto site = ast_site.eval(env,context,mix,ptrn_flag);
 		if(site)
 			agent->addSite(site);//site destructor called
 		else
@@ -415,10 +413,10 @@ Mixture::Mixture(const location &l,const list<Agent> &m):
 Mixture::~Mixture(){};
 
 pattern::Mixture* Mixture::eval(pattern::Environment &env,
-		const vector<Variable*> &vars,char ptrn_flag) const{
+		const SimContext &context,char ptrn_flag) const{
 	pattern::Mixture* mix = new pattern::Mixture(agents.size());
 	for(auto& ag_ast : agents){
-		auto agent = ag_ast.eval(env,vars,*mix,ptrn_flag);
+		auto agent = ag_ast.eval(env,context,*mix,ptrn_flag);
 	}
 	mix->setComponents();
 	if(ptrn_flag & Mixture::Info::PATTERN){
@@ -512,11 +510,12 @@ Effect::Effect(const location &l,const list<StringExpression> &str,
 }*/
 
 simulation::Perturbation::Effect* Effect::eval(pattern::Environment& env,
-		const vector<state::Variable*> &vars) const {
+		const SimContext &context) const {
+	auto& vars = context.getVars();
 	try{
 	switch(action){
 	case INTRO:{
-		auto mixture = mix->eval(env,vars,0);
+		auto mixture = mix->eval(env,context,0);
 		for(auto cc : *mixture)
 			for(auto ag : *cc)
 				for(auto st_sign : env.getSignature(ag->getId()).getSites()){
@@ -524,11 +523,11 @@ simulation::Perturbation::Effect* Effect::eval(pattern::Environment& env,
 					def_site->setValue(st_sign->getDefaultValue());
 					ag->getSite(def_site);
 				}
-		return new simulation::Intro(n->eval(env, vars, nullptr, 0),mixture);
+		return new simulation::Intro(n->eval(env, context, nullptr, 0),mixture);
 	}
 	case DELETE:{
-		auto mixture = mix->eval(env,vars,Expression::PATTERN | Expression::AUX_ALLOW);
-		return new simulation::Delete(n->eval(env, vars, nullptr, 0),*mixture);
+		auto mixture = mix->eval(env,context,Expression::PATTERN | Expression::AUX_ALLOW);
+		return new simulation::Delete(n->eval(env, context, nullptr, 0),*mixture);
 	}
 	case UPDATE:{
 		auto id = env.getVarId(set.var.getString());
@@ -537,7 +536,7 @@ simulation::Perturbation::Effect* Effect::eval(pattern::Environment& env,
 		if(vars[id]->isConst())
 			throw SemanticError("Cannot update constants.",loc);
 		pattern::DepSet deps;
-		auto set_expr = set.value->eval(env, vars, &deps);
+		auto set_expr = set.value->eval(env, context, &deps);
 		auto upd_eff = new simulation::Update(*vars[id],set_expr);
 		if(deps.count(pattern::Dependency(pattern::Dependency::VAR,id)))
 			upd_eff->setValueUpdate();
@@ -550,20 +549,19 @@ simulation::Perturbation::Effect* Effect::eval(pattern::Environment& env,
 			string file;
 			list<const state::KappaVar*> k_vars;
 			for(auto& var_name : names){
-				auto var_id = Id(var_name.loc,var_name.evalLabel(env,vars));
+				auto var_id = Id(var_name.loc,var_name.evalLabel(env,context));
 				auto k_var = dynamic_cast<const state::KappaVar*>(vars[env.getVarId(var_id)]);
 				if(!k_var)
 					throw SemanticError("Variable "+var_id.getString()+" is not a Kappa mixture.",var_id.loc);
 				k_vars.emplace_back(k_var);
 			}
-			expressions::EvalArgs args(0,&vars);
-			auto bins = set.value->eval(env, vars, nullptr, Expression::PATTERN | Expression::AUX_ALLOW)
-					->getValue(args).valueAs<int>();
-			auto aux_func = n ? n->eval(env, vars, nullptr,
+			auto bins = set.value->eval(env, context, nullptr, Expression::PATTERN | Expression::AUX_ALLOW)
+					->getValueSafe(context).valueAs<int>();
+			auto aux_func = n ? n->eval(env, context, nullptr,
 					Expression::PATTERN | Expression::AUX_ALLOW,& k_vars.front()->getMix())
 					: nullptr;
 			for(auto& se : filename)
-				file += se.evalConst(env, vars);
+				file += se.evalConst(env, context);
 			simulation::Histogram* eff;
 			try{
 				eff = new simulation::Histogram(env,bins,file,k_vars,aux_func);
@@ -649,21 +647,21 @@ Pert::Pert(const location &l,const Expression *cond,const list<Effect> &effs,con
 	Node(l), condition(cond), until(rep), effects(effs){};
 
 
-void Pert::eval(pattern::Environment& env,const vector<state::Variable*>& vars) const {
+void Pert::eval(pattern::Environment& env,const SimContext &context) const {
 	expressions::BaseExpression *cond = nullptr,*rep = nullptr;
 	pattern::DepSet deps;
 	if(condition)
-		cond  = condition->eval(env, vars, &deps, 0);
+		cond  = condition->eval(env, context, &deps, 0);
 	else
 		cond = new Constant<bool>(true);
 
 	if(until)
-		rep = until->eval(env, vars, nullptr, 0);
+		rep = until->eval(env, context, nullptr, 0);
 
-	auto pert = new simulation::Perturbation(cond,rep,loc);
+	auto pert = new simulation::Perturbation(cond,rep,loc,context);
 
 	for(auto &eff : effects){
-		pert->addEffect(eff.eval(env, vars),vars,env);
+		pert->addEffect(eff.eval(env, context),context,env);
 	}
 
 	env.declarePert(pert);
@@ -745,11 +743,11 @@ Rate::~Rate(){
 }
 
 const state::BaseExpression* Rate::eval(const pattern::Environment& env,simulation::Rule& r,
-		const vector<state::Variable*> &vars,two<pattern::DepSet> &deps,bool is_bi) const {
+		const SimContext &context,two<pattern::DepSet> &deps,bool is_bi) const {
 	if(!base)
 		throw std::invalid_argument("Base rate cannot be null.");
 	auto& lhs = r.getLHS();
-	auto base_rate = base->eval(env,vars,&deps.first,
+	auto base_rate = base->eval(env,context,&deps.first,
 			Expression::AUX_ALLOW+Expression::RHS,&lhs);//TODO enum rate?
 	r.setRate(base_rate);
 	if(is_bi){
@@ -761,18 +759,18 @@ const state::BaseExpression* Rate::eval(const pattern::Environment& env,simulati
 			ADD_WARN("Assuming same rate for both directions of bidirectional rule.",loc);
 		}
 		else{
-			return reverse->eval(env,vars,&deps.second,Expression::AUX_ALLOW);
+			return reverse->eval(env,context,&deps.second,Expression::AUX_ALLOW);
 		}
 	}
 	else{
 		if(reverse)
 			throw SemanticError("Reverse rate defined for unidirectional rule.",loc);
 		if(unary){
-			auto un_rate = unary->k1->eval(env,vars,&deps.first,0);
+			auto un_rate = unary->k1->eval(env,context,&deps.first,0);
 			int radius = 0;
 			if(unary->opt){
-				radius = unary->opt->eval(env,vars,&deps.first,Expression::CONST + Expression::AUX_ALLOW)->
-						getValue(expressions::EvalArgs(0,&vars)).valueAs<int>();//TODO check if vars is only consts
+				radius = unary->opt->eval(env,context,&deps.first,Expression::CONST + Expression::AUX_ALLOW)->
+						getValueSafe(context).valueAs<int>();//TODO check if vars is only consts
 			}
 			r.setUnaryRate(make_pair(un_rate,radius));
 		}
@@ -786,7 +784,7 @@ Token::Token() : exp(nullptr) {}
 Token::Token(const location &l,const Expression *e,const Id &id):
 	Node(l), exp(e), id(id) {};
 pair<unsigned,const BaseExpression*> Token::eval(const pattern::Environment& env,
-			const vector<state::Variable*> &vars,bool neg) const {
+			const SimContext& context,bool neg) const {
 	unsigned i;
 	try{
 		i = env.getTokenId(id.getString());
@@ -798,7 +796,7 @@ pair<unsigned,const BaseExpression*> Token::eval(const pattern::Environment& env
 			location(),exp,new Const(location(),-1),BaseExpression::MULT)
 			: exp;
 	//pattern::DepSet deps;
-	return make_pair(i,expr->eval(env,vars,nullptr,Expression::RHS + Expression::AUX_ALLOW));//TODO flags
+	return make_pair(i,expr->eval(env,context,nullptr,Expression::RHS + Expression::AUX_ALLOW));//TODO flags
 }
 
 /****** Class RuleSide ***********/
@@ -840,15 +838,15 @@ Rule& Rule::operator=(const Rule& r){
 }
 
 void Rule::eval(pattern::Environment& env,
-		const VarVector &vars) const{
+		const SimContext &context) const{
 	//TODO eval name...
-	auto& lhs_mix = *lhs.agents.eval(env,vars,
+	auto& lhs_mix = *lhs.agents.eval(env,context,
 			Expression::PATTERN + Expression::LHS + Expression::AUX_ALLOW);//TODO do not allow aux?
 	auto& rule = env.declareRule(label,lhs_mix,loc);
 
 	lhs_mix.addInclude(rule.getId());
 	two<pattern::DepSet> deps;//first-> | second<-
-	auto reverse = rate.eval(env,rule,vars,deps,bi);
+	auto reverse = rate.eval(env,rule,context,deps,bi);
 	for(auto dep : deps.first){
 		if(dep.type == Deps::AUX){
 			auto cc_id = lhs_mix.getAuxMap().at(dep.aux).cc_pos;
@@ -856,12 +854,12 @@ void Rule::eval(pattern::Environment& env,
 		}
 	}
 
-	auto rhs_mix_p = rhs.agents.eval(env,vars,
+	auto rhs_mix_p = rhs.agents.eval(env,context,
 			Expression::RHS + Expression::AUX_ALLOW);
 	for(auto& t : lhs.tokens)
-		rule.addTokenChange(t.eval(env,vars,true));
+		rule.addTokenChange(t.eval(env,context,true));
 	for(auto& t : rhs.tokens)
-		rule.addTokenChange(t.eval(env,vars));
+		rule.addTokenChange(t.eval(env,context));
 	if(bi)
 		throw SemanticError("Bidirectional rules are deprecated.",loc);
 		/*rhs_mix_p->declareAgents(env);
@@ -886,7 +884,7 @@ void Rule::eval(pattern::Environment& env,
 		rule.setRHS(rhs_mix_p,bi);
 	//}
 	//DEBUG cout << lhs_mix.toString(env,lhs_mask) << " -> " << rhs_mix_p->toString(env,rhs_mask) << endl;
-	rule.difference(env,vars);
+	rule.difference(env,context);
 	for(auto& dep : deps.first)
 		env.addDependency(dep,Deps::RULE,rule.getId());
 }

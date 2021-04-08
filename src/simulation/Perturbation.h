@@ -31,7 +31,7 @@ public:
 		virtual ~Effect();
 		virtual void apply(state::State &state) const = 0;
 		virtual int addInfluences(int current,Rule::CandidateMap& map,
-				const VarVector& vars,const Environment &env) const;
+				const SimContext &context,const Environment &env) const;
 	};
 	friend class pattern::Environment;
 protected:
@@ -49,18 +49,18 @@ protected:
 
 	void setId(int _id);
 public:
-	Perturbation(BaseExpression* cond,BaseExpression* unt,const yy::location& loc);
+	Perturbation(BaseExpression* cond,BaseExpression* unt,const yy::location& loc,const simulation::SimContext &context);
 	Perturbation(const Perturbation& pert);
 	~Perturbation();
 
 	int getId() const;
 
-	bool test(const expressions::EvalArgs& args) const;
-	FL_TYPE timeTest(const expressions::EvalArgs& args) const;
-	bool testAbort(const expressions::EvalArgs& args,bool just_applied);
+	bool test(const SimContext& context) const;
+	FL_TYPE timeTest(const SimContext& context) const;
+	bool testAbort(const SimContext& context,bool just_applied);
 	void apply(state::State &state) const;
 
-	void addEffect(Effect* eff,const VarVector& vars,const Environment& env);
+	void addEffect(Effect* eff,const simulation::SimContext &context,const Environment& env);
 
 	float nextStopTime() const;
 
@@ -78,7 +78,7 @@ public:
 	~Intro();
 
 	void apply(state::State &state) const override;
-	int addInfluences(int current,Rule::CandidateMap& map,const VarVector& vars,
+	int addInfluences(int current,Rule::CandidateMap& map,const simulation::SimContext &context,
 			const Environment &env) const override;
 };
 
