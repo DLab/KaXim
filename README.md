@@ -4,7 +4,7 @@ Kappa for Expanded Simulations
 Install instructions:
 
 ``` [bash]
-$ git clone https://github.com/naxo100/KaXim.git
+$ git clone https://github.com/DLab/KaXim.git
 $ cd KaXim/src/grammar
 $ make
 $ cd -
