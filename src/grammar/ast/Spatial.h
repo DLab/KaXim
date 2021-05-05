@@ -51,7 +51,7 @@ public:
 	 * @return a short int for every index as a vector.
 	 */
 	vector<short> evalDimensions(const pattern::Environment &env,
-			const vector<Variable*> &consts) const;
+			const SimContext &context) const;
 
 	/** \brief Tests if this compartment is declared and returns its Id.
 	 *
@@ -72,7 +72,7 @@ public:
 	 * @return a list of BaseExpression* for each index of compExpression by copy.
 	 */
 	list<const state::BaseExpression*> evalExpression(const pattern::Environment &env,
-			small_id comp_id,const VarVector &consts) const;
+			small_id comp_id,const SimContext &context) const;
 
 
 protected:
@@ -87,7 +87,7 @@ class Compartment : public Node {
 public:
 	Compartment(const location& l,const CompExpression& comp_exp,
 			Expression* exp);
-	void eval(pattern::Environment &env,const vector<Variable*> &vars);
+	void eval(pattern::Environment &env,const SimContext &context);
 };
 
 /** \brief The AST of a channel declaration */
@@ -102,7 +102,7 @@ public:
 			const CompExpression& trgt, bool bckwrds, const Expression* where=nullptr,
 			const Expression* delay=nullptr);
 	void eval(pattern::Environment &env,
-			const vector<Variable*> &vars);
+			const SimContext &context);
 
 };
 
@@ -122,7 +122,7 @@ public:
 	Use(const Use& u);
 	~Use();
 
-	void eval(pattern::Environment &env,const VarVector &consts) const;
+	void eval(pattern::Environment &env,const SimContext &context) const;
 };
 
 

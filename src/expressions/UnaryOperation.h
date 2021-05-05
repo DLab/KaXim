@@ -17,6 +17,7 @@ namespace expressions {
 template<typename R, typename T>
 struct UnaryOperations {
 	static R (*funcs[])(T);
+	static R (*funcs_safe[])(T);
 };
 
 
@@ -26,13 +27,13 @@ class UnaryOperation: public AlgExpression<R> {
 	R (*func)(T);
 	const char op;
 public:
-	R evaluate(const EvalArguments<true>& args) const override;
-	R evaluate(const EvalArguments<false>& args) const override;
+	R evaluate(const SimContext& args) const override;
+	R evaluateSafe(const SimContext& args) const override;
 	FL_TYPE auxFactors(std::unordered_map<std::string, FL_TYPE> &factor) const
 				override;
 	//std::set<std::string> getAuxiliars() const override;
 	BaseExpression::Reduction factorize(const std::map<std::string,small_id> &aux_cc) const override;
-	BaseExpression* reduce(VarVector &vars) override;
+	BaseExpression* reduce(SimContext& context) override;
 	BaseExpression* clone() const override;
 	bool operator==(const BaseExpression& exp) const override;
 	virtual ~UnaryOperation();

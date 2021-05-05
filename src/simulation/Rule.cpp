@@ -92,12 +92,11 @@ void Rule::addTokenChange(pair<unsigned,const BaseExpression*> tok) {
  *
  *
  */
-void Rule::difference(const Environment& env, const VarVector& consts){
+void Rule::difference(const Environment& env, const SimContext &context){
 	small_id ag_pos;
 	matchCount = 0;
 	//modify nodes
 	//string s_i;
-	expressions::EvalArguments<true> args(0,&consts);
 
 	for(ag_pos = 0; ag_pos < lhs.size(); ag_pos++){//for each agent in LHS
 		auto& lhs_ag = lhs.getAgent(ag_pos);
@@ -208,7 +207,7 @@ void Rule::difference(const Environment& env, const VarVector& consts){
 					break;
 				case ActionType::ASSIGN:
 					try{
-						auto val = site.getValue(args);
+						auto val = site.getValue(context);
 						new_ag->setInternalValue(st_id,val);
 					} catch(out_of_range& e){//is not const value
 						Action a;
@@ -281,10 +280,9 @@ void Rule::addAgentIncludes(CandidateMap &candidates,
 }
 
 
-void Rule::checkInfluence(const Environment &env,const VarVector& vars) {
+void Rule::checkInfluence(const Environment &env,const SimContext &context) {
 	//we first check all candidates to avoid do complete evaluation of same CC twice
 	CandidateMap candidates;
-	expressions::EvalArguments<true> args(0,&vars);
 	list<Action> changes(script);
 	for(auto& act : changes){//for each action (applied to 1 site)
 		if(act.is_new)
@@ -303,13 +301,13 @@ void Rule::checkInfluence(const Environment &env,const VarVector& vars) {
 			case ActionType::CHANGE:case ActionType::ASSIGN:
 				ci.infl_by.emplace(act.trgt_st);
 				if(st_ptrn.getValueType() != Pattern::EMPTY &&
-						st_ptrn.testEmbed(rhs_site,args))
+						st_ptrn.testEmbed(rhs_site,context))
 					addAgentIncludes(candidates,*ag_ptrn,ag_pos,ci);
 				break;
 			case ActionType::UNBIND:case ActionType::LINK:
 				ci.infl_by.emplace(-1-int(act.trgt_st));
 				if(st_ptrn.getLinkType() != Pattern::WILD
-						&& st_ptrn.testEmbed(rhs_site,args))
+						&& st_ptrn.testEmbed(rhs_site,context))
 					addAgentIncludes(candidates,*ag_ptrn,ag_pos,ci);
 				//if(act.new_label)//TODO unbinding a BND_PTRN
 				break;
@@ -328,7 +326,7 @@ void Rule::checkInfluence(const Environment &env,const VarVector& vars) {
 		//auto& ag_sign = env.getSignature(new_ag.getId());
 		CandidateInfo info{{lhs.compsCount(),ag_pos-matchCount},true,{}};
 		for(auto ag_ptrn : env.getAgentPatterns(new_ag.getId())){
-			if(ag_ptrn->testEmbed(new_ag,args))
+			if(ag_ptrn->testEmbed(new_ag,context))
 				addAgentIncludes(candidates,*ag_ptrn,ag_pos,info);
 		}
 	}
@@ -343,7 +341,7 @@ void Rule::checkInfluence(const Environment &env,const VarVector& vars) {
 			continue;//this match for this cc is already done TODO print this
 		//cout << "\t" << cc_info.first->toString(env);
 		map<small_id,small_id> emb;
-		if(key.cc->testEmbed(rhs->getComponent(rhs_coords.first),root,args,emb)){
+		if(key.cc->testEmbed(rhs->getComponent(rhs_coords.first),root,context,emb)){
 			already_done[key.cc->getId()].insert(emb.begin(),emb.end());
 			influence.emplace(key_info);
 		//else cout << " | NO!";
@@ -366,10 +364,10 @@ const Rule::CandidateMap& Rule::getInfluences() const{
 
 /**** DEBUG ****/
 string Rule::toString(const pattern::Environment& env) const {
-	static string acts[] = {"CHANGE","ASSIGN","BIND","FREE","DELETE","CREATE","TRANSPORT"};
-	string s = name+"'s actions:";
+	static string acts[] = {"CHANGE ","ASSIGN ","BIND ","FREE ","CREATE ","DELETE ","TRANSPORT "};
+	string s = name+" ->\n";
 	for(auto nn : newNodes){
-		s += "\tINSERT agent "+nn->toString(env);
+		s += "\tINSERT "+nn->toString(env);
 	}
 	for(auto act : script){
 		auto& agent = act.is_new?
@@ -377,21 +375,21 @@ string Rule::toString(const pattern::Environment& env) const {
 		string pos = to_string(act.is_new?
 				rhs->getAgentPos(act.trgt_ag) : lhs.getAgentPos(act.trgt_ag));
 		auto& ag_sign = env.getSignature(agent.getId());
-		s += "\n\t";
+		s += "\t";
 		switch(act.t){
 		case ActionType::DELETE:
-			s += acts[act.t] + " agent["+pos+"]"+agent.toString(env);
+			s += acts[act.t] +agent.toString(env)+ " ["+pos+"]";
 			break;
 		case ActionType::TRANSPORT:
 			break;
 		case ActionType::CHANGE:{
 			auto& lbl_site = dynamic_cast<const pattern::Signature::LabelSite&>(ag_sign.getSite(act.trgt_st));
-			s += acts[act.t] + " agent["+pos+"]'s site "+ag_sign.getName()+"."+lbl_site.getName();
-			s += " to value " + lbl_site.getLabel(act.new_label);
+			s += acts[act.t] + ag_sign.getName()+"( "+lbl_site.getName();
+			s += " -> " + lbl_site.getLabel(act.new_label) +" )["+pos+"]";
 			break;
 		}
 		case ActionType::ASSIGN:
-			s += acts[act.t]+" ";
+			s += acts[act.t];
 			s = s+(act.is_new? "new-":"")+"agent["+pos+"]'s site ";
 			s += ag_sign.getName()+"."+ag_sign.getSite(act.trgt_st).getName()+
 					" to expression "+act.new_value->toString();
@@ -455,7 +453,7 @@ two<FL_TYPE> Rule::evalActivity(const matching::InjRandContainer* const * injs,
 Rule::Rate::Rate(const Rule& r,state::State& state) :
 		rule(r),baseRate(nullptr),unaryRate(nullptr,-1) {
 	auto new_rate = rule.getRate().clone();
-	baseRate = new_rate->reduce(state.vars);//rates also have to be reduced for every state
+	baseRate = new_rate->reduce(state);//rates also have to be reduced for every state
 	if(new_rate != baseRate)//reduce can return the same pointer on expression but no with vars.
 		delete new_rate;
 }
@@ -479,7 +477,7 @@ AuxDepRate::AuxDepRate(const Rule& r,state::State& state) :
 	map<string,small_id> aux_ccindex;
 	for(auto& aux_cc__ : rule.getLHS().getAuxMap())
 		aux_ccindex[aux_cc__.first] = aux_cc__.second.cc_pos;
-	base = baseRate->reduceAndFactorize(aux_ccindex,state.vars);
+	base = baseRate->reduceAndFactorize(aux_ccindex,state);
 }
 
 const BaseExpression* AuxDepRate::getExpression(small_id cc_index) const {
@@ -524,12 +522,12 @@ AuxDepRate::~AuxDepRate() {
 SameAuxDepRate::~SameAuxDepRate() {}
 
 
-two<FL_TYPE> NormalRate::evalActivity(const expressions::EvalArgs& args) const {
-	FL_TYPE a = baseRate->getValue(args).valueAs<FL_TYPE>();
+two<FL_TYPE> NormalRate::evalActivity(const SimContext &context) const {
+	FL_TYPE a = baseRate->getValue(context).valueAs<FL_TYPE>();
 	auto& lhs = rule.getLHS();
 	for(unsigned i = 0 ; i < lhs.compsCount() ; i++){
 		auto& cc = lhs.getComponent(i);
-		auto count = args.getState().getInjContainer(cc.getId()).count();
+		auto count = context.getInjContainer(cc.getId()).count();
 		if(count)
 			a *= count;
 		else {
@@ -539,10 +537,10 @@ two<FL_TYPE> NormalRate::evalActivity(const expressions::EvalArgs& args) const {
 	return two<FL_TYPE>(a,0.0);
 }
 
-two<FL_TYPE> SamePtrnRate::evalActivity(const expressions::EvalArgs& args) const {
-	FL_TYPE a = baseRate->getValue(args).valueAs<FL_TYPE>()/norm;
+two<FL_TYPE> SamePtrnRate::evalActivity(const SimContext &context) const {
+	FL_TYPE a = baseRate->getValue(context).valueAs<FL_TYPE>()/norm;
 	auto& lhs = rule.getLHS();
-	auto count = args.getState().getInjContainer(lhs.getComponent(0).getId()).count();
+	auto count = context.getInjContainer(lhs.getComponent(0).getId()).count();
 	if(count)
 		for(unsigned i = 0 ; i < lhs.compsCount() ; i++){
 			//injs.selectRule(rule.getId(), i);
@@ -553,12 +551,12 @@ two<FL_TYPE> SamePtrnRate::evalActivity(const expressions::EvalArgs& args) const
 	return two<FL_TYPE>(a,0.0);
 }
 
-two<FL_TYPE> AuxDepRate::evalActivity(const expressions::EvalArgs& args) const {
-	FL_TYPE a = base.factor->getValue(args).valueAs<FL_TYPE>();
+two<FL_TYPE> AuxDepRate::evalActivity(const SimContext &context) const {
+	FL_TYPE a = base.factor->getValue(context).valueAs<FL_TYPE>();
 	auto& lhs = rule.getLHS();
 	for(unsigned i = 0 ; i < lhs.compsCount() ; i++){
 		auto& cc = lhs.getComponent(i);
-		auto& injs = args.getState().getInjContainer(cc.getId());
+		auto& injs = context.getInjContainer(cc.getId());
 		injs.selectRule(rule.getId(), i);
 		auto pr = injs.partialReactivity();
 		if(pr)
@@ -569,10 +567,10 @@ two<FL_TYPE> AuxDepRate::evalActivity(const expressions::EvalArgs& args) const {
 	return two<FL_TYPE>(a,0.0);
 }
 
-two<FL_TYPE> SameAuxDepRate::evalActivity(const expressions::EvalArgs& args) const {
-	FL_TYPE a = base.factor->getValue(args).valueAs<FL_TYPE>()/norm;
+two<FL_TYPE> SameAuxDepRate::evalActivity(const SimContext &context) const {
+	FL_TYPE a = base.factor->getValue(context).valueAs<FL_TYPE>()/norm;
 	auto& lhs = rule.getLHS();
-	auto& injs = args.getState().getInjContainer(lhs.getComponent(0).getId());
+	auto& injs = context.getInjContainer(lhs.getComponent(0).getId());
 	injs.selectRule(rule.getId(), 0);
 	auto ract = injs.partialReactivity();
 	if(ract)

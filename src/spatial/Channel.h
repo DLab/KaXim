@@ -63,7 +63,7 @@ public:
 	 * @return A list of connections as [ head: source cell | tail: target cell list]
 	 *
 	 */
-	std::list<std::list<int> > getConnections() const;
+	std::list<std::list<int> > getConnections(const simulation::SimContext& context) const;
 
 	//DEBUG methods
 	std::string toString(bool show_links = false) const;

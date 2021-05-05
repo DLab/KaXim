@@ -22,32 +22,32 @@ std::string n_ops[] = {"RAND_1","SIM_TIME","CPUTIME","ACTIVITY","RUN_ID",
 		"SIM_EVENT","NULL_EVENT","PROD_EVENT","END_SIM"};
 
 template<>
-FL_TYPE (*NullaryOperations<FL_TYPE>::funcs[4])(const state::State& state)= {
-	[](const state::State& state) {return uniform_real_distribution<FL_TYPE>(0.0,1.0)(state.getRandomGenerator());},
-	[](const state::State& state) {return state.getCounter().getTime();},
-	[](const state::State& state) {return /*TODO cpu_time*/0.0;},
-	[](const state::State& state) {return state.getTotalActivity();}
+FL_TYPE (*NullaryOperations<FL_TYPE>::funcs[4])(const SimContext&)= {
+	[](const SimContext& context) {return uniform_real_distribution<FL_TYPE>(0.0,1.0)(context.getRandomGenerator());},
+	[](const SimContext& context) {return context.getCounter().getTime();},
+	[](const SimContext& context) {return /*TODO cpu_time*/0.0;},
+	[](const SimContext& context) {return context.getTotalActivity();}
 };
 
 template<>
-int (*NullaryOperations<int>::funcs[4])(const state::State& state)= {
-	[](const state::State& state) {return int(state.getSim().getId());},
-	[](const state::State& state) {return int(state.getCounter().getEvent());},
-	[](const state::State& state) {return int(state.getCounter().getNullEvent());},
-	[](const state::State& state) {return int(state.getCounter().getProdEvent());}
+int (*NullaryOperations<int>::funcs[4])(const SimContext& context)= {
+	[](const SimContext& context) {return int(context.getId());},
+	[](const SimContext& context) {return int(context.getCounter().getEvent());},
+	[](const SimContext& context) {return int(context.getCounter().getNullEvent());},
+	[](const SimContext& context) {return int(context.getCounter().getProdEvent());}
 };
 template<>
-bool (*NullaryOperations<bool>::funcs[4])(const state::State& state)= {
-	[](const state::State& state) {return state.getSim().isDone();}
+bool (*NullaryOperations<bool>::funcs[4])(const SimContext& context)= {
+	[](const SimContext& context) {return context.isDone();}
 };
 
 template<typename R>
-R NullaryOperation<R>::evaluate(const EvalArguments<true>& args) const {
-	return func(args.getState());
+R NullaryOperation<R>::evaluate(const SimContext& context) const {
+	return func(context);
 }
 template<typename R>
-R NullaryOperation<R>::evaluate(const EvalArguments<false>& args) const {
-	return func(args.getState());
+R NullaryOperation<R>::evaluateSafe(const SimContext& context) const {
+	return func(context);
 }
 
 template<typename R>
@@ -74,7 +74,7 @@ BaseExpression::Reduction NullaryOperation<R>::factorize(const std::map<std::str
 }
 
 template <typename T>
-BaseExpression* NullaryOperation<T>::reduce(VarVector &vars) {
+BaseExpression* NullaryOperation<T>::reduce(simulation::SimContext &context) {
 	return this;
 }
 

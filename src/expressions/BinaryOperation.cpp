@@ -22,6 +22,7 @@ namespace expressions {
 /*********** BinaryOperations ******************/
 /***********************************************/
 
+using namespace std;
 
 char AlgOpChar[] = "+-*/^%Mm";
 string AlgOpStr[] = {"add","subs","mult","div","pow","mod","max","min"};
@@ -38,6 +39,18 @@ bool (*BinaryOperations<bool, T1, T2>::funcs[10])(T1, T2)= {
 	[](T1 v1,T2 v2) {return true;},
 	[](T1 v1,T2 v2) {return false;}
 };
+template<typename T1, typename T2>
+bool (*BinaryOperations<bool, T1, T2>::funcs_safe[10])(T1, T2) = {
+	[](T1 v1,T2 v2) {return v1 && v2;},
+	[](T1 v1,T2 v2) {return v1 || v2;},
+	[](T1 v1,T2 v2) {return v1 > v2;},
+	[](T1 v1,T2 v2) {return v1 < v2;},
+	[](T1 v1,T2 v2) {return v1 == v2;},
+	[](T1 v1,T2 v2) {return v1 != v2;},
+	[](T1 v1,T2 v2) {return true;},
+	[](T1 v1,T2 v2) {return false;}
+};
+
 template<typename R, typename T1, typename T2>
 R (*BinaryOperations<R, T1, T2>::funcs[10])(T1, T2)= {
 	[](T1 v1,T2 v2) {return v1+v2;},
@@ -47,20 +60,42 @@ R (*BinaryOperations<R, T1, T2>::funcs[10])(T1, T2)= {
 	[](T1 v1,T2 v2) {return (R)std::pow(v1,v2);},
 	[](T1 v1,T2 v2) {return (R)((int)v1%(int)v2);},
 	[](T1 v1,T2 v2) {return (v1 > v2 ? v1 : v2);}, //Max
+	[](T1 v1,T2 v2) {return (v1 > v2 ? v2 : v1);} //Min
+	};
+
+template<typename R, typename T1, typename T2>
+R (*BinaryOperations<R, T1, T2>::funcs_safe[10])(T1, T2)= {
+	[](T1 v1,T2 v2) {return v1+v2;},
+	[](T1 v1,T2 v2) {return v1-v2;},
+	[](T1 v1,T2 v2) {return v1*v2;},
+	[](T1 v1,T2 v2) {
+		if(v2 == 0.0)
+			throw invalid_argument("Division by zero.");
+		return v1/v2;
+	},[](T1 v1,T2 v2) {
+		if(v1 == 0.0 && v2 == 0.0)
+			throw invalid_argument("Zero pows zero.");
+		return (R)std::pow(v1,v2);
+	},[](T1 v1,T2 v2) {
+		if(v2 == 0.0)
+			throw invalid_argument("Mod by zero.");
+		return (R)((int)v1%(int)v2);
+	},
+	[](T1 v1,T2 v2) {return (v1 > v2 ? v1 : v2);}, //Max
 		[](T1 v1,T2 v2) {return (v1 > v2 ? v2 : v1);} //Min
 	};
 
 template<typename R, typename T1, typename T2>
-R BinaryOperation<R, T1, T2>::evaluate(const  EvalArguments<true>& args) const {
+R BinaryOperation<R, T1, T2>::evaluate(const SimContext& args) const {
 	auto a = exp1->evaluate(args);
 	auto b = exp2->evaluate(args);
 	return func(a, b);
 }
 template<typename R, typename T1, typename T2>
-R BinaryOperation<R, T1, T2>::evaluate(const  EvalArguments<false>& args) const {
-	auto a = exp1->evaluate(args);
-	auto b = exp2->evaluate(args);
-	return func(a, b);
+R BinaryOperation<R, T1, T2>::evaluateSafe(const SimContext& args) const {
+	auto a = exp1->evaluateSafe(args);
+	auto b = exp2->evaluateSafe(args);
+	return BinaryOperations<R, T1, T2>::funcs_safe[op](a, b);
 }
 
 /*template <typename R,typename T1,typename T2>
@@ -322,16 +357,15 @@ BaseExpression::Reduction BinaryOperation<R, T1, T2>::factorize(const std::map<s
 
 
 template <typename R, typename T1, typename T2>
-BaseExpression* BinaryOperation<R,T1,T2>::reduce(VarVector& vars){
-	auto r1 = exp1->reduce(vars);
-	auto r2 = exp2->reduce(vars);
+BaseExpression* BinaryOperation<R,T1,T2>::reduce(SimContext& context){
+	auto r1 = exp1->reduce(context);
+	auto r2 = exp2->reduce(context);
 	auto cons_r1 = dynamic_cast<Constant<T1>*>(r1);
 	auto cons_r2 = dynamic_cast<Constant<T2>*>(r2);
-	EvalArgs args(0,&vars);
 	if(cons_r1){
 		if(cons_r2){
-			T1 val1 = cons_r1->evaluate(args);
-			T2 val2 = cons_r2->evaluate(args);
+			T1 val1 = cons_r1->evaluate(context);
+			T2 val2 = cons_r2->evaluate(context);
 			if(r1 != exp1)
 				delete r1;
 			if(r2 != exp2)

@@ -136,15 +136,14 @@ const Compartment& CompartmentExpr::getCompartment() const{
 	return comp;
 }
 
-std::list<int> CompartmentExpr::getCells(const expressions::AuxNames<int> & aux_values) const{
+std::list<int> CompartmentExpr::getCells(const AuxNames& aux_values,const simulation::SimContext& context) const{
 	std::list<int> ret;
-	expressions::EvalArgs args(0,0,0,&aux_values);
 	unsigned int dim = 0;
 	std::list<short> *cell_values = new std::list<short>[comp.getDimensions().size()];
 	//iteration in cell index expressions
 	for(std::list<const state::BaseExpression*>::const_iterator it = cellExpr.cbegin();it != cellExpr.cend();it++){
 		try{
-			int index = (*it)->getValue(args).iVal;//TODO use real VarVector
+			int index = (*it)->getValue(context).iVal;//TODO use real VarVector
 			if(index < 0 || index >= comp.getDimensions()[dim])
 				return ret;
 			cell_values[dim].push_back(index);
@@ -185,7 +184,7 @@ std::list<int> CompartmentExpr::getCells(const expressions::AuxNames<int> & aux_
 
 namespace boost_ublas = boost::numeric::ublas;
 
-void CompartmentExpr::solve(const std::vector<short> &cell_index,expressions::AuxNames<int> & aux_values) const{
+void CompartmentExpr::solve(const std::vector<short> &cell_index,AuxNames& aux_values) const{
 	boost_ublas::vector<short,std::vector<short> > cell(cellExpr.size(),cell_index);
 	boost_ublas::vector<FL_TYPE> b_;
 	if(cellExpr.size() != inverseA.size1())
@@ -330,9 +329,9 @@ UseExpression::~UseExpression(){
 		delete filter;
 }
 
-void UseExpression::evaluateCells(
+void UseExpression::evaluateCells(const simulation::SimContext& context,
 		UseExpression::iterator expr_it,
-		const expressions::AuxNames<int> aux_values){
+		const AuxNames aux_values){
 	if(expr_it == UseExpression::iterator())
 		expr_it = begin();
 	if(expr_it == end())
@@ -340,7 +339,7 @@ void UseExpression::evaluateCells(
 	auto& expr = *expr_it;
 	expr.setEquation();
 	std::vector<short> cell_index(expr.getCompartment().getDimensions().size());
-	for(auto cell_id : expr.getCells(aux_values)){
+	for(auto cell_id : expr.getCells(aux_values,context)){
 		if(cells->find(cell_id)!= cells->end())
 			continue;
 		auto aux_buff(aux_values);
@@ -352,7 +351,7 @@ void UseExpression::evaluateCells(
 			//std::cout << e.what() << std::endl;
 			continue;
 		}
-		evaluateCells(expr_it+1,aux_buff);
+		evaluateCells(context,expr_it+1,aux_buff);
 		cells->insert(cell_id);
 	}
 

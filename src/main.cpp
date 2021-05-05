@@ -27,11 +27,11 @@
 #include <time.h>
 
 using namespace boost::program_options;
-
+using namespace simulation;
 using namespace std;
 
 int main(int argc, char* argv[]){
-	const string version("2.0.06");
+	const string version("2.1.04");
 	const string v_msg("KaXim "+version);
 	const string usage_msg("Simple usage is \n$ "
 			"KaXim ([-i] kappa_file)+ -t time [-p points] [-r runs]");
@@ -57,34 +57,40 @@ int main(int argc, char* argv[]){
 		cerr << "A parser error found: " << e.what() << endl;
 		exit(1);
 	}
+
 	grammar::ast::KappaAst &ast = driver->getAst();
 	//ast.show();cout << "\n\n" ;
 
 	//building the environment and (global) vars
-	pattern::Environment& env = *(new pattern::Environment());//just to delete vars after env
-	vector<state::Variable*> vars;
+	pattern::Environment env;//just to delete vars after env
+	SimContext base_context(env,params.seed);
+	NamesMap<expressions::Auxiliar,FL_TYPE> empty_aux_values;
+	base_context.setAuxMap(&empty_aux_values);
+	//auto& vars = base_context.getVars();
 	try{
-		ast.evaluateDeclarations(env,vars,true);//constants
-		ast.evaluateCompartments(env,vars);
-		ast.evaluateUseExpressions(env,vars);
-		ast.evaluateSignatures(env,vars);
-		ast.evaluateDeclarations(env,vars,false);//vars
-		ast.evaluateChannels(env,vars);
-		ast.evaluateRules(env,vars);
-		ast.evaluatePerts(env,vars);
+		ast.evaluateParams(env,base_context,params.modelParams);
+		ast.evaluateDeclarations(env,base_context,true);//constants
+		ast.evaluateCompartments(env,base_context);
+		ast.evaluateUseExpressions(env,base_context);
+		ast.evaluateSignatures(env,base_context);
+		ast.evaluateDeclarations(env,base_context,false);//vars
+		ast.evaluateChannels(env,base_context);
+		ast.evaluateRules(env,base_context);
+		ast.evaluatePerts(env,base_context);
+		ast.evaluateInits(env,base_context);
 	}
 	catch(const exception &e){
 		cerr << "An exception found while building the environment:\n" << e.what() << endl;
 		exit(1);
 	}
 	env.buildFreeSiteCC();
-	env.buildInfluenceMap(vars);
+	env.buildInfluenceMap(base_context);
 
 	//TODO building the connection map for compartments
 	map<pair<int,int>,double> edges;
 	for(size_t i = 0; i < env.size<pattern::Channel>(); i++ ){
 		for(auto& channel : env.getChannels(i)){
-			for(auto cells : channel.getConnections()){
+			for(auto cells : channel.getConnections(base_context)){
 				int src_id = cells.front();
 				cells.pop_front();
 				for(auto trgt_id : cells){
@@ -96,7 +102,7 @@ int main(int argc, char* argv[]){
 	//cout << "total cells: " << pattern::Compartment::getTotalCells() << endl;
 	//for(auto edge : edges)
 	//	cout << edge.first.first << "->" << edge.first.second << ": " << edge.second << endl;
-	auto cells = simulation::Simulation::allocCells(1,vector<double>(pattern::Compartment::getTotalCells(),1.0),edges,-1);
+	auto cells = Simulation::allocCells(1,vector<double>(pattern::Compartment::getTotalCells(),1.0),edges,-1);
 	//simulation::Simulation sim(env);
 	//for(auto i : cells[0])
 	//	cout << i << ", ";
@@ -106,7 +112,7 @@ int main(int argc, char* argv[]){
 
 
 	if(params.verbose)//verbose > 0
-		env.show();
+		env.show(base_context);
 
 
 	//auto sims = new simulation::Simulation*[params.runs];
@@ -127,17 +133,15 @@ int main(int argc, char* argv[]){
 
 #	pragma omp parallel for
 	for(int i = 0; i < params.runs; i++){
-		simulation::Simulation sim(env,i);
-		sim.setCells(cells.at(0),vars);
+		Simulation sim(base_context,i);
 		try{
-			ast.evaluateInits(env,vars,sim);
+			sim.initialize(cells,ast);
 		}
 		catch(const exception &e){
-			cerr << "An exception found on %init evaluation: " << e.what() << endl;
+			cerr << "An exception found on initialization of simulation["
+					<< i << "]: " << e.what() << endl;
 			exit(1);
 		}
-
-		sim.initialize();
 
 		if(i == 0)
 			WarningStack::getStack().show();
@@ -147,29 +151,30 @@ int main(int argc, char* argv[]){
 		}
 		if(params.verbose > 0){//only print this if if verbose is set for init or more
 			if(i == 0){
-				cout << "Simulation[0]\t|\tInitial State:" << endl;
 				sim.print();
+				cout << difftime(time(nullptr),t) << " seconds loading initial state.\n";
+				cout << "------------------------------------\n";
 			}
-			cout << difftime(time(nullptr),t) << " seconds loading initial state";
-			if(params.runs > 1)
-				cout << " of sim[" << i << "]";
-			cout << ".\n" << endl;
+			if(params.runs > 1){
+				cout << difftime(time(nullptr),t) << " seconds loading initial state";
+				cout << " of sim[" << i << "]\n";
+			}
 		}
 
 		try{
 			sim.run(params);
 		}catch(exception &e){
-			cerr << "An exception found when running simulation (" << i <<"):\n" << e.what() << endl;
+			cerr << "An exception found when running simulation[" << i <<"]:\n" << e.what() << endl;
 			exit(1);
 		}
 	}
 
 	cout << "Total running time: " << difftime(time(nullptr),t)  << " seconds." << endl;
 
-	delete &env;
+	/*delete &env;
 	for(auto var_it = vars.rbegin(); var_it != vars.rend() ; var_it++)
 		delete *var_it;
-
+	*/
 	/* TODO
 	 * Environment env = ast.evaluateGlobals();
 	 * MPI::Bcast((void*)&env,Nbytes,MPI::Datatype.PACKED, 0);

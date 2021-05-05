@@ -69,7 +69,7 @@ Node::~Node() {
 }
 
 void Node::copyDeps(const Node& node,EventInfo& ev,matching::InjRandContainer** injs,
-		const expressions::EvalArgs& args) {
+		const State& state) {
 	for(small_id i = 0; i < intfSize; i++){
 		auto& site_deps = node.interface[i]->getDeps();
 		for(auto inj : *site_deps.first){
@@ -77,7 +77,7 @@ void Node::copyDeps(const Node& node,EventInfo& ev,matching::InjRandContainer** 
 			if(ev.inj_mask.count(inj))
 				new_inj = ev.inj_mask.at(inj);
 			else{
-				new_inj = injs[inj->pattern().getId()]->emplace(inj,ev.new_cc,args);
+				new_inj = injs[inj->pattern().getId()]->emplace(inj,ev.new_cc,state);
 				ev.inj_mask[inj] = new_inj;
 			}
 			site_deps.first->emplace(new_inj);
@@ -88,7 +88,7 @@ void Node::copyDeps(const Node& node,EventInfo& ev,matching::InjRandContainer** 
 			if(ev.inj_mask.count(inj))
 				new_inj = ev.inj_mask.at(inj);
 			else{
-				new_inj = injs[inj->pattern().getId()]->emplace(inj,ev.new_cc,args);
+				new_inj = injs[inj->pattern().getId()]->emplace(inj,ev.new_cc,state);
 				ev.inj_mask[inj] = new_inj;
 			}
 			site_deps.second->emplace(new_inj);
@@ -100,7 +100,7 @@ void Node::copyDeps(const Node& node,EventInfo& ev,matching::InjRandContainer** 
 		if(ev.inj_mask.count(inj))
 			new_inj = ev.inj_mask.at(inj);
 		else{
-			new_inj = injs[inj->pattern().getId()]->emplace(inj,ev.new_cc,args);
+			new_inj = injs[inj->pattern().getId()]->emplace(inj,ev.new_cc,state);
 			ev.inj_mask[inj] = new_inj;
 		}
 		deps->emplace(new_inj);
@@ -182,7 +182,7 @@ void Node::changeIntState(State& state){
 }
 
 void Node::assign(State& state){
-	auto val = state.ev.act.new_value->getValue(state.args);
+	auto val = state.ev.act.new_value->getValue(state);
 	auto old_val = interface[state.ev.act.trgt_st]->getValue();
 	if(old_val == val){
 		state.ev.null_actions.emplace(this,state.ev.act.trgt_st);
@@ -413,7 +413,7 @@ void SubNode::assign(State& state){
 	auto& new_node = state.ev.new_cc.at(this);
 	if(new_node == nullptr)
 		new_node = new Node(*this,state.ev.new_cc);
-	auto value = state.ev.act.new_value->getValue(state.args);
+	auto value = state.ev.act.new_value->getValue(state);
 	if(interface[state.ev.act.trgt_st]->getValue() == value)
 	{}//state.ev.warns++;//ev.null_actions.emplace(this,id);
 	//else
@@ -522,7 +522,7 @@ void InternalState::negativeUpdate(EventInfo& ev,matching::InjRandContainer** in
 						emb[i]->getLifts(site.getId()).first->erase(inj);
 				}
 			}//for i
-			injs[cc.getId()]->erase(inj,state.args);
+			injs[cc.getId()]->erase(inj,state);
 			ev.to_update.emplace(&cc);
 		}//else
 		dep_it = nxt;
@@ -776,12 +776,12 @@ string SubNode::toString(const pattern::Environment &env,bool show_binds,map<con
  ******* EventInfo **************
  ********************************/
 
-EventInfo::EventInfo() : emb(nullptr),cc_count(0),aux_map(emb) {
+EventInfo::EventInfo() : emb(nullptr),cc_count(0) {//,aux_map(emb) {
 	//TODO these numbers are arbitrary!!
 	emb = new vector<Node*>[4];
 	for(int i = 0; i < 4 ; i++)
 		emb[i].resize(12);
-	aux_map.setEmb(emb);
+	//aux_map.setEmb(emb);
 }
 
 EventInfo::~EventInfo(){

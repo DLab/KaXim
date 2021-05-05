@@ -54,6 +54,7 @@ public:
 	string outputFile;				//!< Output file name. Default is "output". PExKa will add a simulation number if needed.
 	string outputFileType;			//!< Type of the output file. Default is ".tsv".
 	string outputDirectory;			//!< Output directory. Default is ".".
+	vector<float> modelParams;		//!< vector with model parameters declared as %param.
 
 	UINT_TYPE maxEvent;	//!< Finish the simulation after this number of successful events.
 	FL_TYPE maxTime;	//!< Finish the simulation after this amount of simulated time.

@@ -25,19 +25,17 @@ pattern::CompartmentExpr* CompExpression::eval
 }
 
 vector<short> CompExpression::evalDimensions(const pattern::Environment &env,
-		const vector<Variable*> &vars) const {
+		const SimContext &context) const {
 	vector<short> ret;
-
-	expressions::EvalArgs args(nullptr,&vars);
 	for(auto& index : indexList) {
 		int tmp = 0;
 
-		switch( (index->eval(env,vars))->getType() ) {
+		switch( (index->eval(env,context))->getType() ) {
 		case FLOAT://TODO check if vars is only consts
-			tmp = (index->eval(env,vars))->getValue(args).fVal;
+			tmp = (index->eval(env,context))->getValueSafe(context).fVal;
 			break;
 		case INT:
-			tmp = (index->eval(env,vars))->getValue(args).iVal;
+			tmp = (index->eval(env,context))->getValueSafe(context).iVal;
 			break;
 		default:break;
 		}
@@ -61,15 +59,14 @@ const Id& CompExpression::evalName(const pattern::Environment &env,bool declare)
 	return name;
 }
 list<const BaseExpression*> CompExpression::evalExpression(const pattern::Environment &env,
-			small_id comp_id,const VarVector &vars) const {
+			small_id comp_id,const SimContext &context) const {
 	list<const state::BaseExpression*> ret;
 	auto& dims = env.getCompartment(comp_id).getDimensions();
-	expressions::EvalArgs args(nullptr,&vars);
 	int i = 0;
 	for(auto index : indexList){
-		auto expr = index->eval(env,vars,nullptr,Expression::AUX_ALLOW);
+		auto expr = index->eval(env,context,nullptr,Expression::AUX_ALLOW);
 		try{//TODO check if vars is only consts
-			int d = expr->getValue(args).valueAs<int>();
+			int d = expr->getValueSafe(context).valueAs<int>();
 			if(d < 0 || d >= dims[i])
 				throw SemanticError("Index out of limits for compartments expression.",index->loc);
 		}
@@ -90,11 +87,11 @@ Compartment::Compartment(const location& l,const CompExpression& comp_exp,
 		Expression* exp) : Node(l), comp(comp_exp), volume(exp) {}
 
 //TODO
-void Compartment::eval(pattern::Environment &env,const vector<Variable*> &vars){
+void Compartment::eval(pattern::Environment &env,const SimContext &context){
 	const Id& name = comp.evalName(env,true);
 	pattern::Compartment& c = env.declareCompartment(name);
-	vector<short> dims = comp.evalDimensions(env,vars);
-	BaseExpression* vol = volume->eval(env,vars,nullptr,Expression::CONST);
+	vector<short> dims = comp.evalDimensions(env,context);
+	BaseExpression* vol = volume->eval(env,context,nullptr,Expression::CONST);
 	c.setDimensions(dims);
 	c.setVolume(vol);
 	return;
@@ -111,7 +108,7 @@ Channel::Channel(const location& l,const Id& nme, const CompExpression& src,
 
 
 void Channel::eval(pattern::Environment &env,
-		const vector<Variable*> &vars){
+		const SimContext &context){
 	short src_id,trgt_id;
 	pattern::Channel& channel = env.declareChannel(name);
 
@@ -119,8 +116,8 @@ void Channel::eval(pattern::Environment &env,
 	trgt_id = env.getCompartmentId(target.evalName(env,false).getString());
 
 	list<const BaseExpression*> src_index,trgt_index;
-	src_index = source.evalExpression(env,src_id,vars);
-	trgt_index = target.evalExpression(env,trgt_id,vars);
+	src_index = source.evalExpression(env,src_id,context);
+	trgt_index = target.evalExpression(env,trgt_id,context);
 
 	pattern::CompartmentExpr *c_exp_src,*c_exp_trgt;
 	try{
@@ -142,8 +139,8 @@ void Channel::eval(pattern::Environment &env,
 	}
 	channel.setCompExpressions(c_exp_src,c_exp_trgt);
 	if(filter)
-		channel.setFilter(filter->eval(env,vars));
-	channel.setDelay(delay->eval(env,vars));
+		channel.setFilter(filter->eval(env,context));
+	channel.setDelay(delay->eval(env,context));
 	return;
 }
 
@@ -166,12 +163,12 @@ Use::~Use(){
 }
 
 
-void Use::eval(pattern::Environment &env, const VarVector &consts) const {
+void Use::eval(pattern::Environment &env, const SimContext &context) const {
 	list<pattern::CompartmentExpr> comp_exprs;
 	auto& use_expr = env.declareUseExpression(id,compartments.size());
 	for(auto& comp : compartments){
 		short comp_id = env.getCompartmentId(comp.evalName(env,false).getString());
-		list<const BaseExpression*> index_list = comp.evalExpression(env,comp_id,consts);
+		list<const BaseExpression*> index_list = comp.evalExpression(env,comp_id,context);
 		try{
 			use_expr.emplace_back(env.getCompartment(comp_id),index_list);
 		}catch(std::invalid_argument &e){
@@ -179,7 +176,7 @@ void Use::eval(pattern::Environment &env, const VarVector &consts) const {
 		}
 	}
 	try{
-		use_expr.evaluateCells();
+		use_expr.evaluateCells(context);
 	}
 	catch(std::invalid_argument& e){
 		throw SemanticError(e.what(),loc);

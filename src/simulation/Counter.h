@@ -25,6 +25,8 @@ using namespace std;
 class Counter {
 	friend class state::State;
 	friend class Plot;
+	friend class TimePlot;
+	friend class EventPlot;
 
 	FL_TYPE time;
 	UINT_TYPE events;

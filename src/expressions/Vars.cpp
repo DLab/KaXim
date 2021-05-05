@@ -13,8 +13,10 @@
 #include "../state/State.h"
 #include "../state/Node.h"
 #include "SomeValue.h"
+#include "../simulation/SimContext.h"
 namespace expressions {
 
+using namespace std;
 
 /*********** Class Auxiliar ***********/
 template<typename R>
@@ -30,54 +32,54 @@ template<typename R>
 Auxiliar<R>::~Auxiliar() {}
 
 template<typename R>
-R Auxiliar<R>::evaluate(const EvalArguments<true>& args) const {
+R Auxiliar<R>::evaluate(const SimContext& context) const {
 #ifdef DEBUG
 	try {
 #endif
-	return args.getAuxMap().at(*this);
+	return context.getAuxMap().at(*this);
 #ifdef DEBUG
-		} catch (std::out_of_range& ex) {
-		throw std::out_of_range(
+		} catch (out_of_range& ex) {
+		throw out_of_range(
 			"Cannot find value for auxiliar "+name+". Try to reorder agent-signature sites if there is dependency.");
 	}
 #endif
 }
 template<typename R>
-R Auxiliar<R>::evaluate(const EvalArguments<false>& args) const {
+R Auxiliar<R>::evaluateSafe(const SimContext& context) const {
 #ifdef DEBUG
 	try {
 #endif
-	return args.getAuxMap().at(*this);
+	return context.getAuxMap().at(*this);
 #ifdef DEBUG
-		} catch (std::out_of_range& ex) {
-		throw std::out_of_range(
+		} catch (out_of_range& ex) {
+		throw out_of_range(
 			"Cannot find value for auxiliar "+name+". Try to reorder agent-signature sites if there is dependency.");
 	}
 #endif
 }
 
 template <>
-int Auxiliar<int>::evaluate(const EvalArguments<true>& args) const {
+int Auxiliar<int>::evaluate(const SimContext& context) const {
 #ifdef DEBUG
 	try {
 #endif
-	return args.getAuxIntMap().at(*this);
+	return context.getAuxIntMap().at(*this);
 #ifdef DEBUG
-		} catch (std::out_of_range& ex) {
-		throw std::out_of_range(
+		} catch (out_of_range& ex) {
+		throw out_of_range(
 			"Cannot find value for auxiliar "+name+". Try to reorder agent-signature sites if there is dependency.");
 	}
 #endif
 }
 template <>
-int Auxiliar<int>::evaluate(const EvalArguments<false>& args) const {
+int Auxiliar<int>::evaluateSafe(const SimContext& context) const {
 #ifdef DEBUG
 	try {
 #endif
-	return args.getAuxIntMap().at(*this);
+	return context.getAuxIntMap().at(*this);
 #ifdef DEBUG
-		} catch (std::out_of_range& ex) {
-		throw std::out_of_range(
+		} catch (out_of_range& ex) {
+		throw out_of_range(
 			"Cannot find value for auxiliar "+name+". Try to reorder agent-signature sites if there is dependency.");
 	}
 #endif
@@ -85,13 +87,13 @@ int Auxiliar<int>::evaluate(const EvalArguments<false>& args) const {
 
 template<typename R>
 FL_TYPE Auxiliar<R>::auxFactors(
-		std::unordered_map<std::string, FL_TYPE> &var_factors) const {
+		std::unordered_map<string, FL_TYPE> &var_factors) const {
 	var_factors[name] = 1;
 	return 0;
 }
 
 template<typename R>
-BaseExpression::Reduction Auxiliar<R>::factorize(const std::map<std::string,small_id> &aux_cc) const {
+BaseExpression::Reduction Auxiliar<R>::factorize(const map<string,small_id> &aux_cc) const {
 	BaseExpression::Reduction r;
 	Auxiliar<R>* aux = new Auxiliar<R>(*this);
 	r.aux_functions[aux_cc.at(aux->toString())] = aux;
@@ -105,7 +107,7 @@ BaseExpression* Auxiliar<R>::clone() const {
 }
 
 template<typename R>
-BaseExpression* Auxiliar<R>::reduce(VarVector &vars) {
+BaseExpression* Auxiliar<R>::reduce(SimContext& context) {
 	return this;
 }
 
@@ -132,7 +134,7 @@ bool Auxiliar<T>::isAux() const {
 }
 
 template <typename T>
-std::string Auxiliar<T>::toString() const {
+string Auxiliar<T>::toString() const {
 	return name;
 }
 
@@ -147,14 +149,14 @@ VarLabel<R>::VarLabel(int id,const string &_name) :
 		varId(id),name(_name) {}
 
 template<typename R>
-R VarLabel<R>::evaluate(const EvalArguments<true>& args) const {
+R VarLabel<R>::evaluate(const SimContext& context) const {
 	//throw std::invalid_argument("This should never been used");
-	return args.getVars()[varId]->getValue(args).valueAs<R>();
+	return context.getVars()[varId]->getValue(context).valueAs<R>();
 }
 template<typename R>
-R VarLabel<R>::evaluate(const EvalArguments<false>& args) const {
+R VarLabel<R>::evaluateSafe(const SimContext& context) const {
 	//throw std::invalid_argument("This should never been used");
-	return args.getVars()[varId]->getValue(args).valueAs<R>();
+	return context.getVars()[varId]->getValue(context).valueAs<R>();
 }
 
 template<typename R>
@@ -164,11 +166,11 @@ FL_TYPE VarLabel<R>::auxFactors(
 }
 
 template<typename R>
-BaseExpression* VarLabel<R>::reduce(VarVector &vars ) {
-	EvalArgs args(0,&vars);
+BaseExpression* VarLabel<R>::reduce(SimContext& context) {
+	auto& vars = context.getVars();
 	auto cons_var = dynamic_cast<state::ConstantVar<R>*>(vars[varId]);
 	if(cons_var)
-		return new Constant<R>(cons_var->evaluate(args));
+		return new Constant<R>(cons_var->evaluate(context));
 	return vars[varId];//this var should has been reduced
 }
 
@@ -197,7 +199,7 @@ char VarLabel<T>::getVarDeps() const{
 }
 
 template <typename T>
-std::string VarLabel<T>::toString() const{
+string VarLabel<T>::toString() const{
 	return name;
 }
 
@@ -206,8 +208,9 @@ template class VarLabel<FL_TYPE> ;
 template class VarLabel<bool> ;
 
 
-/************** AuxMaps ******************************/
 
+/************** AuxMaps ******************************/
+/*
 template <typename T>
 AuxValueMap<T>::~AuxValueMap() {}
 
@@ -328,6 +331,8 @@ size_t AuxMixEmb::size() const {
 template class AuxValueMap<FL_TYPE>;
 template class AuxValueMap<int>;
 template class AuxNames<int>;
+
+*/
 
 
 

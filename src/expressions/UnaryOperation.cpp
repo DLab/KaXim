@@ -38,13 +38,33 @@ R (*UnaryOperations<R, T>::funcs[])(T)= {
 };
 
 template<typename R, typename T>
-R UnaryOperation<R, T>::evaluate(const EvalArguments<true>& args) const {
-	auto a = exp->evaluate(args);
+R (*UnaryOperations<R, T>::funcs_safe[])(T)= {
+	[](T v) { // SQRT
+		if(v < 0)
+			throw std::invalid_argument("Root of negative not defined.");
+		return (R)std::sqrt(v);
+	},[](T v) {return (R)std::exp(v);}, // EXPONENT
+	[](T v) {return (R)std::log(v);}, // LOG
+	[](T v) {return (R)std::sin(v);}, // SINE
+	[](T v) {return (R)std::cos(v);}, // COSINE
+	[](T v) {return (R)std::tan(v);}, // TAN
+	[](T v) {return (R)std::atan(v);}, // ATAN
+	[](T v) {return (R)std::abs(v);}, // ABS
+	[](T v) {return (R)std::nextafter(v,std::numeric_limits<float>::infinity());}, // NEXT
+	[](T v) {return (R)std::nextafter(v,-std::numeric_limits<float>::infinity());}, // PREV
+	[](T v) {return ((rand()%10)/10.0) > v ? (R)1 : (R)0;}, // COIN
+	[](T v) {return (R)std::fmod(std::rand(), v);}, // RAND_N //TODO use better rand function
+	[](T v) {return (R)!v;}
+};
+
+template<typename R, typename T>
+R UnaryOperation<R, T>::evaluate(const SimContext& context) const {
+	auto a = exp->evaluate(context);
 	return func(a);
 }
 template<typename R, typename T>
-R UnaryOperation<R, T>::evaluate(const EvalArguments<false>& args) const {
-	auto a = exp->evaluate(args);
+R UnaryOperation<R, T>::evaluateSafe(const SimContext& context) const {
+	auto a = exp->evaluate(context);
 	return func(a);
 }
 
@@ -124,15 +144,14 @@ BaseExpression::Reduction UnaryOperation<R, T>::factorize(const std::map<std::st
 }
 
 template <typename R, typename T>
-BaseExpression* UnaryOperation<R,T>::reduce(VarVector &vars){
+BaseExpression* UnaryOperation<R,T>::reduce(SimContext& context){
 	if(op >= BaseExpression::COIN)//random constant
 		return this;
-	auto r = exp->reduce(vars);
-	EvalArgs args(0,&vars);
+	auto r = exp->reduce(context);
 	auto cons_r = dynamic_cast<Constant<T>*>(r);
 	if(cons_r){
 		delete exp;
-		return new Constant<R>(func(cons_r->evaluate(args)));
+		return new Constant<R>(func(cons_r->evaluate(context)));
 	}
 	return this;
 }

@@ -12,7 +12,8 @@
 #include <unordered_map>
 #include "../util/Warning.h"
 #include "SomeValue.h"
-#include <vector>
+#include "../data_structs/ValueMap.h"
+//#include "../simulation/SimContext.h"
 #include <map>
 
 
@@ -21,44 +22,22 @@ namespace state {
 	class Variable;
 }
 
+namespace simulation {
+class SimContext;
+}
+
 /** Collection of state::Variable. Useful to use in method params. */
 typedef std::vector<state::Variable*> VarVector;
 
 namespace expressions {
 
 template <typename T> class Auxiliar;
+typedef ValueMap<Auxiliar,FL_TYPE> AuxMap;
+typedef ValueMap<Auxiliar,int> AuxIntMap;
 
-/** \brief Class used to map aux to values in different ways */
-template <typename T>
-class AuxValueMap {
-public:
-	virtual ~AuxValueMap();
-	virtual T& operator[](const Auxiliar<T>& a) = 0;
-	virtual T at(const Auxiliar<T>& a) const = 0;
-	virtual void clear() = 0;
-	virtual size_t size() const = 0;
-};
 
-typedef AuxValueMap<FL_TYPE> AuxMap;
-
-template <bool safe = false>
-class EvalArguments {
-	const state::State* state;
-	const VarVector* vars;
-	const AuxMap* auxMap;
-	const AuxValueMap<int>* auxIntMap;
-public:
-	EvalArguments(const state::State* state = nullptr,const VarVector* vars = nullptr,
-			const AuxMap* auxValues = nullptr,const AuxValueMap<int>* auxIntValues = nullptr);
-	EvalArguments(state::State* state);
-
-	inline const state::State& getState() const;
-	inline const VarVector& getVars() const;
-	inline const AuxMap& getAuxMap() const;
-	inline const AuxValueMap<int>& getAuxIntMap() const;
-};
-
-using EvalArgs = EvalArguments<false>;
+using namespace simulation;
+//using SimContext = simulation::SimContext;
 
 
 /** \brief Base class for algebraic and boolean expressions. */
@@ -121,9 +100,11 @@ public:
 	//virtual SomeValue getValue(const VarVector &consts,
 	//		const std::unordered_map<std::string, int> *aux_values = nullptr) const = 0;
 
-	/** \brief Returns the value of this expression. */
-	virtual SomeValue getValue(const EvalArguments<true>& args) const = 0;
-	virtual SomeValue getValue(const EvalArguments<false>& args) const = 0;
+	/** \brief Returns the value of this expression (OPT). */
+	virtual SomeValue getValue(const SimContext& context) const = 0;
+	/** \brief Returns the value of this expression.
+	 * Throws exception when the value cannot be calculated. */
+	virtual SomeValue getValueSafe(const SimContext& context) const = 0;
 
 	/** \brief Returns the value of this expression using only the State of the
 	 * simulation. It cannot contain auxiliary variables. */
@@ -140,9 +121,9 @@ public:
 	 */
 	virtual Reduction factorize(const std::map<std::string,small_id> &aux_cc) const = 0;
 	virtual BaseExpression* clone() const = 0;
-	virtual BaseExpression* reduce(VarVector& vars) = 0;
+	virtual BaseExpression* reduce(SimContext& context) = 0;
 	virtual Reduction reduceAndFactorize(const std::map<std::string,small_id> &aux_cc,
-		VarVector& vars) const;
+		SimContext& context) const;
 
 	//virtual std::set<std::string> getAuxiliars() const = 0;
 	virtual bool operator==(const BaseExpression& exp) const = 0;
@@ -176,42 +157,6 @@ protected:
 	};
 
 };
-
-
-
-template <>
-inline const state::State& EvalArguments<false>::getState() const {
-#ifdef DEBUG
-	if(!state)
-		throw std::invalid_argument("EvalArgs::getState(): attribute is null.");
-#endif
-	return *state;
-}
-template <>
-inline const VarVector& EvalArguments<false>::getVars() const {
-#ifdef DEBUG
-	if(!vars)
-		throw std::invalid_argument("EvalArgs::getVars(): attribute is null.");
-#endif
-	return *vars;
-}
-template <>
-inline const AuxMap& EvalArguments<false>::getAuxMap() const {
-#ifdef DEBUG
-	if(!auxMap)
-		throw std::invalid_argument("EvalArgs::getAuxMap(): attribute is null.");
-#endif
-	return *auxMap;
-}
-template <>
-inline const AuxValueMap<int>& EvalArguments<false>::getAuxIntMap() const {
-#ifdef DEBUG
-	if(!auxIntMap)
-		throw std::invalid_argument("EvalArgs::getAuxIntMap(): attribute is null.");
-#endif
-	return *auxIntMap;
-}
-
 
 
 

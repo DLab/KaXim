@@ -22,6 +22,7 @@
 
 
 namespace pattern {
+class Environment;
 
 using namespace std;
 

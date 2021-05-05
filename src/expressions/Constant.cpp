@@ -21,11 +21,11 @@ template <typename T>
 Constant<T>::~Constant(){}
 
 template<typename T>
-T Constant<T>::evaluate(const EvalArguments<true>& args) const {
+T Constant<T>::evaluate(const SimContext& args) const {
 	return val;
 }
 template<typename T>
-T Constant<T>::evaluate(const EvalArguments<false>& args) const {
+T Constant<T>::evaluateSafe(const SimContext& args) const {
 	return val;
 }
 //TODO
@@ -43,7 +43,7 @@ BaseExpression::Reduction Constant<T>::factorize(const std::map<std::string,smal
 }
 
 template <typename T>
-BaseExpression* Constant<T>::reduce(VarVector& vars){
+BaseExpression* Constant<T>::reduce(SimContext& context){
 	return this;
 }
 

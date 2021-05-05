@@ -16,8 +16,11 @@
 #include <boost/numeric/ublas/io.hpp>
 #include "../state/Variable.h"
 #include "../expressions/Vars.h"
+#include "../data_structs/ValueMap.h"
 
 namespace pattern {
+
+typedef NamesMap<expressions::Auxiliar,int> AuxNames;
 
 //template <short dims>
 class Compartment {
@@ -88,7 +91,7 @@ public:
 	 *
 	 *
 	 */
-	std::list<int> getCells(const expressions::AuxNames<int> & aux_values) const;
+	std::list<int> getCells(const AuxNames& aux_values,const simulation::SimContext& context) const;
 
 	/** \brief Solve the implicit system for auxiliars in this expression
 	 * and return a map with the values for the auxiliars.
@@ -99,7 +102,7 @@ public:
 	 * that solve the system will be set here. If an auxliar value was set before
 	 * and is not equal to the solution of the system, an exception is thrown.
 	 */
-	void solve(const std::vector<short> &cell_index,expressions::AuxNames<int> & aux_values) const;
+	void solve(const std::vector<short> &cell_index,AuxNames& aux_values) const;
 
 	void setEquation();
 
@@ -120,8 +123,9 @@ public:
 	~UseExpression();
 
 
-	void evaluateCells(UseExpression::iterator it = UseExpression::iterator(),
-			expressions::AuxNames<int> aux_values = expressions::AuxNames<int>()
+	void evaluateCells(const simulation::SimContext& context,
+			UseExpression::iterator it = UseExpression::iterator(),
+			AuxNames aux_values = AuxNames()
 		);
 	//void emplaceCompExpression(const CompartmentExpr &c);
 	using std::vector<CompartmentExpr>::emplace_back;

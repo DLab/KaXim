@@ -68,6 +68,10 @@ real		([0-9]+\.[0-9]*|[0-9]*\.[0-9]+)(([eE][+-][0-9]+)|([eE][0-9]+))?
 				return Parser::make_LET(loc);
 			else if(!strcmp(yytext,"%const:"))
 				return Parser::make_CONST(loc);
+			else if(!strcmp(yytext,"%params:"))
+				return Parser::make_PARAMS(loc);
+			else if(!strcmp(yytext,"%param:"))
+				return Parser::make_PARAM(loc);
 			else if(!strcmp(yytext,"%plot:"))
 				return Parser::make_PLOT(loc);
 			else if(!strcmp(yytext,"%mod:"))

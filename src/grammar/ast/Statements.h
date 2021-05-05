@@ -13,7 +13,9 @@
 #include "Dynamics.h"
 #include "Spatial.h"
 
-#include "../../simulation/Simulation.h"
+namespace simulation {
+	class Simulation;
+}
 
 namespace grammar {
 namespace ast {
@@ -53,7 +55,7 @@ public:
 	 * Consts have a fixed value before the simulation begins.
 	 * @returns a pointer to a state::ConstantVar object. 			*/
 	Variable* evalConst(pattern::Environment &env,
-			VarVector &vars) const;
+			SimContext &context) const;
 
 	/** Evaluate a %var declaration.
 	 *
@@ -61,7 +63,9 @@ public:
 	 * And they should be deleted in reverse order.
 	 * @returns a pointer to a state::Variable object.		*/
 	Variable* evalVar(pattern::Environment &env,
-				VarVector &vars) const;
+			SimContext &context) const;
+
+	const Id& getName() const;
 	bool isKappa() const;
 	bool isConstant() const;
 	void setConstant(bool b);
@@ -103,7 +107,7 @@ public:
 
 	/** \brief Evaluate the %init ASTs to add agents and tokens into the Simulation object.  */
 	void eval(pattern::Environment &env,
-			const VarVector &vars,simulation::Simulation &sim);
+			simulation::SimContext &sim);
 
 };
 

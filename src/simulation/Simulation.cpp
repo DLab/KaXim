@@ -6,18 +6,34 @@
  */
 
 #include "Simulation.h"
+#include "../state/Variable.h"
 #include <set>
 #include <boost/random.hpp>
 
 namespace simulation {
 
-Simulation::Simulation(const pattern::Environment& _env,int _id) : id(_id),env(_env),
-		params(Parameters::get()), plot(env,_id),ccInjections(nullptr),mixInjections(nullptr),
-		rng(params.seed+_id),done(false){/****/}
+/*Simulation::Simulation(pattern::Environment& _env,VarVector& _vars,int _id) :
+		SimContext(_id,Parameters::get().seed+_id),env(_env),plot(env,_id),
+		ccInjections(nullptr),mixInjections(nullptr),done(false){}*/
 
-Simulation::Simulation(const Simulation& sim,int _id) : id(_id),env(sim.env),params(Parameters::get()),
-		plot(env,_id),ccInjections(nullptr),mixInjections(nullptr),rng(params.seed+_id),done(false){}
+Simulation::Simulation(SimContext& context,int _id) :
+		SimContext(_id,&context),ccInjections(nullptr),
+		mixInjections(nullptr),done(false){
+	auto& params = Parameters::get();
+	if(params.maxTime >= std::numeric_limits<FL_TYPE>::infinity())
+		if(params.maxEvent == std::numeric_limits<UINT_TYPE>::infinity())
+			throw invalid_argument("No limit to stop or control simulation.");
+		else
+			plot = new EventPlot(env,_id);
+	else
+		plot = new TimePlot(env,_id);
 
+}
+
+/*Simulation::Simulation() : SimContext(0,Parameters::get().seed),
+		plot(*env,0),ccInjections(nullptr),mixInjections(nullptr),
+		done(false) {}
+*/
 Simulation::~Simulation() {
 	cout << "Simulation[" << id << "] finished." << endl;
 	// TODO Auto-generated destructor stub
@@ -25,20 +41,47 @@ Simulation::~Simulation() {
 	//delete[] mixInjections;
 }
 
-void Simulation::setCells(const list<unsigned int>& _cells,const VarVector& vars){
-	auto distr = uniform_int_distribution<int>();
-	for(auto cell_id : _cells){
-		cells.emplace(piecewise_construct,forward_as_tuple(cell_id),
-				forward_as_tuple(*this,vars,env.getCompartmentByCellId(cell_id).getVolume(),
-						plot,env,distr(rng)));
-	}
-}
+//void Simulation::setCells(const list<unsigned int>& _cells,const VarVector& vars){}
 
 const state::State& Simulation::getCell(int id) const {
 	return cells.at(id);
 }
 
-void Simulation::initialize(){
+void Simulation::initialize(const vector<list<unsigned int>>& _cells,grammar::ast::KappaAst& ast){
+	int id = 0;
+	for(auto& param : env.getParams()){
+		auto var = getVars()[env.getVarId(param.first)];
+		//if(var == nullptr)
+			var = new state::ConstantVar<FL_TYPE>(id,param.first,
+					param.second->getValue(*this).valueAs<FL_TYPE>());
+		id++;
+	}
+	for(auto var : parent->getVars()){
+		//todo set sim-vars
+	}
+	auto distr = uniform_int_distribution<int>();
+	for(auto cell_id : _cells.at(0)){//TODO all cells
+		cells.emplace(piecewise_construct,forward_as_tuple(cell_id),
+				forward_as_tuple((int)cell_id,*this,
+				env.getCompartmentByCellId(cell_id).getVolume(),*plot));
+	}
+	for(auto& init : env.getInits()){
+		auto &cells = env.getUseExpression(init.use_id).getCells();
+		auto n_value = init.n->getValueSafe(*this);
+		if(init.mix){
+			int n;
+			if(n_value.t == Type::FLOAT){
+				n = round(n_value.fVal);
+				if(n != n_value.fVal)
+					ADD_WARN_NOLOC("Making approximation of a float value in agent initialization to "+to_string(n));
+			}
+			else
+				n = n_value.valueAs<int>();
+			addAgents(cells,n,*init.mix);
+		}
+		else
+			addTokens(cells,n_value.valueAs<FL_TYPE>(),init.tok_id);
+	}
 	for(auto& id_state : cells){
 		//env.buildInfluenceMap(id_state.second);
 		//id_state.second.buildInfluenceMap();
@@ -57,22 +100,23 @@ void Simulation::run(const Parameters& params){
 		auto tau = params.maxTime;// = calculate-tau( map-diffusion-in )
 		//parallel
 		for(auto& id_state : cells){
-			id_state.second.advanceUntil(counter.getTime()+tau);
+			id_state.second.advanceUntil(counter.getTime()+tau,params.maxEvent);
 			id_state.second.updateDeps(pattern::Dependency());
 		}
 		done = true;
-		for(auto& id_state : cells){
+		for(auto& id_state : cells)
 			id_state.second.tryPerturbate();
 #ifdef DEBUG
-			if(params.verbose > 0){
-				cout << "------ " << env.cellIdToString(id_state.first) << " (final-state) ------\n";
-				id_state.second.print();
-				cout << "------------------------------------\n";
-			}
-#else
-			//id_state.second.print();//cout << id_state.second.getCounter().toString() << endl;
-#endif
+		if(params.verbose > 0 && id == 0){
+			cout << "=== Final-State ";
+			print();
+			cout << "------------------------------------\n";
 		}
+#else
+		cout << "------------------------------------\n";
+		cout << cells.at(0).getCounter().toString() << endl;
+		cout << "------------------------------------\n";
+#endif
 		counter.advanceTime(tau);
 	//}
 }
@@ -145,12 +189,12 @@ void Simulation::addTokens(const Range<int,Args...> &cell_ids,float count,short 
 		try{
 			cells.at(id).addTokens(count/cell_ids.size(),token_id);
 		}
-		catch(std::out_of_range &e){
+		catch(out_of_range &e){
 			//other mpi_process will add this tokens.
 		}
 	}
 }
-template void Simulation::addTokens(const std::set<int> &cell_ids,float count,short token_id);
+template void Simulation::addTokens(const set<int> &cell_ids,float count,short token_id);
 
 
 template <template<typename,typename...> class Range,typename... Args>
@@ -163,13 +207,13 @@ void Simulation::addAgents(const Range<int,Args...> &cell_ids,unsigned count,con
 		try{
 			cells.at(*ids_it).initNodes(n,mix);
 		}
-		catch(std::out_of_range &e){
+		catch(out_of_range &e){
 			//other mpi_process will add this tokens.
 		}
 		ids_it++;
 	}
 }
-template void Simulation::addAgents(const std::set<int> &cell_ids,unsigned count,const pattern::Mixture &mix);
+template void Simulation::addAgents(const set<int> &cell_ids,unsigned count,const pattern::Mixture &mix);
 
 
 /** \brief Return a way to allocate cells among cpu's.
@@ -249,7 +293,7 @@ vector<list<unsigned int>> Simulation::allocCells( int n_cpus,
 		}
 	}
 
-	// showing P
+	/*
 #ifdef DEBUG
 	if(Parameters::get().verbose > 0){
 		cout << "Vertex Assignment:" << endl;
@@ -262,7 +306,7 @@ vector<list<unsigned int>> Simulation::allocCells( int n_cpus,
 		}
 	}
 #endif
-
+*/
 	return P;
 }
 
@@ -324,12 +368,13 @@ bool Simulation::isDone() const {
 }
 
 void Simulation::print() const {
+	cout << "========= Simulation[" << id << "] =========" << endl;
 	if(cells.size() > 1)
 		cout << cells.size() << " cells in this simulation object." << endl;
 	for(auto& id_state : cells){
-		cout << "------- " << env.cellIdToString(id_state.first) << " (initial-state) ---------\n";
+		if(cells.size() > 1)
+		cout << "---" << env.cellIdToString(id_state.first) << "---\n";
 		id_state.second.print();
-		cout << "-----------------------------------------\n";
 	}
 }
 

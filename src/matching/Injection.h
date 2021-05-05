@@ -19,13 +19,18 @@
 #include "../pattern/mixture/Pattern.h"
 #include "../data_structs/DistributionTree.h"
 #include "../expressions/BaseExpression.h"
+//#include "../simulation/SimContext.h"
+
+namespace simulation {
+class SimContext;
+}
 
 namespace state {
-	class State;
+	//class State;
 	class Node;
 	class Internal;
 }
-namespace expressions {class AuxMixEmb;class AuxCcEmb;}
+//namespace expressions {class AuxMixEmb;class AuxCcEmb;}
 
 namespace matching {
 
@@ -70,7 +75,7 @@ public:
 	inline unsigned getAddress() const;
 	/** \brief Returns the value of aux_expr using the internal values
 	 * of the nodes pointed by this injection. */
-	inline FL_TYPE evalAuxExpr(const expressions::EvalArgs& args,
+	inline FL_TYPE evalAuxExpr(const simulation::SimContext& context,
 			const expressions::BaseExpression* aux_expr) const;
 
 	/** \brief Returns a new injection based on this one but
@@ -122,7 +127,7 @@ public:
 	~CcInjection();
 
 	bool reuse(const pattern::Pattern::Component& cc,Node& node,
-			map<int,InjSet*>& port_list,const expressions::EvalArgs& args,small_id root = 0);
+			map<int,InjSet*>& port_list,const simulation::SimContext& context,small_id root = 0);
 
 	const vector<Node*>& getEmbedding() const override;
 
@@ -185,11 +190,11 @@ inline const pattern::Pattern& Injection::pattern() const{
 	return ptrn;
 }
 
-inline FL_TYPE Injection::evalAuxExpr(const expressions::EvalArgs& args,
+inline FL_TYPE Injection::evalAuxExpr(const simulation::SimContext& context,
 		const expressions::BaseExpression* aux_func) const {
 	//expressions::AuxCcEmb aux_map(getEmbedding());
 	//expressions::EvalArgs args(&_args.getState(),&args.getVars(),&aux_map);
-	return aux_func->getValue(args).valueAs<FL_TYPE>();
+	return aux_func->getValue(context).valueAs<FL_TYPE>();
 }
 
 

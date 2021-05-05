@@ -22,41 +22,6 @@ template<> struct BaseExpression::EnumType<bool> {
 	static const Type t = BOOL;
 };
 
-template <bool safe>
-EvalArguments<safe>::EvalArguments(const state::State* state,const VarVector* vars,
-		const AuxMap* auxValues,const AuxValueMap<int>* auxIntValues):
-			state(state),vars(vars),auxMap(auxValues),auxIntMap(auxIntValues){};
-template <bool safe>
-EvalArguments<safe>::EvalArguments(state::State* state) : state(state),
-	vars(&state->vars),auxMap(&state->args.getAuxMap()),auxIntMap(nullptr){};
-
-template <>
-const state::State& EvalArguments<true>::getState() const {
-	if(!state)
-		throw std::out_of_range("EvalArgs::getState(): attribute is null.");
-	return *state;
-}
-template <>
-const VarVector& EvalArguments<true>::getVars() const {
-	if(!vars)
-		throw std::out_of_range("EvalArgs::getVars(): attribute is null.");
-	return *vars;
-}
-template <>
-const AuxMap& EvalArguments<true>::getAuxMap() const {
-	if(auxMap == nullptr)
-		throw std::out_of_range("EvalArgs::getAuxMap(): attribute is null.");
-	return *auxMap;
-}
-template <>
-const AuxValueMap<int>& EvalArguments<true>::getAuxIntMap() const {
-	if(!auxIntMap)
-		throw std::out_of_range("EvalArgs::getAuxIntMap(): attribute is null.");
-	return *auxIntMap;
-}
-
-template class EvalArguments<true>;
-template class EvalArguments<false>;
 
 BaseExpression::Reduction::Reduction() : factor(nullptr) {}
 
@@ -76,15 +41,15 @@ bool BaseExpression::operator!=(const BaseExpression& exp) const {
 BaseExpression::~BaseExpression() { }
 
 BaseExpression::Reduction BaseExpression::reduceAndFactorize(
-		const std::map<std::string,small_id> &aux_cc,VarVector& vars) const{
+		const std::map<std::string,small_id> &aux_cc,SimContext& context) const{
 	Reduction red(this->factorize(aux_cc));
-	auto factor = red.factor->reduce(vars);
+	auto factor = red.factor->reduce(context);
 	if(factor != red.factor){
 		delete red.factor;
 		red.factor = factor;
 	}
 	for(auto& aux_f : red.aux_functions){
-		auto reduced = aux_f.second->reduce(vars);
+		auto reduced = aux_f.second->reduce(context);
 		if(reduced  != aux_f.second){
 			delete aux_f.second;
 			aux_f.second = reduced;

@@ -24,12 +24,12 @@ class AlgExpression: public virtual BaseExpression {
 public:
 	AlgExpression();
 	virtual ~AlgExpression() = 0;
-	virtual T evaluate(const EvalArguments<true>& args) const = 0;
-	virtual T evaluate(const EvalArguments<false>& args) const = 0;
+	virtual T evaluate(const SimContext& context) const = 0;
+	virtual T evaluateSafe(const SimContext& context) const = 0;
 	virtual FL_TYPE auxFactors(
 			std::unordered_map<std::string, FL_TYPE> &factor) const override = 0;
-	virtual SomeValue getValue(const EvalArguments<true>& args) const override;
-	virtual SomeValue getValue(const EvalArguments<false>& args) const override;
+	inline virtual SomeValue getValue(const SimContext& context) const override;
+	inline virtual SomeValue getValueSafe(const SimContext& context) const override;
 	virtual bool operator==(const BaseExpression& exp) const override = 0;
 
 	//virtual void getNeutralAuxMap(
@@ -37,6 +37,21 @@ public:
 	//virtual Reduction reduce(const state::State& state,const AuxMap&& aux_values = AuxMap()) const;
 	//virtual T auxPoly(std::list<AlgExpression<T>>& poly) const = 0;
 };
+
+
+template<typename T>
+SomeValue AlgExpression<T>::getValue(const SimContext& context) const {
+	return SomeValue(this->evaluate(context));
+}
+template<typename T>
+SomeValue AlgExpression<T>::getValueSafe(const SimContext& context) const {
+	return SomeValue(this->evaluateSafe(context));
+}
+
+template class AlgExpression<FL_TYPE> ;
+template class AlgExpression<int> ;
+template class AlgExpression<bool> ;
+
 
 } /* namespace expression */
 

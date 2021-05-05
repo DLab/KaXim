@@ -23,7 +23,7 @@ class InjRandContainer {
 protected:
 	list<CcInjection*> freeInjs;
 	const pattern::Pattern::Component& cc;
-	virtual void insert(CcInjection* inj,const expressions::EvalArgs& args) = 0;
+	virtual void insert(CcInjection* inj,const state::State& state) = 0;
 	virtual void del(Injection* inj) = 0;
 	virtual CcInjection* newInj() const = 0;
 
@@ -39,17 +39,17 @@ public:
 	virtual FL_TYPE partialReactivity() const = 0;
 
 	virtual Injection* emplace(Node& node,map<int,InjSet*> &port_list,
-			const expressions::EvalArgs& args,small_id root = 0);
+			const state::State& state,small_id root = 0);
 	virtual Injection* emplace(Injection* base_inj,map<Node*,Node*>& mask,
-			const expressions::EvalArgs& args);
-	inline virtual void erase(Injection* inj,const expressions::EvalArgs& args);
+			const state::State& state);
+	inline virtual void erase(Injection* inj,const simulation::SimContext& context);
 	virtual void clear() = 0;
 
 	virtual void selectRule(int rid,small_id cc) const;
 	virtual FL_TYPE getM2() const;
 
 	virtual FL_TYPE sumInternal(const expressions::BaseExpression* aux_func,
-			const expressions::EvalArgs& args) const;
+			const simulation::SimContext& context) const;
 	//vector<CcInjection*>::iterator begin();
 	//vector<CcInjection*>::iterator end();
 
@@ -62,7 +62,7 @@ class InjRandSet : public InjRandContainer {
 	size_t counter;
 	size_t multiCount;
 	vector<CcInjection*> container;
-	void insert(CcInjection* inj,const expressions::EvalArgs& args) override;
+	void insert(CcInjection* inj,const state::State& state) override;
 	virtual CcInjection* newInj() const override;
 public:
 	InjRandSet(const pattern::Pattern::Component& _cc);
@@ -93,12 +93,17 @@ class InjRandTree : public InjRandContainer {
 	//list<CcInjection*> freeInjs;
 	list<CcInjection*> infList;
 
+	/** \brief A root of the rule-rate associated with a CC	 */
 	struct Root {
+		/** a tree structure containing injs ordered by partial-rate value */
 		distribution_tree::DistributionTree<CcValueInj>* tree;
+		/** the partial-rate of the CC in the rule. */
+		const expressions::BaseExpression* partial_rate;
+		/** second-moment of the injs collection, useful for approximations*/
 		two<FL_TYPE> second_moment;//(sum x*x,sum x) at validation
 		bool is_valid;
 
-		Root();
+		Root(const expressions::BaseExpression* rate);
 	};
 	unsigned counter;
 	// (r_id,cc_index) -> contribution to rule-rate per cc
@@ -107,7 +112,7 @@ class InjRandTree : public InjRandContainer {
 
 	mutable pair<int,small_id> selected_root;
 
-	void insert(CcInjection *inj,const expressions::EvalArgs& args) override;
+	void insert(CcInjection *inj,const state::State& state) override;
 	virtual CcInjection* newInj() const override;
 
 public:
@@ -127,7 +132,7 @@ public:
 	void selectRule(int rid,small_id cc) const override;
 
 	FL_TYPE sumInternal(const expressions::BaseExpression* aux_func,
-				const expressions::EvalArgs& args) const override;
+				const simulation::SimContext& context) const override;
 	virtual void fold(const function<void (const Injection*)> func) const;
 	//void addHint(FL_TYPE value);
 };
@@ -143,7 +148,7 @@ class InjLazyContainer : public InjRandContainer {
 	void loadContainer() const;
 
 
-	virtual void insert(CcInjection* inj,const expressions::EvalArgs& args) override;
+	virtual void insert(CcInjection* inj,const state::State& state) override;
 	virtual CcInjection* newInj() const override;
 
 public:
@@ -157,10 +162,10 @@ public:
 	virtual FL_TYPE partialReactivity() const override;
 
 	virtual Injection* emplace(Node& node,map<int,InjSet*> &port_lists,
-			const expressions::EvalArgs& args,small_id root = 0) override;
+			const state::State& state,small_id root = 0) override;
 	virtual Injection* emplace(Injection* base_inj,map<Node*,Node*>& mask,
-			const expressions::EvalArgs& args) override;
-	virtual void erase(Injection* inj,const expressions::EvalArgs& args) override;
+			const state::State& state) override;
+	virtual void erase(Injection* inj,const simulation::SimContext& context) override;
 	virtual void del(Injection* inj) override;
 	virtual void clear() override;
 
@@ -168,16 +173,16 @@ public:
 	virtual FL_TYPE getM2() const override;
 
 	virtual FL_TYPE sumInternal(const expressions::BaseExpression* aux_func,
-			const expressions::EvalArgs& args) const override;
+			const simulation::SimContext& context) const override;
 
 	virtual void fold(const function<void (const Injection*)> func) const override;
 };
 
 
 
-inline void InjRandContainer::erase(Injection* inj,const expressions::EvalArgs& args){
+inline void InjRandContainer::erase(Injection* inj,const simulation::SimContext& context){
 	for(auto& s : sumList)
-		s.second -= inj->evalAuxExpr(args,s.first);
+		s.second -= inj->evalAuxExpr(context,s.first);
 	del(inj);
 	freeInjs.push_back(static_cast<CcInjection*>(inj));
 	inj->dealloc();//dealloc

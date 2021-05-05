@@ -40,7 +40,7 @@ namespace pattern {
 
 using namespace std;
 
-using Id = grammar::ast::Id;
+using AstId = grammar::ast::Id;
 
 typedef unsigned short short_id;
 
@@ -57,6 +57,7 @@ protected:
 	//IdMap algMap, kappaMap;
 	IdMap varMap, compartmentMap, channelMap, signatureMap;
 	unordered_map<string,unsigned> tokenMap;
+	map<string,const expressions::BaseExpression*> paramVars;
 	//vector<string> algNames, kappaNames;
 	vector<string> varNames, tokenNames, compartmentNames;
 	vector<Signature> signatures;
@@ -73,6 +74,20 @@ protected:
 	map<const Mixture*,list<expressions::Auxiliar<FL_TYPE>*>> auxExpressions;
 	mutable Dependencies deps;//mutable because [] accessing
 
+	struct Init {
+		int use_id;
+		expressions::BaseExpression* n;
+		Mixture* mix;
+		int tok_id;
+
+		Init(int id, expressions::BaseExpression* expr,
+				Mixture* m, int tok) : use_id(id),n(expr),mix(m),tok_id(tok) {}
+		~Init(){
+			delete n;delete mix;
+		}
+	};
+	list<Init> inits;
+
 	//(ag_id,site) -> list { (cc,ag_id) } map to every freeSite for side-effect events?
 	unordered_map<int,list<pair<const Pattern::Component*,small_id> > > freeSiteCC;
 
@@ -82,12 +97,19 @@ public:
 	Environment();
 	~Environment();
 
-	unsigned declareToken(const grammar::ast::Id &name);
-	short declareVariable(const grammar::ast::Id &name,bool isKappa);
-	Signature& declareSignature(const grammar::ast::Id& sign);
-	Compartment& declareCompartment(const grammar::ast::Id& comp);
+	unsigned declareToken(const AstId &name);
+	short declareParam(const AstId& name,const expressions::BaseExpression* value);
+
+	/** \brief Declares a new variable name and returns its id.
+	 *
+	 * @returns the id associated to the new name or -1 if a
+	 * model param was declared with the same name. Throws if the
+	 * name was already used. */
+	short declareVariable(const AstId &name,bool isKappa);
+	Signature& declareSignature(const AstId& sign);
+	Compartment& declareCompartment(const AstId& comp);
 	UseExpression& declareUseExpression(unsigned short id,size_t n);
-	Channel& declareChannel(const grammar::ast::Id &channel);
+	Channel& declareChannel(const AstId &channel);
 	void declareMixture(Mixture* &m);
 	map<small_id,small_id> declareComponent(Pattern::Component* &c);
 
@@ -102,9 +124,12 @@ public:
 			const yy::location& loc);
 	void declarePert(simulation::Perturbation* pert);
 
+	void declareMixInit(int use_id,expressions::BaseExpression* n,Mixture* mix);
+	void declareTokInit(int use_id,expressions::BaseExpression* n,int tok_id);
+
 	void declareObservable(state::Variable* obs);
 
-	void buildInfluenceMap(const VarVector& vars);
+	void buildInfluenceMap(const simulation::SimContext &context);
 	void buildFreeSiteCC();
 	const list<pair<const Mixture::Component*,small_id> >& getFreeSiteCC(small_id ag,small_id site) const;
 
@@ -122,7 +147,9 @@ public:
 	const list<Mixture::Agent*>& getAgentPatterns(small_id id) const;
 	const vector<simulation::Rule>& getRules() const;
 	const vector<simulation::Perturbation*>& getPerts() const;
+	const list<Init>& getInits() const;
 	const list<state::Variable*>& getObservables() const;
+	const map<string,const expressions::BaseExpression*>& getParams() const;
 
 
 	const Compartment& getCompartmentByCellId(unsigned id) const;
@@ -149,7 +176,7 @@ public:
 
 	//DEBUG methods
 	std::string cellIdToString(unsigned int cell_id) const;
-	void show() const;
+	void show(const simulation::SimContext& context) const;
 
 };
 

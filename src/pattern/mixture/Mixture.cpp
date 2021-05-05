@@ -232,13 +232,15 @@ const vector<Pattern::Component*>::const_iterator Mixture::end() const {
 }
 
 string Mixture::toString(const Environment& env) const {
-	string out = "Agents: " + to_string(agents.size()) + "\tComponents: " + to_string(comps.size()) + "\n";
+	string out;
 	short i = 0;
-
-	for( auto c : comps ) {
-		out += "[" + to_string(i) + "] -> " + c->toString(env) + ", ";
-		i++;
-	}
+	if(comps.size())
+		for( auto c : comps ) {
+			out += " {" + c->toString(env) + "},";
+			i++;
+		}
+	else
+		out = " {}";
 
 	return out;
 }

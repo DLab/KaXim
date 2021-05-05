@@ -25,18 +25,17 @@ class State;
 
 using namespace std;
 
-using expressions::EvalArgs;
 class SiteGraph {
 public:
 	SiteGraph();
 	~SiteGraph();
 
 	void addComponents(unsigned n,const pattern::Mixture::Component& cc,
-			const EvalArgs& args,vector<Node*>& nodes);
+			const State &context,vector<Node*>& nodes);
 	inline void addComponents(unsigned n,const pattern::Mixture::Component& cc,
-			const EvalArgs& args){
+			const State &context){
 		vector<Node*> v(10);
-		addComponents(n,cc,args,v);
+		addComponents(n,cc,context,v);
 	}
 
 

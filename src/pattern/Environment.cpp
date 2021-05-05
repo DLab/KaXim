@@ -46,11 +46,32 @@ unsigned Environment::declareToken(const Id &name_loc){
 	tokenNames.push_back(name);
 	return id;
 }
+
+short Environment::declareParam(const AstId &name_loc,const expressions::BaseExpression* val){
+	auto name  = name_loc.getString();
+	short& id = varMap[name];
+	if(!paramVars.count(name)){//first param declaration
+		id = varNames.size();
+		varNames.push_back(name);
+	}
+	else if(paramVars[name])//param was declared with value before
+		ADD_WARN("Previous value of model parameter '"+name+"' overwritten.",name_loc.loc);
+	paramVars.emplace(name_loc.getString(),val);
+	return id;
+}
+
 short Environment::declareVariable(const Id &name_loc,bool is_kappa){
 	//if(this->exists(name,algMap) || this->exists(name,kappaMap))
 	const string& name = name_loc.getString();
-	if(this->exists(name,varMap))
+	//if var declared and not a param
+	if(this->exists(name,varMap)){
+		/*if(!paramVars.count(name))
+			if(paramVars.at(name)){
+				ADD_WARN("Ignoring value for parameter defined in higher level.",name_loc.loc);
+				return -1;
+			}*/
 		throw SemanticError("Label "+name+" already defined.",name_loc.loc);
+	}
 	short id;
 	id = varNames.size();
 	varMap[name] = id;
@@ -154,6 +175,13 @@ void Environment::declarePert(simulation::Perturbation* pert){
 	perts.push_back(pert);
 }
 
+void Environment::declareMixInit(int use_id,expressions::BaseExpression* n,Mixture* mix){
+	inits.emplace_back(use_id,n,mix,-1);
+}
+void Environment::declareTokInit(int use_id,expressions::BaseExpression* n,int tok_id){
+	inits.emplace_back(use_id,n,nullptr,tok_id);
+}
+
 /*
 void Environment::declareAux(const Id& name,Mixture& mix,small_id site_id){
 	auto& aux_name = name.getString();
@@ -198,9 +226,9 @@ void Environment::declareObservable(state::Variable* var){
 	observables.emplace_back(var);
 }
 
-void Environment::buildInfluenceMap(const VarVector& vars){
+void Environment::buildInfluenceMap(const simulation::SimContext &context){
 	for(auto& r : rules)
-		r.checkInfluence(*this,vars);
+		r.checkInfluence(*this,context);
 }
 void Environment::buildFreeSiteCC() {
 	for(auto ag_class : agentPatterns){
@@ -287,8 +315,14 @@ const vector<simulation::Rule>& Environment::getRules() const {
 const vector<simulation::Perturbation*>& Environment::getPerts() const {
 	return perts;
 }
+const list<Environment::Init>& Environment::getInits() const{
+	return inits;
+}
 const list<state::Variable*>& Environment::getObservables() const {
 	return observables;
+}
+const map<string,const expressions::BaseExpression*>& Environment::getParams() const {
+	return paramVars;
 }
 
 
@@ -378,10 +412,10 @@ std::string Environment::cellIdToString(unsigned int cell_id) const {
 
 }
 
-void Environment::show() const {
+void Environment::show(const simulation::SimContext& context) const {
 	//try{
-		cout << "This is the environment content" << endl;
-		cout << "\t\tCompartments[" << compartments.size() << "]" << endl;
+		cout << "========= The Environment =========" << endl;
+		/*cout << "\t\tCompartments[" << compartments.size() << "]" << endl;
 		for(unsigned int i = 0; i < compartments.size() ; i++)
 			cout << (i+1) << ") " << compartments[i].toString() << endl;
 
@@ -398,10 +432,11 @@ void Environment::show() const {
 			cout << (i+1) << ") ";
 			for(list<Channel>::const_iterator it = channels[i].cbegin();it != channels[i].cend();it++){
 				cout << it->toString() << endl;
-				list< list<int> > l = it->getConnections();
+				list< list<int> > l = it->getConnections(context);
 				it->printConnections(l);
 			}
 		}
+		*/
 		/*cout << "\n\t\tAgentPatterns[" ;
 		int count = 0;
 		for(auto& ag_list : agentPatterns)
@@ -426,33 +461,38 @@ void Environment::show() const {
 				}
 				cout << endl;
 			}*/
-		cout << "\n\t\tComponents[" << components.size() << "]" << endl;
+		cout << "Components[" << components.size() << "]" << endl;
 		int i = 0;
 		for(auto comp : components){
-			cout << "[" << comp->getId() << "] -> ";
+			cout << "  [" << comp->getId() << "] -> ";
 			cout << comp->toString(*this) << endl;
 			//i++;
 		}
-		cout << "\n\t\tMixtures[" << mixtures.size() << "]" << endl;
-
-		cout << "\n\t\tRules[" << rules.size() << "]" << endl;
+		/*cout << "Mixtures[" << mixtures.size() << "]" << endl;
+		for(auto mix : mixtures){
+			cout << "  [" << mix->getId() << "] -> ";
+			cout << mix->toString(*this) << endl;
+			//i++;
+		}*/
+		cout << "Rules[" << rules.size() << "]" << endl;
 		i = 0;
 		for(auto& rul : rules){
-			cout << "[" << rul.getId() << "] ";
-			cout << rul.toString(*this) << endl;
-			cout << rul.getInfluences().size() <<
+			cout << "  [" << rul.getId() << "] ";
+			cout << rul.toString(*this);
+			if(rul.getInfluences().size())
+				cout << "\n    " << rul.getInfluences().size() <<
 					" new Injections will be produced.";
 			int rhs_ag_pos(-1);
 			for(auto& key_info : rul.getInfluences()){
 				if(rhs_ag_pos != int(key_info.first.match_root.second)){
 					rhs_ag_pos = key_info.first.match_root.second;
-					cout << "\nChanges in RHS-Agent[" << rhs_ag_pos << "]"
-						" will produce new Injections of patterns: {";
+					cout << "\n      Changes in RHS-Agent[" << rhs_ag_pos << "]"
+						" will produce new Injections of patterns:";
 				}
 				cout << "\n\troot-agent["<< int(key_info.first.match_root.first)
 						<<"]\t" << key_info.first.cc->toString(*this);
 			}
-			cout << "\n}" << endl;
+			cout << "\n" << endl;
 			i++;
 		}
 
@@ -460,7 +500,7 @@ void Environment::show() const {
 	catch(exception &e){
 		cout << "error: " << e.what() << endl;
 	}*/
-	cout << "end of env.show()" << endl;
+	cout << "-----------------------------" << endl;
 
 }
 
