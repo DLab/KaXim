@@ -3,7 +3,7 @@
 %defines
 %define parse.assert
 %define api.namespace { grammar::kappa3 }
-%define api.parser.class { Parser }
+%define parser_class_name { Parser }
 %define api.value.type variant
 %define api.token.constructor
 %define parse.error verbose
