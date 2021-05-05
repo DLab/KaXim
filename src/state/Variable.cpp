@@ -232,10 +232,18 @@ BaseExpression* KappaVar::clone() const {
 	return new KappaVar(*this);
 }
 int KappaVar::evaluate(const SimContext& context) const {
-	return context.getInjContainer(mixture->getId()).count();
+	UINT_TYPE  count = 1;
+	for(const auto cc : *mixture){
+		count *= context.getInjContainer(cc->getId()).count();
+	}
+	return count;
 }
 int KappaVar::evaluateSafe(const SimContext& context) const {
-	return context.getInjContainer(mixture->getId()).count();
+	UINT_TYPE  count = 1;
+	for(const auto cc : *mixture){
+		count *= context.getInjContainer(cc->getId()).count();
+	}
+	return count;
 }
 
 const pattern::Mixture& KappaVar::getMix() const {

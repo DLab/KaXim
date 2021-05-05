@@ -119,6 +119,12 @@ void State::apply(const simulation::Rule& r){
 		graph.allocate(node);
 		ev.emb[ev.cc_count][i] = node;
 		i++;
+#ifdef DEBUG
+		if(simulation::Parameters::get().verbose > 2){
+			//auto& ag_sign = state.getEnv().getSignature(n->getId());
+			cout << "[create] " << n->toString(env) << endl;//ag_sign.getName() << "()\n";
+		}
+#endif
 	}
 	ev.new_cc.clear();
 	for(auto& act : r.getScript()){
@@ -226,12 +232,12 @@ void State::positiveUpdate(const simulation::Rule::CandidateMap& wake_up){
 	ev.clear();
 }
 
-void State::advanceUntil(FL_TYPE sync_t) {
+void State::advanceUntil(FL_TYPE sync_t,UINT_TYPE max_e) {
 	counter.next_sync_at = sync_t;
 	plot.fill(*this,env);
-	while(counter.getTime() < sync_t){
+	while(counter.getTime() < sync_t && counter.getEvent() < max_e){
 		try{
-			const NullEvent ex(event());
+			const NullEvent ex(event());//next-event
 			if(ex.error){
 				counter.incNullEvents(ex.error);
 				#ifdef DEBUG
@@ -248,8 +254,8 @@ void State::advanceUntil(FL_TYPE sync_t) {
 			counter.incNullEvents(ex.error);
 		}
 #ifdef DEBUG
-		if(counter.getEvent() % 10 == 0 && simulation::Parameters::get().verbose > 1){
-			cout << "------------ volume-name[i] -----------------\n";
+		if(counter.getEvent() % 10 == 0 && simulation::Parameters::get().verbose > 3){
+			cout << "---------------------------------------------\n";
 			this->print();
 			cout << "---------------------------------------------\n";
 		}
@@ -558,7 +564,7 @@ void State::initActTree() {
 
 void State::print() const {
 	graph.print(env);
-	cout << "Injections\n";
+	cout << "Active Injections -> {\n";
 	int i = 0;
 	for(auto& cc : env.getComponents()){
 		if(injections[i]->count())
@@ -566,14 +572,14 @@ void State::print() const {
 			" injs of " << cc->toString(env) << endl;
 		i++;
 	}
-	cout << "Rules\n";
+	cout << "}\nActive Rules -> {\n";
 	for(auto& r : env.getRules()){
 		auto act = rates[r.getId()]->evalActivity(*this);
 		if(act.first || act.second)
 			cout << "\t(" << r.getId() << ")\t" << r.getName() << "\t("
 				<< act.first << " , " << act.second << ")" << endl;
 	}
-	cout << "\n";
+	cout << "}\n";
 	cout << counter.toString() << endl;
 }
 

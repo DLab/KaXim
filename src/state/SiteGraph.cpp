@@ -40,7 +40,8 @@ void SiteGraph::addComponents(unsigned n,const pattern::Mixture::Component& cc,
 				auto node = new Node(context.getEnv().getSignature(p_ag->getId()));
 				//node->setCount(n);
 				for(auto& site : *p_ag)
-					node->setInternalValue(site.getId(),site.getValue(context));
+					if(site.getValueType() != pattern::Pattern::EMPTY)
+						node->setInternalValue(site.getId(),site.getValue(context));
 				this->allocate(node);
 				buff_nodes[i] = node;
 				i++;
@@ -54,7 +55,8 @@ void SiteGraph::addComponents(unsigned n,const pattern::Mixture::Component& cc,
 		for(auto p_ag : cc){
 			auto node = new SubNode(context.getEnv().getSignature(p_ag->getId()),*multi);
 			for(auto& site : *p_ag)
-				node->setInternalValue(site.getId(),site.getValue(context));
+				if(site.getValueType() != pattern::Pattern::EMPTY)
+					node->setInternalValue(site.getId(),site.getValue(context));
 			this->allocate(node);
 			buff_nodes[i] = node;
 			i++;
@@ -135,18 +137,18 @@ vector<Node*>::const_iterator SiteGraph::end() const {
 }
 
 void SiteGraph::print(const pattern::Environment& env) const {
-	cout << getPopulation() << " agents";
+	cout << "StateGraph[" << getPopulation() << "]";
 	big_id nodes_to_show = std::min<big_id>(simulation::Parameters::get().showNodes,container.size());
 
 	if(nodes_to_show)
-		cout << " -> Graph Nodes {\n";
+		cout << " -> {\n";
 	else
 		cout << endl;
 	for(big_id i = 0; i < nodes_to_show; i++){
 		auto node = container[i];
 		if(!node)
 			continue;
-		cout << node->getAddress() << ": ";
+		cout << "  [" << node->getAddress() << "] ";
 		if(node->getCount() > 1)
 			cout << node->getCount() << " ";
 		cout << node->toString(env,true) << endl;

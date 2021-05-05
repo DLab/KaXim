@@ -39,7 +39,7 @@ void KappaAst::evaluateSignatures(pattern::Environment &env,const SimContext &co
 
 void KappaAst::evaluateCompartments(pattern::Environment &env,const SimContext &context){
 	if(compartments.size() == 0){
-		ADD_WARN("No compartment declared. Declaring default compartment 'volume'.",yy::location());
+		//ADD_WARN("No compartment declared. Declaring default compartment 'volume'.",yy::location());
 		env.declareCompartment(Id(yy::location(),"volume"));
 		return;
 	}
@@ -89,20 +89,28 @@ vector<Variable*> KappaAst::evaluateDeclarations(pattern::Environment &env,SimCo
 void KappaAst::evaluateParams(pattern::Environment &env,SimContext &context,const vector<float>& po_params){
 	if(params.size() > po_params.size())
 		throw invalid_argument("Too many parameters given as command line argument.");
-	int i = 0;
+	unsigned i = 0;
 	auto& vars = context.getVars();
 	for(auto& param : params){
-		auto p_expr = param.second->eval(env,context);
-		unsigned id;
-		if(i < po_params.size())
-			id = env.declareParam(param.first,new expressions::Constant<FL_TYPE>(po_params[i]));
+		if(i < po_params.size()){
+			env.declareParam(param.first,new expressions::Constant<FL_TYPE>(po_params[i]));
+			cout << "%param: '" << param.first.getString() << "' " << po_params[i] << endl;
+		}
 		else
-			id = env.declareParam(param.first,p_expr);
-		if(id == vars.size())
-			vars.push_back(nullptr);
-		else if(id > vars.size())
-			throw invalid_argument("Unexpected param id.");
+			if(param.second)
+				env.declareParam(param.first,param.second->eval(env,context));
+			else
+				throw SemanticError("Sim. parameter "+param.first.getString()+" has no value.",param.first.loc);
+		//if(id == vars.size())
+		//	vars.push_back(nullptr); else
+		//if(id > vars.size())
+		//	throw invalid_argument("Unexpected param id.");
 		i++;
+	}
+	vars.resize(env.getParams().size(),nullptr);
+	for(auto& param : env.getParams()){
+		int id = env.getVarId(param.first);
+		vars[id] = Variable::makeAlgVar(id,param.first,param.second->clone());
 	}
 }
 

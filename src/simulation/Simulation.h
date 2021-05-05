@@ -31,7 +31,7 @@ class Simulation : public SimContext {
 	vector<state::State> states;//vector?
 	pattern::RuleSet rules;
 	//GlobalCounter counter;
-	Plot plot;
+	Plot* plot;
 
 	set<matching::Injection*> *ccInjections;//[cc_env_id].at(node_id)
 	set<matching::Injection*> *mixInjections;//[mix_id].at(node_id)[cc_mix_id]

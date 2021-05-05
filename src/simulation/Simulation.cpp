@@ -17,10 +17,17 @@ namespace simulation {
 		ccInjections(nullptr),mixInjections(nullptr),done(false){}*/
 
 Simulation::Simulation(SimContext& context,int _id) :
-		SimContext(_id,&context),
-		plot(env,_id),ccInjections(nullptr),mixInjections(nullptr),
-		done(false){//,vars(context.getVars()){
-	//vars = context.getVars();
+		SimContext(_id,&context),ccInjections(nullptr),
+		mixInjections(nullptr),done(false){
+	auto& params = Parameters::get();
+	if(params.maxTime >= std::numeric_limits<FL_TYPE>::infinity())
+		if(params.maxEvent == std::numeric_limits<UINT_TYPE>::infinity())
+			throw invalid_argument("No limit to stop or control simulation.");
+		else
+			plot = new EventPlot(env,_id);
+	else
+		plot = new TimePlot(env,_id);
+
 }
 
 /*Simulation::Simulation() : SimContext(0,Parameters::get().seed),
@@ -41,10 +48,13 @@ const state::State& Simulation::getCell(int id) const {
 }
 
 void Simulation::initialize(const vector<list<unsigned int>>& _cells,grammar::ast::KappaAst& ast){
+	int id = 0;
 	for(auto& param : env.getParams()){
 		auto var = getVars()[env.getVarId(param.first)];
 		//if(var == nullptr)
-		//	var = new state::ConstantVar<FL_TYPE>(0.0);
+			var = new state::ConstantVar<FL_TYPE>(id,param.first,
+					param.second->getValue(*this).valueAs<FL_TYPE>());
+		id++;
 	}
 	for(auto var : parent->getVars()){
 		//todo set sim-vars
@@ -52,8 +62,8 @@ void Simulation::initialize(const vector<list<unsigned int>>& _cells,grammar::as
 	auto distr = uniform_int_distribution<int>();
 	for(auto cell_id : _cells.at(0)){//TODO all cells
 		cells.emplace(piecewise_construct,forward_as_tuple(cell_id),
-				forward_as_tuple((int)cell_id,*this,env.getCompartmentByCellId(cell_id).getVolume(),
-						plot));
+				forward_as_tuple((int)cell_id,*this,
+				env.getCompartmentByCellId(cell_id).getVolume(),*plot));
 	}
 	for(auto& init : env.getInits()){
 		auto &cells = env.getUseExpression(init.use_id).getCells();
@@ -62,7 +72,8 @@ void Simulation::initialize(const vector<list<unsigned int>>& _cells,grammar::as
 			int n;
 			if(n_value.t == Type::FLOAT){
 				n = round(n_value.fVal);
-				ADD_WARN_NOLOC("Making approximation of a float value in agent initialization to "+to_string(n));
+				if(n != n_value.fVal)
+					ADD_WARN_NOLOC("Making approximation of a float value in agent initialization to "+to_string(n));
 			}
 			else
 				n = n_value.valueAs<int>();
@@ -89,22 +100,23 @@ void Simulation::run(const Parameters& params){
 		auto tau = params.maxTime;// = calculate-tau( map-diffusion-in )
 		//parallel
 		for(auto& id_state : cells){
-			id_state.second.advanceUntil(counter.getTime()+tau);
+			id_state.second.advanceUntil(counter.getTime()+tau,params.maxEvent);
 			id_state.second.updateDeps(pattern::Dependency());
 		}
 		done = true;
-		for(auto& id_state : cells){
+		for(auto& id_state : cells)
 			id_state.second.tryPerturbate();
 #ifdef DEBUG
-			if(params.verbose > 0){
-				cout << "------ " << env.cellIdToString(id_state.first) << " (final-state) ------\n";
-				id_state.second.print();
-				cout << "------------------------------------\n";
-			}
-#else
-			//id_state.second.print();//cout << id_state.second.getCounter().toString() << endl;
-#endif
+		if(params.verbose > 0 && id == 0){
+			cout << "=== Final-State ";
+			print();
+			cout << "------------------------------------\n";
 		}
+#else
+		cout << "------------------------------------\n";
+		cout << cells.at(0).getCounter().toString() << endl;
+		cout << "------------------------------------\n";
+#endif
 		counter.advanceTime(tau);
 	//}
 }
@@ -281,7 +293,7 @@ vector<list<unsigned int>> Simulation::allocCells( int n_cpus,
 		}
 	}
 
-	// showing P
+	/*
 #ifdef DEBUG
 	if(Parameters::get().verbose > 0){
 		cout << "Vertex Assignment:" << endl;
@@ -294,7 +306,7 @@ vector<list<unsigned int>> Simulation::allocCells( int n_cpus,
 		}
 	}
 #endif
-
+*/
 	return P;
 }
 
@@ -356,12 +368,13 @@ bool Simulation::isDone() const {
 }
 
 void Simulation::print() const {
+	cout << "========= Simulation[" << id << "] =========" << endl;
 	if(cells.size() > 1)
 		cout << cells.size() << " cells in this simulation object." << endl;
 	for(auto& id_state : cells){
-		cout << "------- " << env.cellIdToString(id_state.first) << " (initial-state) ---------\n";
+		if(cells.size() > 1)
+		cout << "---" << env.cellIdToString(id_state.first) << "---\n";
 		id_state.second.print();
-		cout << "-----------------------------------------\n";
 	}
 }
 

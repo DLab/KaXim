@@ -139,7 +139,7 @@ public:
 	 */
 	void apply(const simulation::Rule& r);
 
-	void advanceUntil(FL_TYPE sync_t);
+	void advanceUntil(FL_TYPE sync_t,UINT_TYPE max_e);
 
 	void updateVar(const Variable& val,bool by_value = false);
 	void updateDeps(const pattern::Dependency& dep);

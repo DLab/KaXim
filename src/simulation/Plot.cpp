@@ -14,7 +14,7 @@ namespace simulation {
 
 using namespace boost::filesystem;
 
-Plot::Plot(const pattern::Environment& env,int run_id) : nextPoint(0.),dT(0.) {
+Plot::Plot(const pattern::Environment& env,int run_id) {
 	auto& params = Parameters::get();
 	try {
 		path p(params.outputDirectory);
@@ -35,9 +35,6 @@ Plot::Plot(const pattern::Environment& env,int run_id) : nextPoint(0.),dT(0.) {
 	catch(exception &e){
 		throw invalid_argument("Error on creating output file:\n\t"+string(e.what()));
 	}
-	dT = params.maxTime / params.points;
-	if(dT == 0.0)
-		dT = 0.0001;
 	file << "#Time";
 	for(auto obs : env.getObservables())
 		file << "\t" << obs->toString();
@@ -49,7 +46,17 @@ Plot::~Plot() {
 }
 
 
-void Plot::fill(const state::State& state,const pattern::Environment& env) {
+
+
+TimePlot::TimePlot(const pattern::Environment& env,int run_id) : Plot(env,run_id), nextPoint(0.){
+	auto& params = Parameters::get();
+	dT = params.maxTime / params.points;
+	//if(dT == 0.0)
+	//	dT = 0.0001;
+}
+
+
+void TimePlot::fill(const state::State& state,const pattern::Environment& env) {
 	auto t = min(state.getCounter().getTime(),state.getCounter().next_sync_at);
 	//AuxMixEmb aux_map;
 	while(t >= nextPoint){
@@ -65,7 +72,7 @@ void Plot::fill(const state::State& state,const pattern::Environment& env) {
 	}
 }
 
-void Plot::fillBefore(const state::State& state,const pattern::Environment& env) {
+void TimePlot::fillBefore(const state::State& state,const pattern::Environment& env) {
 	auto t = min(std::nextafter(state.getCounter().getTime(),0.),state.getCounter().next_sync_at);
 	//AuxMixEmb aux_map;
 	while(t >= nextPoint){
@@ -79,6 +86,33 @@ void Plot::fillBefore(const state::State& state,const pattern::Environment& env)
 		//cout << endl;
 		nextPoint += dT;
 	}
+}
+
+EventPlot::EventPlot(const pattern::Environment& env,int run_id) : Plot(env,run_id), nextPoint(0.){
+	auto& params = Parameters::get();
+	dE = params.maxEvent / params.points;
+	//if(dT == 0.0)
+	//	dT = 0.0001;
+}
+
+void EventPlot::fill(const state::State& state,const pattern::Environment& env) {
+	auto e = state.getCounter().getEvent();
+	//AuxMixEmb aux_map;
+	while(e >= nextPoint){
+		file << state.getCounter().getTime();
+		//cout << state.getSim().getId() <<"]\t" << nextPoint;
+		for(auto var : env.getObservables()){
+			file << "\t" << state.getVarValue(var->getId());
+			//cout << "\t" << state.getVarValue(var->getId(), aux_map);
+		}
+		file << endl;
+		//cout << endl;
+		nextPoint += dE;
+	}
+}
+
+void EventPlot::fillBefore(const state::State& state,const pattern::Environment& env) {
+
 }
 
 

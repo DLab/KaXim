@@ -31,7 +31,7 @@ using namespace simulation;
 using namespace std;
 
 int main(int argc, char* argv[]){
-	const string version("2.0.06");
+	const string version("2.1.04");
 	const string v_msg("KaXim "+version);
 	const string usage_msg("Simple usage is \n$ "
 			"KaXim ([-i] kappa_file)+ -t time [-p points] [-r runs]");
@@ -151,19 +151,20 @@ int main(int argc, char* argv[]){
 		}
 		if(params.verbose > 0){//only print this if if verbose is set for init or more
 			if(i == 0){
-				cout << "Simulation[0]\t|\tInitial State:" << endl;
 				sim.print();
+				cout << difftime(time(nullptr),t) << " seconds loading initial state.\n";
+				cout << "------------------------------------\n";
 			}
-			cout << difftime(time(nullptr),t) << " seconds loading initial state";
-			if(params.runs > 1)
-				cout << " of sim[" << i << "]";
-			cout << ".\n" << endl;
+			if(params.runs > 1){
+				cout << difftime(time(nullptr),t) << " seconds loading initial state";
+				cout << " of sim[" << i << "]\n";
+			}
 		}
 
 		try{
 			sim.run(params);
 		}catch(exception &e){
-			cerr << "An exception found when running simulation (" << i <<"):\n" << e.what() << endl;
+			cerr << "An exception found when running simulation[" << i <<"]:\n" << e.what() << endl;
 			exit(1);
 		}
 	}

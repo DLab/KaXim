@@ -364,10 +364,10 @@ const Rule::CandidateMap& Rule::getInfluences() const{
 
 /**** DEBUG ****/
 string Rule::toString(const pattern::Environment& env) const {
-	static string acts[] = {"CHANGE","ASSIGN","BIND","FREE","CREATE","DELETE","TRANSPORT"};
-	string s = name+"'s actions:";
+	static string acts[] = {"CHANGE ","ASSIGN ","BIND ","FREE ","CREATE ","DELETE ","TRANSPORT "};
+	string s = name+" ->\n";
 	for(auto nn : newNodes){
-		s += "\tINSERT agent "+nn->toString(env);
+		s += "\tINSERT "+nn->toString(env);
 	}
 	for(auto act : script){
 		auto& agent = act.is_new?
@@ -375,21 +375,21 @@ string Rule::toString(const pattern::Environment& env) const {
 		string pos = to_string(act.is_new?
 				rhs->getAgentPos(act.trgt_ag) : lhs.getAgentPos(act.trgt_ag));
 		auto& ag_sign = env.getSignature(agent.getId());
-		s += "\n\t";
+		s += "\t";
 		switch(act.t){
 		case ActionType::DELETE:
-			s += acts[act.t] + " agent["+pos+"]"+agent.toString(env);
+			s += acts[act.t] +agent.toString(env)+ " ["+pos+"]";
 			break;
 		case ActionType::TRANSPORT:
 			break;
 		case ActionType::CHANGE:{
 			auto& lbl_site = dynamic_cast<const pattern::Signature::LabelSite&>(ag_sign.getSite(act.trgt_st));
-			s += acts[act.t] + " agent["+pos+"]'s site "+ag_sign.getName()+"."+lbl_site.getName();
-			s += " to value " + lbl_site.getLabel(act.new_label);
+			s += acts[act.t] + ag_sign.getName()+"( "+lbl_site.getName();
+			s += " -> " + lbl_site.getLabel(act.new_label) +" )["+pos+"]";
 			break;
 		}
 		case ActionType::ASSIGN:
-			s += acts[act.t]+" ";
+			s += acts[act.t];
 			s = s+(act.is_new? "new-":"")+"agent["+pos+"]'s site ";
 			s += ag_sign.getName()+"."+ag_sign.getSite(act.trgt_st).getName()+
 					" to expression "+act.new_value->toString();

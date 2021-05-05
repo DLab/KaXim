@@ -18,15 +18,34 @@ namespace simulation {
 using namespace std;
 
 class Plot {
+protected:
 	ofstream file;
+public:
+	Plot(const pattern::Environment& env,int run_id = 0);
+	virtual ~Plot();
+
+	virtual void fill(const state::State& state,const pattern::Environment& env) = 0;
+	virtual void fillBefore(const state::State& state,const pattern::Environment& env) = 0;
+};
+
+class TimePlot : public Plot {
 	FL_TYPE nextPoint;
 	FL_TYPE dT;
 public:
-	Plot(const pattern::Environment& env,int run_id = 0);
-	~Plot();
+	TimePlot(const pattern::Environment& env,int run_id = 0);
 
-	void fill(const state::State& state,const pattern::Environment& env);
-	void fillBefore(const state::State& state,const pattern::Environment& env);
+	void fill(const state::State& state,const pattern::Environment& env) override;
+	void fillBefore(const state::State& state,const pattern::Environment& env) override;
+};
+
+class EventPlot : public Plot {
+	FL_TYPE nextPoint;
+	FL_TYPE dE;
+public:
+	EventPlot(const pattern::Environment& env,int run_id = 0);
+
+	void fill(const state::State& state,const pattern::Environment& env) override;
+	void fillBefore(const state::State& state,const pattern::Environment& env) override;
 };
 
 } /* namespace simulation */

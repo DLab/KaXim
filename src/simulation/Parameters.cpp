@@ -6,6 +6,7 @@
  */
 
 #include "Parameters.h"
+#include "../util/Warning.h"
 #include <random>
 
 #include <limits>
@@ -16,7 +17,7 @@ Parameters Parameters::singleton;
 
 Parameters::Parameters() : options(nullptr),outputFile("sim"),outputFileType("tsv"),
 		outputDirectory("."),maxEvent(std::numeric_limits<UINT_TYPE>::max()),
-		maxTime(/*std::numeric_limits<FL_TYPE>::infinity()*/0),points(0),seed(0),
+		maxTime(std::numeric_limits<FL_TYPE>::infinity()),points(0),seed(0),
 		useMultiNode(false),runs(1),verbose(0),showNodes(0){
 #ifdef DEBUG
 	verbose = 3;
@@ -30,19 +31,19 @@ void Parameters::makeOptions(const string &msg){
 	options->add_options()
 		("input-file,i",value<vector <string> >(),"Kappa files to read model (for backward compatibility with KaSim/PISKa)")
 		("runs,r",value<int>(),"Produce several trajectories, and make some statistical analysis at the end")
-		("events,e",value<int>(),"Stop simulation at 'arg' events (negative for unbounded)")
+		("events,e",value<int>(),"Stop simulation at 'arg' events")// (negative for unbounded)")
 		("time,t",value<float>(),"Stop simulation at time 'arg' (arbitrary time unit)")
 		("points,p",value<int>(),"Number of points in plot files")
 		("out,o",value<string>(),"File names of data outputs. It can include a dot '.' to separate prefix and file type.")
 		("dir,d",value<string>(),"Specifies directory where output files should be stored")
-		("load-sim,l",value<string>(),"Load kappa model from 'arg' instead of kappa files")
-		("make-sim,m",value<string>(),"Save the kappa model 'arg' from kappa files")
+		//("load-sim,l",value<string>(),"Load kappa model from 'arg' instead of kappa files")
+		//("make-sim,m",value<string>(),"Save the kappa model 'arg' from kappa files")
 		("params",value<std::vector<float> >()->multitoken(),
 				"Set values for each model %param, in the same order they are read from kappa model.")
-		("implicit-signature","Parser will guess agent signatures automatically")
+		//("implicit-signature","Parser will guess agent signatures automatically")
 		("multinode,n",value<bool>(),"If true, equal agents will be stored in one node. Default is false.")
 		("seed,s",value<int>(),"Seed for random number generation (default is chosen from time())")
-		("sync-t",value<float>(),"Synchronize compartments every 'arg' simulation-time units")
+		//("sync-t",value<float>(),"Synchronize compartments every 'arg' simulation-time units")
 		("verbose",value<int>(),"Set the std output verbose level (> 2 only in Debug mode)."
 				" (0: errors; 1: initialization; 2: events; 3: actions).")
 		("show-nodes",value<int>(),"Set the max number of nodes to show when printing state (negative to show full state).")
@@ -92,8 +93,10 @@ void Parameters::evalOptions(int argc, char* argv[]){
 
 	if(vm.count("time")){
 		maxTime = vm["time"].as<float>();
-		if(vm.count("events"))
-			cout << "ignoring given max-event option." << endl;
+		if(vm.count("events")){
+			maxEvent = vm["events"].as<int>();
+			ADD_WARN_NOLOC("Max-Time option will be used to plot output points instead of Max-Events.");
+		}
 	}
 	else if(vm.count("events"))
 		maxEvent = vm["events"].as<int>();
@@ -104,7 +107,7 @@ void Parameters::evalOptions(int argc, char* argv[]){
 	if(vm.count("points"))
 		points = vm["points"].as<int>();
 	else
-		cout << "No points to plot." << endl;
+		ADD_WARN_NOLOC("Option --points missing: empty output will be generated.");
 
 	if (!vm["params"].empty() )
 		modelParams = vm["params"].as<vector<float> >();
