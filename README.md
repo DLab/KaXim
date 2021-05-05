@@ -13,11 +13,12 @@ $ make all
 $ sudo cp KaXim /usr/bin
 ```
 Dependencies:
+- libfl-dev
 - flex
 - bison
-- libboost_program_options
-- libboost_system
-- libboost_filesystem
+- libboost-program-options-dev
+- libboost-system-dev
+- libboost-filesystem
 
 PS:
 For testing is useful to install debug version:
