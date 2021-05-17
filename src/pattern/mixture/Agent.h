@@ -144,7 +144,7 @@ public:
 		return id < site.id;
 	}
 
-	string toString(small_id,small_id ag_pos,map<ag_st_id,short> bindLabels,
+	string toString(small_id,small_id ag_pos,const map<ag_st_id,short>& bindLabels,
 			const Environment& env) const;
 };
 

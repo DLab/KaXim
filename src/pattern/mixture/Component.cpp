@@ -57,13 +57,16 @@ void Pattern::Component::addBind(ag_st_id p1,ag_st_id p2){
 }
 
 map<small_id,small_id> Pattern::Component::declareAgents(Environment &env){
-	map<Agent*,small_id> old_order;
+	vector<pair<Agent*,small_id>> old_order;
 	map<small_id,small_id> order_mask;//old-pos -> new-pos
 	for(unsigned i = 0; i < agents.size(); i++){
 		env.declareAgentPattern(agents[i]);//this can change agent pointer
-		old_order.emplace(agents[i],i);
+		old_order.emplace_back(agents[i],small_id(i));
 	}
-	sort(agents.begin(),agents.end());//sorts in pointer order
+	stable_sort(agents.begin(),agents.end());//sorts in pointer order
+	stable_sort(old_order.begin(),old_order.end(),[](const pair<Agent*,small_id>& a,const pair<Agent*,small_id>& b) -> bool {
+		return a.first < b.first;
+	});
 	//if(agents.size() == 1)
 	//	return order_mask;//debugging purposes
 	small_id i = 0;
@@ -181,10 +184,9 @@ string Pattern::Component::toString(const Environment& env) const {
 		 * the graph is bidirectional because the links are symmetrical, that means exist [ag_id,site_id],[ag_id',site_id'0]
 		 * and [ag_id',site_id'],[ag_id,site_id]
 		 */
-		if( ! bindLabels[ag_st_id(lnk->first.first, lnk->first.second)] &&
-				! bindLabels[ag_st_id(lnk->second.first, lnk->second.second)] ) {
-			bindLabels[ag_st_id(lnk->first.first, lnk->first.second)] = bindLabel;
-			bindLabels[ag_st_id(lnk->second.first, lnk->second.second)] = bindLabel;
+		if( !bindLabels.count(lnk->first) && !bindLabels.count(lnk->second) ) {
+			bindLabels[lnk->first] = bindLabel;
+			bindLabels[lnk->second] = bindLabel;
 			bindLabel++;
 
 		}

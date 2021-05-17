@@ -21,7 +21,7 @@ namespace simulation {
 
 namespace pattern {
 //Forward declaration needed for setComponents() and toString()
-//class Environment;
+class Environment;
 using namespace std;
 
 /* Abstract class Pattern *
@@ -65,6 +65,7 @@ public:
 	virtual void addInclude(small_id id){
 		includes.emplace(id);
 	}
+	virtual string toString(const Environment& env) const = 0;
 };
 
 class Mixture;

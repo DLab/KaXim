@@ -88,8 +88,7 @@ bool Pattern::Agent::testEmbed(const Agent &rhs_ag,
 	if(signId != rhs_ag.signId)
 		return false;
 
-	set<small_id> already_done;
-	for(auto &site : rhs_ag.interface){
+	for(auto &site : rhs_ag.interface){//every site in RHS-ag must be tested
 		auto& lhs_site = getSiteSafe(site.getId());
 		if(lhs_site.testEmbed(site,context)){
 			if(site.getLinkType() == BND &&
@@ -634,7 +633,7 @@ void Pattern::Site::setMatchFunction(){
 
 
 string Pattern::Site::toString(small_id sign_id, small_id ag_pos,
-		map<ag_st_id,short> bindLabels, const Environment &env) const {
+		const map<ag_st_id,short>& bindLabels, const Environment &env) const {
 	string out;
 	auto& sign = env.getSignature(sign_id).getSite(id);
 	out += sign.getName(); //site name
@@ -671,8 +670,8 @@ string Pattern::Site::toString(small_id sign_id, small_id ag_pos,
 	case LinkType::FREE :
 		break;
 	case LinkType::BND :
-		if ( bindLabels.size() > 0 && bindLabels[ag_st_id(ag_pos,id)] )
-			out += "!" + to_string( bindLabels[ag_st_id(ag_pos,id)] );
+		if ( bindLabels.size() > 0 && bindLabels.count(ag_st_id(ag_pos,id) ) )
+			out += "!" + to_string( bindLabels.at(ag_st_id(ag_pos,id)) );
 		else{
 			auto& signature2bind = env.getSignature( lnk_ptrn.first );
 			auto& site2bind = signature2bind.getSite( lnk_ptrn.second );

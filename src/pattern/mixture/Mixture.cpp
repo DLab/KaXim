@@ -73,10 +73,6 @@ void Mixture::addBindLabel(int lbl, small_id ag_pos,small_id site_id){
 			binds.emplace(p1,p2);
 		else
 			binds.emplace(p2,p1);
-		agents[p1.first]->getSite(p1.second).lnk_ptrn =
-				ag_st_id(agents[p2.first]->getId(),p2.second);
-		agents[p2.first]->getSite(p2.second).lnk_ptrn =
-				ag_st_id(agents[p1.first]->getId(),p1.second);
 	}
 	else if(sites.size() > 2)
 		throw SemanticError("Edge identifier "+to_string(lbl)+
@@ -85,6 +81,7 @@ void Mixture::addBindLabel(int lbl, small_id ag_pos,small_id site_id){
 
 void Mixture::declareComponents(Environment &env){
 	int cc_pos = 0;
+	//cout << "before reorder: " << toString(env) << endl;
 	for(auto& comp : comps){
 		auto order_mask = env.declareComponent(comp);
 		for(auto swap : order_mask){//updating possible agent pointer change and positions
@@ -105,6 +102,7 @@ void Mixture::declareComponents(Environment &env){
 	}
 	for(auto aux : auxRefs)
 		aux->coords = auxCoords.at(aux->toString());
+	//cout << "after reorder: " << toString(env) << endl;
 }
 
 void Mixture::setComponents(){
@@ -119,6 +117,11 @@ void Mixture::setComponents(){
 	for(auto l_it = binds.cbegin();l_it != binds.cend(); l_it++){
 		auto p1 = l_it->first,p2 = l_it->second;
 		auto c_it = comps.begin();
+
+		agents[p1.first]->getSite(p1.second).lnk_ptrn =
+				ag_st_id(agents[p2.first]->getId(),p2.second);
+		agents[p2.first]->getSite(p2.second).lnk_ptrn =
+				ag_st_id(agents[p1.first]->getId(),p1.second);
 		//iterate on local components, test if ag(p1) or ag(p2) \in comp
 		unsigned cc_pos = 0;
 		for(;c_it != comps.end(); c_it++,cc_pos++){
