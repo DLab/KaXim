@@ -174,6 +174,7 @@ void State::apply(const simulation::Rule& r){
 void State::positiveUpdate(const simulation::Rule::CandidateMap& wake_up){
 	//TODO vars_to_wake_up
 	//auto& wake_up = r.getInfluences();
+	int new_injs = 0;
 	for(auto& key_info : wake_up){
 		auto key = key_info.first;
 		auto info = key_info.second;
@@ -182,9 +183,21 @@ void State::positiveUpdate(const simulation::Rule::CandidateMap& wake_up){
 		//if(info.infl_by.size() && distance(nulls.first,nulls.second) == info.infl_by.size())
 		//	continue;	//every action applied to node is null
 		map<int,matching::InjSet*> port_list;
-		auto inj_p = injections[key.cc->getId()]->emplace(*node,port_list,*this,key.match_root.first);
+		auto inj_p = injections[key.cc->getId()]->
+				emplace(*node,port_list,*this,key.match_root.first);
 
 		if(inj_p){
+#ifdef DEBUG
+			if(simulation::Parameters::get().verbose > 3){
+				if(new_injs == 0)
+					cout << "New injections found:\n";
+				cout << "\tPattern " << inj_p->pattern().toString(env) << " matches with agents IDs ";
+				for(auto& node : inj_p->getEmbedding())
+					cout << node->getAddress() << ",";
+				cout << endl;
+				new_injs++;
+			}
+#endif
 			for(;nulls.first != nulls.second;++nulls.first)
 				port_list.erase(nulls.first->second);
 			if(port_list.empty())//TODO check cc.size()
@@ -241,7 +254,7 @@ void State::advanceUntil(FL_TYPE sync_t,UINT_TYPE max_e) {
 			if(ex.error){
 				counter.incNullEvents(ex.error);
 				#ifdef DEBUG
-					cout << "\tnull-event (" << ex.what() << ")" << endl;
+					cout << "  | Null-Event (" << ex.what() << ")" << endl;
 				#endif
 			}
 			else
@@ -249,7 +262,7 @@ void State::advanceUntil(FL_TYPE sync_t,UINT_TYPE max_e) {
 		}
 		catch(const NullEvent &ex){
 			#ifdef DEBUG
-				cout << "\tnull-event (" << ex.what() << ")" << endl;
+				cout << "  | Null-Event (" << ex.what() << ")" << endl;
 			#endif
 			counter.incNullEvents(ex.error);
 		}

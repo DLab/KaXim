@@ -332,20 +332,21 @@ void Rule::checkInfluence(const Environment &env,const SimContext &context) {
 	}
 	//Checking candidates
 	map<int,set<ag_st_id>> already_done;//cc-id -> every match (cc-ag -> rhs-ag)
-	//cout << "testing if rule " << this->getName() << " have influence on candidates CC:" << endl;
+	cout << "testing if rule " << this->getName() << " have influence on candidates CC:" << endl;
 	for(auto& key_info : candidates){
 		auto& key = key_info.first;
 		auto rhs_coords = rhs->getAgentCoords(key_info.first.match_root.second);
 		ag_st_id root(key.match_root.first,rhs_coords.second);//agent-pos in ptrn -> agent-pos in rhc-cc
 		if(already_done[key.cc->getId()].count(root))
 			continue;//this match for this cc is already done TODO print this
-		//cout << "\t" << cc_info.first->toString(env);
+		//cout << "\t" << key.cc->toString(env);
 		map<small_id,small_id> emb;
 		if(key.cc->testEmbed(rhs->getComponent(rhs_coords.first),root,context,emb)){
 			already_done[key.cc->getId()].insert(emb.begin(),emb.end());
 			influence.emplace(key_info);
-		//else cout << " | NO!";
+			//cout << " | YES!";
 		}
+		//else cout << " | NO!";
 		//cout << endl;
 	}
 

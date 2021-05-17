@@ -138,7 +138,7 @@ void Parameters::evalOptions(int argc, char* argv[]){
 	}
 	if(vm.count("verbose")){
 		verbose = vm["verbose"].as<int>();
-		if(verbose < 0 || verbose > 3){
+		if(verbose < 0 || verbose > 10){
 			cout << "Not a valid value for --verbose parameter." << endl;
 			exit(1);
 		}

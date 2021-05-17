@@ -33,6 +33,7 @@ bool CcInjection::reuse(const pattern::Pattern::Component& _cc,Node& node,
 		n = nullptr;
 	//if(_cc.getAgent(root).getId() == node.getId()){
 	ccAgToNode.resize(_cc.size(),nullptr);
+	map<Node*,small_id> nodeToCcAg;
 	std::list<pair<small_id,Node*> > q;
 	q.emplace_back(root,&node);
 	const pattern::Mixture::Agent* ag;
@@ -51,18 +52,22 @@ bool CcInjection::reuse(const pattern::Pattern::Component& _cc,Node& node,
 			if(next_node.second->getId() != short_id(-1)){//compare different pointers
 				next_node.first = _cc.follow(q.front().first,site.getId()).first;
 				//need to check site of links?? TODO No
-				if(ccAgToNode[next_node.first]){
-					if(ccAgToNode[next_node.first] != next_node.second)
-						return false;
-				}
+				//if(next_node.first >= _cc.size())
+				//	return false;
+				if(nodeToCcAg.count(next_node.second) && nodeToCcAg[next_node.second] != next_node.first)
+					return false;
+				if(ccAgToNode[next_node.first] && ccAgToNode[next_node.first] != next_node.second)
+					return false;
 				else {
 					q.emplace_back(next_node);
 					ccAgToNode[next_node.first] = next_node.second;//todo review
+					nodeToCcAg[next_node.second] = next_node.first;//todo review
 				}
 				//next_node.second = nullptr;
 			}
 		}
 		ccAgToNode[q.front().first] = q.front().second;//case when agent mixture with no sites
+		nodeToCcAg[next_node.second] = next_node.first;//todo review
 		q.pop_front();
 	}
 	return true;
