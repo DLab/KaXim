@@ -56,14 +56,15 @@ bool CcInjection::reuse(const pattern::Pattern::Component& _cc,Node& node,
 				//	return false;
 				if(nodeToCcAg.count(next_node.second) && nodeToCcAg[next_node.second] != next_node.first)
 					return false;
-				if(ccAgToNode[next_node.first] && ccAgToNode[next_node.first] != next_node.second)
-					return false;
+				if(ccAgToNode[next_node.first]){
+					if(ccAgToNode[next_node.first] != next_node.second)
+						return false;
+				}
 				else {
 					q.emplace_back(next_node);
 					ccAgToNode[next_node.first] = next_node.second;//todo review
 					nodeToCcAg[next_node.second] = next_node.first;//todo review
-				}
-				//next_node.second = nullptr;
+				}//next_node.second = nullptr;
 			}
 		}
 		ccAgToNode[q.front().first] = q.front().second;//case when agent mixture with no sites
