@@ -86,6 +86,7 @@ void Simulation::initialize(const vector<list<unsigned int>>& _cells,grammar::as
 		//env.buildInfluenceMap(id_state.second);
 		//id_state.second.buildInfluenceMap();
 		id_state.second.initInjections();
+		id_state.second.initUnaryInjections();
 		id_state.second.initActTree();
 	}
 }
@@ -104,8 +105,10 @@ void Simulation::run(const Parameters& params){
 			id_state.second.updateDeps(pattern::Dependency());
 		}
 		done = true;
-		for(auto& id_state : cells)
+		for(auto& id_state : cells){
 			id_state.second.tryPerturbate();
+			id_state.second.plotOut();
+		}
 #ifdef DEBUG
 		if(params.verbose > 0 && id == 0){
 			cout << "=== Final-State ";

@@ -56,7 +56,8 @@ class State : public SimContext {
 	FL_TYPE* tokens;
 
 	data_structs::RandomTree* activityTree;
-	matching::InjRandContainer** injections;
+	CcInjRandContainer** injections;
+	map<int,matching::InjRandContainer<matching::MixInjection>*> nlInjections;
 
 	simulation::LocalCounter counter;
 	simulation::Plot& plot;
@@ -111,11 +112,16 @@ public:
 	//}
 
 
-	void positiveUpdate(const simulation::Rule::CandidateMap& wake_up);
+	void positiveUpdate(const Rule::CandidateMap& wake_up);
+	void nonLocalUpdate(const simulation::Rule& rule,
+			const list<matching::Injection*>& new_injs);
+	void activityUpdate();
 
 	FL_TYPE getTotalActivity() const;
-	matching::InjRandContainer& getInjContainer(int cc_id) override;
-	const matching::InjRandContainer& getInjContainer(int cc_id) const override;
+	CcInjRandContainer& getInjContainer(int cc_id) override;
+	const CcInjRandContainer& getInjContainer(int cc_id) const override;
+	MixInjRandContainer& getMixInjContainer(int mix_id) override;
+	const MixInjRandContainer& getMixInjContainer(int mix_id) const override;
 	FL_TYPE getTokenValue(unsigned tok_id) const override;
 
 	/** \brief Add nodes to the SiteGraph using a fully described mixture.
@@ -130,6 +136,11 @@ public:
 	}
 
 	UINT_TYPE mixInstances(const pattern::Mixture& mix) const;
+
+	void updateActivity(small_id r_id){
+		auto act = rates[r_id]->evalActivity(*this);
+		activityTree->add(r_id,act.first+act.second);
+	}
 
 	//two<FL_TYPE> evalActivity(const simulation::Rule& r) const;
 
@@ -153,10 +164,17 @@ public:
 	int event();
 
 	void initInjections();
+	void initUnaryInjections();
 	void initActTree();
 
 	//const pattern::Environment& getEnv() const;
 	//const simulation::Simulation& getSim() const;
+
+	void plotOut() const;
+
+	bool isDone() const override {
+		return parent->isDone();
+	}
 
 	/** \brief Print the state for debugging purposes.
 	 **/
@@ -187,11 +205,18 @@ inline SomeValue State::getVarValue(short_id var_id) const {
 inline FL_TYPE State::getTotalActivity() const {
 	return activityTree->total();
 }
-inline const matching::InjRandContainer& State::getInjContainer(int cc_id) const{
+inline const CcInjRandContainer& State::getInjContainer(int cc_id) const{
 	return *(injections[cc_id]);
 }
-inline matching::InjRandContainer& State::getInjContainer(int cc_id) {
+inline matching::InjRandContainer<matching::CcInjection>& State::getInjContainer(int cc_id) {
 	return *(injections[cc_id]);
+}
+
+inline const MixInjRandContainer& State::getMixInjContainer(int mix_id) const{
+	return *(nlInjections.at(mix_id));
+}
+inline MixInjRandContainer& State::getMixInjContainer(int mix_id) {
+	return *(nlInjections.at(mix_id));
 }
 
 

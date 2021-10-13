@@ -210,6 +210,7 @@ public:
 		UPDATE_TOK,	///< Sets a new value to a token variable (\<-).
 		STOP,		///< Stop the simulation.
 		SNAPSHOT,	///< Save the current state of the simulation to a file.
+		HISTOGRAM,	///< Print histogram-like data to file.
 		PRINT,		///< Write text to the standard output.
 		PRINTF,		///< Write text to a file.
 		CFLOW,
@@ -238,7 +239,7 @@ public:
 	//Effect& operator=(const Effect& eff);
 
 	simulation::Perturbation::Effect* eval(pattern::Environment& env,
-			const SimContext &context) const;
+			const SimContext &context,const BaseExpression* trigger = nullptr) const;
 
 	void show(string tabs = "") const;
 
@@ -277,32 +278,21 @@ protected:
 	list<Effect> effects;
 };
 
-/** \brief The rate and radius for the unary instance of a rule. */
-struct Radius : Node {
-	const Expression *k1;
-	const Expression *opt;
-public:
-	Radius();
-	Radius(const location &l,const Expression *k1);
-	Radius(const location &l,const Expression *k1,const Expression *opt);
-	~Radius();
-};
-
 /** \brief The AST of the rate(s) of a rule. */
 class Rate : Node {
 	const Expression *base;		///< The base rate of the rule.
 	const Expression *reverse;	///< The rate for the backward rule.
-	Radius *unary;				///< The rate for unary instances of the rule.
 	bool volFixed;				///< do not depend on volume
 	bool fixed;					///< do not depend on concentrations
+	two<const Expression*> unary;///< The (rate,radius) for unary instances of the rule.
 public:
 	Rate();
 	Rate(const Rate& rate);
 	Rate& operator=(const Rate& rate);
 	Rate(const location &l,const Expression *def,const bool fix);
-	Rate(const location &l,const Expression *def,const bool fix,const Radius *un);
+	Rate(const location &l,const Expression *def,const bool fix,two<const Expression*> un);
 	Rate(const location &l,const Expression *def,const bool fix,const Expression *op);
-	const state::BaseExpression* eval(const pattern::Environment& env,simulation::Rule& r,
+	const state::BaseExpression* eval(pattern::Environment& env,simulation::Rule& r,
 			const SimContext &context,two<pattern::DepSet>& deps,
 			bool is_bi = false) const;
 	~Rate();

@@ -172,7 +172,7 @@ const list<pair<const simulation::Rule&,small_id>>& Pattern::Component::getRateD
 	return deps;
 }
 
-string Pattern::Component::toString(const Environment& env) const {
+string Pattern::Component::toString(const Environment& env,int mark) const {
 	string out, glue = ",";
 
 	// put labels to bindings
@@ -194,6 +194,8 @@ string Pattern::Component::toString(const Environment& env) const {
 	}
 
 	for( unsigned mixAgId = 0; mixAgId < agents.size(); mixAgId++ ) {
+		if(mark == mixAgId)
+			out += "*";
 		out += (agents[mixAgId])->toString(env, mixAgId, bindLabels ) + glue;
 		bindLabel++;
 	}

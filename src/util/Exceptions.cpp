@@ -21,9 +21,9 @@ const char* SemanticError::what() const _GLIBCXX_USE_NOEXCEPT {
 	static char c[250] ;//TODO??
 
 	if(loc.begin.filename == nullptr)
-		sprintf(c,"Semantic error in file (no-location):\n%s",msg);
+		sprintf(c,"Semantic error in file (no-location):\n\t%s",msg);
 	else
-		sprintf(c,"Semantic error in file \"%s\", line %d, characters %d-%d:\n%s",
+		sprintf(c,"Semantic error in file \"%s\", line %d, characters %d-%d:\n\t%s",
 	        loc.begin.filename->c_str(),loc.begin.line,loc.begin.column,loc.end.column,msg);
 	return c;
 }
@@ -57,7 +57,12 @@ void SyntaxError::setLocation(const yy::location &l){
 
 
 
-NullEvent::NullEvent(int e) : error(e) {}
+NullEvent::NullEvent(int e) : error(e) {
+#ifdef DEBUg
+	if(e < 0 || e > 6)
+		throw invalid_argument("invalid null event!");
+#endif
+}
 
 const char* NullEvent::what() const _GLIBCXX_USE_NOEXCEPT {
 	switch(error){
@@ -68,8 +73,8 @@ const char* NullEvent::what() const _GLIBCXX_USE_NOEXCEPT {
 	case 4:return "overapproximation clash";
 	case 5:return "invalid injection clash";
 	case 6:return "perturbation interrupting time";
-	default:return "invalid arg";
+	default:throw invalid_argument("invalid null event!");
 	}
-	return "invalid!!!!";
+	return nullptr;
 }
 

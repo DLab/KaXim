@@ -87,7 +87,7 @@ vector<Variable*> KappaAst::evaluateDeclarations(pattern::Environment &env,SimCo
  *     Each float value will be associated to a parameter in the same order that
  *     they were declared in the model. This overwrite every previous value. */
 void KappaAst::evaluateParams(pattern::Environment &env,SimContext &context,const vector<float>& po_params){
-	if(params.size() > po_params.size())
+	if(params.size() < po_params.size())
 		throw invalid_argument("Too many parameters given as command line argument.");
 	unsigned i = 0;
 	auto& vars = context.getVars();

@@ -261,7 +261,7 @@ void Delete::apply(state::State& state) const {
 	for(size_t i = 0; i < del; i++){
 		auto j = distr(state.getRandomGenerator());
 		auto& inj = inj_cont.choose(j);
-		for(auto node : inj.getEmbedding()){
+		for(auto node : *inj.getEmbedding()){
 			node->removeFrom(state);
 		}
 	}
@@ -353,6 +353,8 @@ Histogram::Histogram(const Environment& env,int _bins,string _prefix,
 		filetype = file_name.substr(pos+1);
 	}
 */
+	if(!_bins)
+		return;
 
 	if(min != max && !isinf(max) && !isinf(min)){
 		fixedLim = true;
@@ -403,12 +405,31 @@ void Histogram::apply(state::State& state) const {
 		}
 
 		sum = 0;
+		if(bins.size() == 2){//no-bins | print only once at end-sim
+			map<FL_TYPE,int> values;
+			function<void (const matching::Injection*)> f = [&](const matching::Injection* inj) -> void {
+				cc_map.setEmb(*inj->getEmbedding());
+				auto val = func->getValue(state).valueAs<FL_TYPE>();
+				sum += val;
+				values[val]++;
+			};
+			state.getInjContainer(cc.getId()).fold(f);
+			file << "\ttime";
+			for(auto val : values)
+				file << "\t" << val.first;
+			file << "\tAverage\n" << kappa->toString() << "\t" << state.getCounter().getTime();
+			for(auto val : values)
+				file << "\t" << val.second;
+			file << "\t" << sum / state.getInjContainer(cc.getId()).count() << endl;
+			continue;
+		}
+
 		if(min == max || isinf(min) || isinf(max)){
 			list<FL_TYPE> values;
 			max = -numeric_limits<float>::infinity();
 			min = -max;
 			function<void (const matching::Injection*)> f = [&](const matching::Injection* inj) -> void {
-				cc_map.setEmb(inj->getEmbedding());
+				cc_map.setEmb(*inj->getEmbedding());
 				auto val = func->getValue(state).valueAs<FL_TYPE>();
 				if(val < min)
 					min = val;
@@ -428,7 +449,7 @@ void Histogram::apply(state::State& state) const {
 		}
 		else{
 			function<void (const matching::Injection*)> f = [&](const matching::Injection* inj) -> void {
-				cc_map.setEmb(inj->getEmbedding());
+				cc_map.setEmb(*inj->getEmbedding());
 				auto val = func->getValue(state).valueAs<FL_TYPE>();
 				if(!fixedLim && !isinf(val)){
 					if(val < min){

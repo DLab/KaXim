@@ -21,7 +21,7 @@
 namespace simulation {
 
 Rule::Rule(int _id,const string& nme, Mixture& mix,const yy::location& _loc) : loc(_loc),id(_id),name(nme),
-		lhs(mix),rhs(nullptr),isRhsDeclared(false),rate(nullptr),matchCount(0){}
+		lhs(mix),rhs(nullptr),isRhsDeclared(false),rate(nullptr),matchCount(0),bindCount(0){}
 
 Rule::~Rule() {
 	if(!isRhsDeclared)
@@ -51,6 +51,9 @@ pattern::Mixture& Rule::getLHS() {
 const BaseExpression& Rule::getRate() const {
 	return *rate;
 }
+const pair<const BaseExpression*,int>& Rule::getUnaryRate() const {
+	return unaryRate;
+}
 /*const BaseExpression::Reduction& Rule::getReduction() const {
 	return basic;
 }
@@ -70,6 +73,9 @@ void Rule::setRate(const BaseExpression* r){
 	//	basic = r->factorize();
 }
 void Rule::setUnaryRate(pair<const BaseExpression*,int> u_rate ){
+	if(lhs.compsCount() != 2)
+		throw SemanticError("Only binary rules can have an unary"
+				" (not explicitly connected) rate.",loc);
 	unaryRate = u_rate;
 	//if(u_rate.first->getVarDeps() & BaseExpression::AUX)
 	//	unary = u_rate.first->factorize();
@@ -132,11 +138,11 @@ void Rule::difference(const Environment& env, const SimContext &context){
 						% name % ag_sign.getName() % st_sign.getName()).str(),loc);
 				case ActionType::CHANGE:
 					a.new_label = diff.new_label;
-					script.emplace_back(a);
+					script.emplace_front(a);
 					break;
 				case ActionType::ASSIGN:
 					a.new_value = diff.new_value;
-					script.emplace_back(a);
+					script.emplace_front(a);
 					break;
 				case ActionType::LINK:{
 					auto rhs_coords = rhs->getAgentCoords(ag_pos);
@@ -148,8 +154,9 @@ void Rule::difference(const Environment& env, const SimContext &context){
 					else if(ag_pos < trgt_pos)
 						break;//This avoids to evaluate binds to new agents
 					if( diff.new_label ){//new_label is 1 if both sites are BIND
-						if(trgt_pos == lhs.getAgentPos(lhs.follow(ag_coords,st_id))
-								&& rhs_lnk.second == lhs.follow(ag_coords,st_id).second)
+						auto lhs_lnk = lhs.follow(ag_coords,st_id);
+						if(trgt_pos == lhs.getAgentPos(ag_st_id(ag_coords.first,lhs_lnk.first))
+								&& rhs_lnk.second == lhs_lnk.second)
 							break;//The bind in RHS is equal to LHS so no action
 						else
 							diff.warning = "Application of rule '%s' will induce a bind permutation on %s(%s).";
@@ -159,6 +166,7 @@ void Rule::difference(const Environment& env, const SimContext &context){
 					a.chain = new Action{ActionType::LINK,trgt_coords,rhs_lnk.second,
 						false,trgt_lnk_type != Pattern::FREE};//TODO replace for unbind -> bind ???
 					script.emplace_back(a);
+					bindCount++;
 					break;
 				}
 				case ActionType::UNBIND:
@@ -172,7 +180,7 @@ void Rule::difference(const Environment& env, const SimContext &context){
 					catch(out_of_range& e){/*the broken-bind is not fully specified.*/
 						a.new_label = diff.new_label;
 					}
-					script.emplace_back(a);
+					script.emplace_front(a);
 					break;
 				default:
 					throw invalid_argument("Rule::difference(): invalid ActionType.");
@@ -215,7 +223,7 @@ void Rule::difference(const Environment& env, const SimContext &context){
 						a.trgt_ag = ag_coords;//TODO
 						a.trgt_st = st_id;a.is_new = true;
 						a.new_value = diff.new_value;
-						script.emplace_back(a);
+						script.emplace_front(a);
 					}
 					catch(invalid_argument& e){//not a valued site
 						cout << e.what();
@@ -238,6 +246,7 @@ void Rule::difference(const Environment& env, const SimContext &context){
 						Action a{ActionType::LINK,ag_coords,st_id,true,false};
 						a.chain = new Action{ActionType::LINK,rhs->getAgentCoords(trgt_pos),lnk.second,false,false};
 						script.emplace_back(a);
+						bindCount++;
 					}
 					break;
 				}
@@ -303,6 +312,17 @@ void Rule::checkInfluence(const Environment &env,const SimContext &context) {
 				if(st_ptrn.getValueType() != Pattern::EMPTY &&
 						st_ptrn.testEmbed(rhs_site,context))
 					addAgentIncludes(candidates,*ag_ptrn,ag_pos,ci);
+				else { //check if this site have aux deps
+					auto iter = env.getAuxSiteInfl(two<int>(ag_ptrn->getId(),act.trgt_st));
+					while(iter.first != iter.second){
+						auto cc_agid = iter.first->second;
+						auto& c_info = candidates[CandidateKey{&cc_agid.first,{cc_agid.second,ag_pos}}];
+						c_info.emb_coords = ci.emb_coords;
+						c_info.is_new = ci.is_new;
+						c_info.infl_by.insert(ci.infl_by.begin(),ci.infl_by.end());
+						iter.first++;
+					}
+				}
 				break;
 			case ActionType::UNBIND:case ActionType::LINK:
 				ci.infl_by.emplace(-1-int(act.trgt_st));
@@ -332,7 +352,7 @@ void Rule::checkInfluence(const Environment &env,const SimContext &context) {
 	}
 	//Checking candidates
 	map<int,set<ag_st_id>> already_done;//cc-id -> every match (cc-ag -> rhs-ag)
-	cout << "testing if rule " << this->getName() << " have influence on candidates CC:" << endl;
+	//cout << "testing if rule " << this->getName() << " have influence on candidates CC:" << endl;
 	for(auto& key_info : candidates){
 		auto& key = key_info.first;
 		auto rhs_coords = rhs->getAgentCoords(key_info.first.match_root.second);
@@ -366,9 +386,9 @@ const Rule::CandidateMap& Rule::getInfluences() const{
 /**** DEBUG ****/
 string Rule::toString(const pattern::Environment& env) const {
 	static string acts[] = {"CHANGE ","ASSIGN ","BIND ","FREE ","CREATE ","DELETE ","TRANSPORT "};
-	string s = name+" ->\n";
+	string s = name+" ->";
 	for(auto nn : newNodes){
-		s += "\tINSERT "+nn->toString(env);
+		s += "\n\tINSERT "+nn->toString(env);
 	}
 	for(auto act : script){
 		auto& agent = act.is_new?
@@ -376,7 +396,7 @@ string Rule::toString(const pattern::Environment& env) const {
 		string pos = to_string(act.is_new?
 				rhs->getAgentPos(act.trgt_ag) : lhs.getAgentPos(act.trgt_ag));
 		auto& ag_sign = env.getSignature(agent.getId());
-		s += "\t";
+		s += "\n\t";
 		switch(act.t){
 		case ActionType::DELETE:
 			s += acts[act.t] +agent.toString(env)+ " ["+pos+"]";
@@ -457,6 +477,13 @@ Rule::Rate::Rate(const Rule& r,state::State& state) :
 	baseRate = new_rate->reduce(state);//rates also have to be reduced for every state
 	if(new_rate != baseRate)//reduce can return the same pointer on expression but no with vars.
 		delete new_rate;
+	if(r.unaryRate.first){
+		auto unary_rate = r.unaryRate.first->clone();
+		unaryRate.first = unary_rate->reduce(state);
+		if(unary_rate != unaryRate.first)//reduce can return the same pointer on expression but no with vars.
+				delete unary_rate;
+		unaryRate.second = r.unaryRate.second;
+	}
 }
 
 const BaseExpression* Rule::Rate::getExpression(small_id cc_index) const {
@@ -524,64 +551,87 @@ SameAuxDepRate::~SameAuxDepRate() {}
 
 
 two<FL_TYPE> NormalRate::evalActivity(const SimContext &context) const {
-	FL_TYPE a = baseRate->getValue(context).valueAs<FL_TYPE>();
+	two<FL_TYPE> a;
+	a.first = baseRate->getValue(context).valueAs<FL_TYPE>();
 	auto& lhs = rule.getLHS();
 	for(unsigned i = 0 ; i < lhs.compsCount() ; i++){
 		auto& cc = lhs.getComponent(i);
 		auto count = context.getInjContainer(cc.getId()).count();
 		if(count)
-			a *= count;
+			a.first *= count;
 		else {
-			return two<FL_TYPE>(0.0,0.0);//TODO change when implement unary rate
+			a.first = 0.0;
+			break;
 		}
 	}
-	return two<FL_TYPE>(a,0.0);
+	if(unaryRate.first)
+		a.second = unaryRate.first->getValue(context).valueAs<FL_TYPE>() *
+			context.getMixInjContainer(lhs.getId()).partialReactivity();
+	else
+		a.second = 0.0;
+	return a;
 }
 
 two<FL_TYPE> SamePtrnRate::evalActivity(const SimContext &context) const {
-	FL_TYPE a = baseRate->getValue(context).valueAs<FL_TYPE>()/norm;
+	two<FL_TYPE> a;
+	a.first = baseRate->getValue(context).valueAs<FL_TYPE>()/norm;
 	auto& lhs = rule.getLHS();
 	auto count = context.getInjContainer(lhs.getComponent(0).getId()).count();
-	if(count)
-		for(unsigned i = 0 ; i < lhs.compsCount() ; i++){
-			//injs.selectRule(rule.getId(), i);
-			a *= (count-i);
-		}
+	for(unsigned i = 0 ; i < lhs.compsCount() ; i++){
+		//injs.selectRule(rule.getId(), i);
+		a.first *= (count-i);
+	}
+
+	if(unaryRate.first)
+		a.second = unaryRate.first->getValue(context).valueAs<FL_TYPE>() *
+			context.getMixInjContainer(lhs.getId()).partialReactivity();
 	else
-		return two<FL_TYPE>(0.0,0.0);
-	return two<FL_TYPE>(a,0.0);
+		a.second = 0.0;
+	return a;
 }
 
 two<FL_TYPE> AuxDepRate::evalActivity(const SimContext &context) const {
-	FL_TYPE a = base.factor->getValue(context).valueAs<FL_TYPE>();
+	two<FL_TYPE> a;
+	a.first = base.factor->getValue(context).valueAs<FL_TYPE>();
 	auto& lhs = rule.getLHS();
 	for(unsigned i = 0 ; i < lhs.compsCount() ; i++){
 		auto& cc = lhs.getComponent(i);
 		auto& injs = context.getInjContainer(cc.getId());
 		injs.selectRule(rule.getId(), i);
 		auto pr = injs.partialReactivity();
-		if(pr)
-			a *= pr;
-		else
-			return two<FL_TYPE>(0.0,0.0);
+
+		a.first *= pr;
 	}
-	return two<FL_TYPE>(a,0.0);
+	if(unaryRate.first)
+		a.second = unaryRate.first->getValue(context).valueAs<FL_TYPE>() *
+			context.getMixInjContainer(lhs.getId()).partialReactivity();
+	else
+		a.second = 0.0;
+	return a;
 }
 
 two<FL_TYPE> SameAuxDepRate::evalActivity(const SimContext &context) const {
-	FL_TYPE a = base.factor->getValue(context).valueAs<FL_TYPE>()/norm;
+	two<FL_TYPE> a;
+	a.first = base.factor->getValue(context).valueAs<FL_TYPE>()/norm;
 	auto& lhs = rule.getLHS();
 	auto& injs = context.getInjContainer(lhs.getComponent(0).getId());
 	injs.selectRule(rule.getId(), 0);
 	auto ract = injs.partialReactivity();
 	if(ract)
 		for(unsigned i = 0 ; i < lhs.compsCount() ; i++){
-			a *= ract;
+			a.first *= ract;
 		}
 	else
 		return two<FL_TYPE>(0.0,0.0);
-	a -= injs.getM2();
-	return two<FL_TYPE>(a,0.0);
+	a.first -= injs.getM2();
+
+	if(unaryRate.first)
+			a.second = unaryRate.first->getValue(context).valueAs<FL_TYPE>() *
+				context.getMixInjContainer(lhs.getId()).partialReactivity();
+		else
+			a.second = 0.0;
+
+	return a;
 }
 
 

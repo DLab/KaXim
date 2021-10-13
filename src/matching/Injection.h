@@ -16,9 +16,11 @@
 #include <random>
 #include "../util/params.h"
 //#include "../state/SiteGraph.h"
-#include "../pattern/mixture/Pattern.h"
+#include "../pattern/mixture/Mixture.h"
 #include "../data_structs/DistributionTree.h"
 #include "../expressions/BaseExpression.h"
+//#include "../state/Node.h"
+#include "../data_structs/DebugPtrSet.h"
 //#include "../simulation/SimContext.h"
 
 namespace simulation {
@@ -28,7 +30,7 @@ class SimContext;
 namespace state {
 	//class State;
 	class Node;
-	class Internal;
+	//class Internal;
 }
 //namespace expressions {class AuxMixEmb;class AuxCcEmb;}
 
@@ -38,8 +40,9 @@ using namespace std;
 
 using Node = state::Node;
 
-
+template <typename T>
 class InjRandContainer;
+template <typename T>
 class InjRandSet;
 
 /*struct try_match {
@@ -49,12 +52,14 @@ class InjRandSet;
 	small_id root;
 };*/
 
+class InjSet;
 
 class Injection {
 protected:
-	friend class InjRandSet;
+	friend class InjSet;
 	const pattern::Pattern& ptrn;
 	unsigned address;
+	mutable int depCount;///> times this inj has been add to node site deps
 #ifdef DEBUG
 	int cc_id;
 #endif
@@ -82,79 +87,76 @@ public:
 	 * with the nodes mapped by mask. */
 	virtual Injection* clone(const map<Node*,Node*>& mask) const = 0;
 	/** \brief Returns the nodes pointed by this Injection. */
-	virtual const vector<Node*>& getEmbedding() const = 0;
+	virtual const vector<Node*>* getEmbedding() const = 0;
 
-	virtual void codomain(vector<Node*>& injs,set<Node*>& cod) const = 0;
+	/** \brief Fills injs and cod with the nodes of this injection.
+	 *
+	 * @returns false if a node is already in cod. */
+	virtual bool codomain(vector<Node*>* injs,set<Node*>& cod) const = 0;
 
 	virtual size_t count() const = 0;
 	//bool operator< (const Injection& inj) const;
 	virtual bool operator==(const Injection& inj) const = 0;
 
-};
-
-
-#ifdef DEBUG
-class InjSet : public set<Injection*> {
-public:
-	inline auto emplace(Injection* inj) {
-		for(auto dep : *this)
-			if(*inj == *dep)
-				throw invalid_argument("Node::addDep(): cannot add same dependency (cc->emb).");
-		return set<Injection*>::emplace(inj);
+protected:
+	void incDeps() const {
+		depCount++;
 	}
-	using set<Injection*>::erase;
-};
+	auto decDeps() const {
+		return --depCount;
+	}
 
-#else
-class InjSet : public set<Injection*>{};
-#endif
-
-
-
-
-
-class CcInjection : public Injection {
-	friend class InjRandSet;
-	//map<small_id,big_id> ccAgToNode;//unordered
-	vector<Node*> ccAgToNode;
-	//const pattern::Mixture::Component& cc;//cc_id
-
-public:
-	CcInjection(const pattern::Pattern& _cc);
-	CcInjection(const pattern::Pattern::Component& cc);
-	Injection* clone(const map<Node*,Node*>& mask) const override;
-	void copy(const CcInjection* inj,const map<Node*,Node*>& mask);
-	~CcInjection();
-
-	bool reuse(const pattern::Pattern::Component& cc,Node& node,
-			map<int,InjSet*>& port_list,const simulation::SimContext& context,small_id root = 0);
-
-	const vector<Node*>& getEmbedding() const override;
-
-	void codomain(vector<Node*>& injs,set<Node*>& cod) const override;
-
-	size_t count() const override;
-
-	bool operator==(const Injection& inj) const override;
 };
 
 
-/*namespace distribution_tree{
-	template <typename T>
-	class DistributionTree<T>;
-}*/
 
-class CcValueInj : public CcInjection {
-	map<distribution_tree::DistributionTree<CcValueInj>*,int> containers;//TODO try with unordered_map
-	//FL_TYPE value;
+class MixInjection : public Injection {
+	const Injection* ccInjs[2];
+	vector<Node*> emb[2];
+	int distance;//radius
+	//bool rev;
+
 public:
-	CcValueInj(const pattern::Pattern::Component& _cc);
-	CcValueInj(const CcInjection& inj);
+	MixInjection(const pattern::Mixture& m) :
+		Injection(m),ccInjs{nullptr,nullptr},distance(0){}
+		//rev(&m.getComponent(0) > &m.getComponent(1) ? true : false){};
+	MixInjection(const Injection* inj1,const Injection* inj2,const pattern::Mixture& m);
+	MixInjection(const Injection* &injs,const pattern::Mixture& m) :
+		MixInjection((&injs)[0],(&injs)[1],m) {}
 
-	void addContainer(distribution_tree::DistributionTree<CcValueInj>& cont,int addr);
-	void selfRemove();
-	//returns true if the containers list is empty
-	bool removeContainer(distribution_tree::DistributionTree<CcValueInj>& cont);
+	bool reuse(const simulation::SimContext& context,const Injection* inj1,const Injection* inj2,int d){
+		/*if(rev){
+			ccInjs[0] = inj2;ccInjs[1] = inj1;
+		}
+		else {}*/
+		ccInjs[0] = inj1; ccInjs[1] = inj2;
+		emb[0] = *ccInjs[0]->getEmbedding();
+		emb[1] = *ccInjs[1]->getEmbedding();
+		distance = d;
+		return true;
+	}
+	Injection* clone(const map<Node*,Node*>& mask) const;
+	void copy(const MixInjection* inj,const map<Node*,Node*>& mask);
+	const vector<Node*>* getEmbedding() const {
+		return emb;
+	}
+	bool codomain(vector<Node*>* injs,set<Node*>& cod) const {
+		if(ccInjs[0]->isTrashed() || ccInjs[1]->isTrashed())
+			return 5;//invalid injection
+		return ccInjs[0]->codomain(injs,cod) || ccInjs[1]->codomain(&injs[1],cod);
+	}
+
+	size_t count() const {
+		return ccInjs[0]->count();
+	}
+	bool operator==(const Injection& inj) const;
+
+	int getDistance() const {
+		return distance;
+	}
+	two<const Injection*> getInjs() const {
+		return two<const Injection*>(ccInjs[0],ccInjs[1]);
+	}
 
 };
 
@@ -163,7 +165,8 @@ public:
 
 static auto trshd = unsigned(-1);//TODO a global static?
 
-inline Injection::Injection(const pattern::Pattern& _ptrn) : ptrn(_ptrn),address(unsigned(-1)) {
+inline Injection::Injection(const pattern::Pattern& _ptrn) : ptrn(_ptrn),
+		address(unsigned(-1)),depCount(0) {
 #ifdef DEBUG
 	cc_id = ptrn.getId();
 #endif
@@ -196,36 +199,6 @@ inline FL_TYPE Injection::evalAuxExpr(const simulation::SimContext& context,
 	//expressions::EvalArgs args(&_args.getState(),&args.getVars(),&aux_map);
 	return aux_func->getValue(context).valueAs<FL_TYPE>();
 }
-
-
-
-/************* CcValueInj Inlines ****************************/
-
-inline CcValueInj::CcValueInj(const pattern::Pattern::Component& _cc) : CcInjection(_cc) {}
-
-inline CcValueInj::CcValueInj(const CcInjection& inj) : CcInjection(inj) {};
-
-inline void CcValueInj::addContainer(distribution_tree::DistributionTree<CcValueInj>& cont,int address){
-	containers[&cont] = address;this->address++;
-}
-
-inline bool CcValueInj::removeContainer(distribution_tree::DistributionTree<CcValueInj>& cont){
-	containers.erase(&cont);address--;
-	return containers.empty();
-}
-
-inline void CcValueInj::selfRemove(){
-	for(auto cont_addr : containers){
-		auto inj = cont_addr.first->erase(cont_addr.second);//TODO this will delete cont, check iterator invalidation
-#ifdef DEBUG
-		if(this != inj)
-			throw invalid_argument("erasing another inj (CcValueInj::selfRemove())");
-#endif
-	}
-	containers.clear();//is mandatory!
-}
-
-
 
 
 

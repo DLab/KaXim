@@ -11,6 +11,7 @@
 #include <utility> //pair
 #include <list>
 #include <vector>
+#include <functional>
 #include "Node.h"
 #include "../util/params.h"
 #include "../expressions/AlgExpression.h"
@@ -60,6 +61,35 @@ public:
 	size_t getPopulation() const;
 	void decPopulation(size_t pop = 1);
 
+	/*void neighbourhood(map<int,list<Node*>>& nb, int radius = 1000) const {
+		nb[0].insert(nb[0].begin(),visited.begin(),visited.end());
+	}*/
+	/** \brief Explore the neighborhood of nodes.
+	 *
+	 * Starting from nbh[0] node-list, visit every node in their neighborhood
+	 * and stores them once in nbh[distance] lists.
+	 * @param nbh Mapping of the NBH as distance -> node list. Used as input and output.
+	 * @param visited set of nodes to avoid visiting (filled as output).
+	 * @param radius the max distance to look for nodes.
+	 * @param filter function to avoid insert a node when true.	 */
+	void neighborhood(map<int,list<Node*>>& nbh,set<Node*>& visited, int radius = 1000,
+			function<bool(Node*,int)>* filter = nullptr) const;
+	bool areConnected(const vector<Node*> &emb1,const vector<Node*> &emb2,int max_dist) const {
+		list<Node*> to_visit;
+		set<Node*> to_find;
+		for(auto node : emb1){
+			if(node == nullptr)
+				break;
+			to_visit.emplace_back(node);
+		}
+		for(auto node : emb2){
+			if(node == nullptr)
+				break;
+			to_find.emplace(node);
+		}
+		return areConnected(to_visit,to_find,max_dist);
+	}
+	bool areConnected(list<Node*> &to_visit,set<Node*>& to_find,int max_dist) const;
 	void print(const pattern::Environment& env) const;
 
 

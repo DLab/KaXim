@@ -9,6 +9,7 @@
 #include "../../util/Warning.h"
 #include "../../expressions/BinaryOperation.h"
 #include "../../expressions/UnaryOperation.h"
+#include "../../expressions/NullaryOperation.h"
 #include "../../pattern/mixture/Agent.h"
 #include "../../pattern/mixture/Component.h"
 
@@ -214,6 +215,7 @@ pattern::Mixture::Site* Site::eval(pattern::Environment &env,
 	short ag_pos = mix.size()-1,site_id;//mix.size() gives the actual agent-id.
 	pattern::Pattern::Agent& agent = mix.getAgent(ag_pos);
 	pattern::Pattern::Site* mix_site;
+	DepSet deps;
 
 	if(name.getString() == "..."){			//Auto-complete was set for this agent
 		if(!(ptrn_flag & Mixture::Info::RHS))
@@ -280,18 +282,18 @@ pattern::Mixture::Site* Site::eval(pattern::Environment &env,
 		}
 		if(stateInfo.range[0]){//TODO infinity expressions
 			if(stateInfo.flag & SiteState::MIN_EQUAL)
-				values[0] = stateInfo.range[0]->eval(env, context, nullptr, ptrn_flag,&mix);//TODO reduce these expressions
+				values[0] = stateInfo.range[0]->eval(env, context, &deps, ptrn_flag,&mix);//TODO reduce these expressions
 			else
 				values[0] = BaseExpression::makeUnaryExpression(
-						stateInfo.range[0]->eval(env, context, nullptr, ptrn_flag,&mix),
+						stateInfo.range[0]->eval(env, context, &deps, ptrn_flag,&mix),
 						BaseExpression::PREV);
 		}
 		if(stateInfo.range[2]){
 			if(stateInfo.flag & SiteState::MAX_EQUAL)
-				values[2] = stateInfo.range[2]->eval(env, context, nullptr, ptrn_flag,&mix);
+				values[2] = stateInfo.range[2]->eval(env, context, &deps, ptrn_flag,&mix);
 			else
 				values[2] = BaseExpression::makeUnaryExpression(
-						stateInfo.range[2]->eval(env, context, nullptr, ptrn_flag,&mix),
+						stateInfo.range[2]->eval(env, context, &deps, ptrn_flag,&mix),
 						BaseExpression::PREV);
 		}
 		if(!mix.addAuxCoords(stateInfo.aux.getString(),ag_pos,site_id))
@@ -302,7 +304,14 @@ pattern::Mixture::Site* Site::eval(pattern::Environment &env,
 			if(values[0] || values[2])
 				throw invalid_argument("Site::eval(): cannot declare 'equality' and 'inequality' patterns.");
 			values[1] = stateInfo.range[1]->eval
-					(env,context,nullptr,ptrn_flag|Expression::FORCE,&mix);
+					(env,context,&deps,ptrn_flag|Expression::FORCE,&mix);
+		}
+		for(auto dep : deps){
+			if(dep.type == Dependency::AUX){
+				if(dep.aux == stateInfo.aux.getString())
+					throw SemanticError("The site pattern-value cannot depends on itself.",loc);
+				mix.setPatternAux(dep.aux);
+			}
 		}
 		//If values[1] && values[0|2] throw...
 		mix_site->setValuePattern(values);
@@ -383,8 +392,16 @@ pattern::Mixture::Agent* Agent::eval(pattern::Environment &env,
 	mix.addAgent(agent);
 	for(auto &ast_site : sites){
 		auto site = ast_site.eval(env,context,mix,ptrn_flag);
-		if(site)
-			agent->addSite(site);//site destructor called
+		if(site){
+			/*if(site->getValueType() == Pattern::EMPTY && site->getLinkType() == Pattern::WILD){
+				if(ast_site.stateInfo.aux.getString() == "")
+					ADD_WARN("The site "+ast_site.name.getString()+" is useless for the agent"
+							" pattern and will be omitted.",ast_site.loc);
+				delete site;//useless site
+			}
+			else*/
+				agent->addSite(site);//site destructor called
+		}
 		else
 			agent->setAutoFill();
 	}
@@ -453,7 +470,7 @@ Effect::Effect(const location& l,const Action& a,const list<StringExpression>& s
 //HISTOGRAM
 Effect::Effect(const location &l,const list<StringExpression> &str,
 		const VarValue &bins,const list<Id>& _vars,const Expression* aux_expr) :
-	Node(l),action(SNAPSHOT),n(aux_expr),names(_vars),set(bins),filename(str),mix(nullptr){}
+	Node(l),action(HISTOGRAM),n(aux_expr),names(_vars),set(bins),filename(str),mix(nullptr){}
 
 /*Effect::Effect(const Effect &eff):
 	Node(eff.loc),action(eff.action),n(nullptr),mix(nullptr) {
@@ -510,7 +527,7 @@ Effect::Effect(const location &l,const list<StringExpression> &str,
 }*/
 
 simulation::Perturbation::Effect* Effect::eval(pattern::Environment& env,
-		const SimContext &context) const {
+		const SimContext &context,const BaseExpression* trigger) const {
 	auto& vars = context.getVars();
 	try{
 	switch(action){
@@ -545,33 +562,37 @@ simulation::Perturbation::Effect* Effect::eval(pattern::Environment& env,
 	case UPDATE_TOK:
 	case STOP:
 	case SNAPSHOT:
-		if(set.value){//histogram
-			string file;
-			list<const state::KappaVar*> k_vars;
-			for(auto& var_name : names){
-				auto var_id = Id(var_name.loc,var_name.evalLabel(env,context));
-				auto k_var = dynamic_cast<const state::KappaVar*>(vars[env.getVarId(var_id)]);
-				if(!k_var)
-					throw SemanticError("Variable "+var_id.getString()+" is not a Kappa mixture.",var_id.loc);
-				k_vars.emplace_back(k_var);
-			}
-			auto bins = set.value->eval(env, context, nullptr, Expression::PATTERN | Expression::AUX_ALLOW)
-					->getValueSafe(context).valueAs<int>();
-			auto aux_func = n ? n->eval(env, context, nullptr,
-					Expression::PATTERN | Expression::AUX_ALLOW,& k_vars.front()->getMix())
-					: nullptr;
-			for(auto& se : filename)
-				file += se.evalConst(env, context);
-			simulation::Histogram* eff;
-			try{
-				eff = new simulation::Histogram(env,bins,file,k_vars,aux_func);
-			}
-			catch(exception &e){
-				throw SemanticError(e.what(),loc);
-			}
-			return eff;
-		}
 		break;
+	case HISTOGRAM:{
+		auto bins = 0;
+		if(set.value)
+			bins = set.value->eval(env, context, nullptr, Expression::PATTERN | Expression::AUX_ALLOW)
+					->getValueSafe(context).valueAs<int>();
+		else if(!trigger || !dynamic_cast<const expressions::NullaryOperation<bool>*>(trigger))
+			ADD_WARN("Use $HISTOGRAM(BINS) to select how many bins to plot.",loc);
+		string file;
+		list<const state::KappaVar*> k_vars;
+		for(auto& var_name : names){
+			auto var_id = Id(var_name.loc,var_name.evalLabel(env,context));
+			auto k_var = dynamic_cast<const state::KappaVar*>(vars[env.getVarId(var_id)]);
+			if(!k_var)
+				throw SemanticError("Variable "+var_id.getString()+" is not a Kappa mixture.",var_id.loc);
+			k_vars.emplace_back(k_var);
+		}
+		auto aux_func = n ? n->eval(env, context, nullptr,
+				Expression::PATTERN | Expression::AUX_ALLOW,& k_vars.front()->getMix())
+				: nullptr;
+		for(auto& se : filename)
+			file += se.evalConst(env, context);
+		simulation::Histogram* eff;
+		try{
+			eff = new simulation::Histogram(env,bins,file,k_vars,aux_func);
+		}
+		catch(exception &e){
+			throw SemanticError(e.what(),loc);
+		}
+		return eff;
+	}
 	case PRINT:
 	case PRINTF:
 	case CFLOW:
@@ -661,7 +682,7 @@ void Pert::eval(pattern::Environment& env,const SimContext &context) const {
 	auto pert = new simulation::Perturbation(cond,rep,loc,context);
 
 	for(auto &eff : effects){
-		pert->addEffect(eff.eval(env, context),context,env);
+		pert->addEffect(eff.eval(env,context,cond),context,env);
 	}
 
 	env.declarePert(pert);
@@ -696,53 +717,43 @@ Pert::~Pert() {
 };
 
 
-/****** Class Radius ****/
-Radius::Radius(){}
-Radius::Radius(const location &l,const Expression *k1):
-	Node(l),k1(k1), opt(NULL) {};
-Radius::Radius(const location &l,const Expression *k1,const Expression *opt):
-	Node(l),k1(k1), opt(opt) {};
-Radius::~Radius(){
-	if(opt)
-		delete opt;
-}
-
 
 /****** Class Rate ***************/
 Rate::Rate():
-	Node(), base(nullptr), reverse(nullptr), fixed(nullptr), unary(nullptr) {};
-Rate::Rate(const Rate& r) :
+	Node(), base(nullptr), reverse(nullptr), fixed(nullptr), unary(nullptr,nullptr) {};
+Rate::Rate(const Rate& r) : Node(r.loc),
 		base(r.base ? r.base->clone() : nullptr),
 		reverse(r.reverse ? r.reverse->clone() : nullptr),
-		unary(r.unary ? new Radius(*r.unary) : nullptr),
+		unary(r.unary),
 		volFixed(r.volFixed),fixed(r.fixed){}
 Rate& Rate::operator=(const Rate& r) {
+	loc = r.loc;
 	base = r.base ? r.base->clone() : nullptr;
 	reverse = r.reverse ? r.reverse->clone() : nullptr;
-	unary = r.unary ? new Radius(*r.unary) : nullptr;
+	unary = r.unary;
 	volFixed = r.volFixed;
 	fixed = r.fixed;
 	return *this;
 }
 
 Rate::Rate(const location &l,const Expression *def,const bool fix):
-	Node(l), base(def), reverse(nullptr), fixed(fix), unary(nullptr) {};
-Rate::Rate(const location &l,const Expression *def,const bool fix,const Radius *un):
-	Node(l), base(def), reverse(nullptr), fixed(fix), unary(new Radius(*un)) {};
+	Node(l), base(def), reverse(nullptr), fixed(fix), unary(nullptr,nullptr) {};
+Rate::Rate(const location &l,const Expression *def,const bool fix,two<const Expression*>un):
+	Node(l), base(def), reverse(nullptr), fixed(fix), unary(un) {};
 Rate::Rate(const location &l,const Expression *def,const bool fix,const Expression *ope):
-	Node(l), base(def), reverse(ope), fixed(fix), unary(nullptr) {};
+	Node(l), base(def), reverse(ope), fixed(fix), unary(nullptr,nullptr) {};
 Rate::~Rate(){
 	if(base)
 		delete base;
-	if(unary){
-		delete unary->k1;
-		delete unary->opt;
-	}
+	/*if(unary.first)
+		delete unary.first;
+	if(unary.second)
+		delete unary.second;*/
 	if(reverse)
 		delete reverse;
 }
 
-const state::BaseExpression* Rate::eval(const pattern::Environment& env,simulation::Rule& r,
+const state::BaseExpression* Rate::eval(pattern::Environment& env,simulation::Rule& r,
 		const SimContext &context,two<pattern::DepSet> &deps,bool is_bi) const {
 	if(!base)
 		throw std::invalid_argument("Base rate cannot be null.");
@@ -750,8 +761,9 @@ const state::BaseExpression* Rate::eval(const pattern::Environment& env,simulati
 	auto base_rate = base->eval(env,context,&deps.first,
 			Expression::AUX_ALLOW+Expression::RHS,&lhs);//TODO enum rate?
 	r.setRate(base_rate);
-	if(is_bi){
-		if(unary)
+	if(is_bi)
+		throw SemanticError("Bidirectional rules are deprecated. Please write 2 rules instead.",loc);
+	/*	if(unary)  BIDIRECTIONAL RULES ARE DEPRECATED
 			throw SemanticError("Cannot define a bidirectional rule with a rate for unary cases.",loc);
 		if(deps.first.count(Deps::AUX))
 			throw SemanticError("Cannot define a bidirectional rule with a rate depending on auxiliars.",loc);
@@ -762,18 +774,19 @@ const state::BaseExpression* Rate::eval(const pattern::Environment& env,simulati
 			return reverse->eval(env,context,&deps.second,Expression::AUX_ALLOW);
 		}
 	}
-	else{
-		if(reverse)
-			throw SemanticError("Reverse rate defined for unidirectional rule.",loc);
-		if(unary){
-			auto un_rate = unary->k1->eval(env,context,&deps.first,0);
-			int radius = 0;
-			if(unary->opt){
-				radius = unary->opt->eval(env,context,&deps.first,Expression::CONST + Expression::AUX_ALLOW)->
-						getValueSafe(context).valueAs<int>();//TODO check if vars is only consts
-			}
-			r.setUnaryRate(make_pair(un_rate,radius));
+	else{*/
+	if(reverse)
+		throw SemanticError("Reverse rate defined for unidirectional rule.",loc);
+	if(unary.first){
+		auto un_rate = unary.first->eval(env,context,&deps.first,
+				Expression::AUX_ALLOW+Expression::RHS,&lhs);
+		int radius = 10000;
+		if(unary.second){
+			radius = unary.second->eval(env,context,&deps.first,Expression::CONST + Expression::AUX_ALLOW)->
+					getValueSafe(context).valueAs<int>();//TODO check if vars is only consts
 		}
+		r.setUnaryRate(make_pair(un_rate,radius));
+		env.declareUnaryMix(lhs,radius);
 	}
 	return nullptr;
 
@@ -844,9 +857,9 @@ void Rule::eval(pattern::Environment& env,
 			Expression::PATTERN + Expression::LHS + Expression::AUX_ALLOW);//TODO do not allow aux?
 	auto& rule = env.declareRule(label,lhs_mix,loc);
 
-	lhs_mix.addInclude(rule.getId());
+	lhs_mix.addInclude(rule.getId());//TODO check if only addinclude in mix on unary rules
 	two<pattern::DepSet> deps;//first-> | second<-
-	auto reverse = rate.eval(env,rule,context,deps,bi);
+	rate.eval(env,rule,context,deps,bi);
 	for(auto dep : deps.first){
 		if(dep.type == Deps::AUX){
 			auto cc_id = lhs_mix.getAuxMap().at(dep.aux).cc_pos;

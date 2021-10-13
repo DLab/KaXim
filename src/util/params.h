@@ -33,5 +33,13 @@ class False : public std::exception {
 	virtual const char* what() const _GLIBCXX_USE_NOEXCEPT override {return "False exception";}
 };
 
+#ifdef DEBUG
+	#define IF_DEBUG_LVL(lvl,to_do) \
+		if(simulation::Parameters::get().verbose >= lvl) { to_do; }
+#else
+	#define IF_DEBUG_LVL(lvl,to_do) /* do not debug */
+#endif
+
 
 #endif
+

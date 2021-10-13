@@ -19,7 +19,7 @@ namespace pattern {
 using namespace std;
 using namespace grammar::ast;
 
-Environment::Environment() {
+Environment::Environment() : max_radius(0){
 	//the empty mixture pattern is only declared once.
 	auto empty_mix = new Mixture(0);
 	empty_mix->setId(0);
@@ -170,6 +170,28 @@ simulation::Rule& Environment::declareRule(const Id &name_loc,Mixture& mix,const
 	return rules.back();
 }
 
+void Environment::declareUnaryMix(Mixture& mix,int radius){
+	//TODO check if new unary mix is in reverse order
+	if(mix.compsCount() != 2)
+		throw invalid_argument("Environment::declareUnaryRule().");
+	mix.setRadius(radius);
+	auto ids = mix.getUnaryKey();
+	if(ids.first > ids.second)
+		throw SemanticError("The C.Components of unary mixture have to be put in reverse order (see TODO).",yy::location());
+	unaryMix[ids].emplace_back(radius,int(mix.getId()));
+	unaryMix[ids].sort();
+	unaryCC[ids.first].emplace_back(radius,ids.second);
+	unaryCC[ids.first].sort();
+	if(ids.first != ids.second){
+		unaryMix[make_pair(ids.second,ids.first)].emplace_back(radius,int(mix.getId()));
+		unaryMix[make_pair(ids.second,ids.first)].sort();
+		unaryCC[ids.second].emplace_back(radius,ids.first);
+		unaryCC[ids.second].sort();
+	}
+	if(max_radius < radius)
+		max_radius = radius;
+}
+
 void Environment::declarePert(simulation::Perturbation* pert){
 	pert->setId(perts.size());
 	perts.push_back(pert);
@@ -300,10 +322,10 @@ const Signature& Environment::getSignature(short id) const {
 const vector<pattern::Signature>& Environment::getSignatures() const{
 	return signatures;
 }
-const list<Mixture*>& Environment::getMixtures() const{
+const vector<Mixture*>& Environment::getMixtures() const{
 	return mixtures;
 }
-const list<Mixture::Component*>& Environment::getComponents() const{
+const vector<Mixture::Component*>& Environment::getComponents() const{
 	return components;
 }
 const list<Mixture::Agent*>& Environment::getAgentPatterns(small_id id) const{
@@ -479,18 +501,16 @@ void Environment::show(const simulation::SimContext& context) const {
 		for(auto& rul : rules){
 			cout << "  [" << rul.getId() << "] ";
 			cout << rul.toString(*this);
-			if(rul.getInfluences().size())
-				cout << "\n    " << rul.getInfluences().size() <<
-					" new Injections will be produced.";
 			int rhs_ag_pos(-1);
+			int j = 0;
 			for(auto& key_info : rul.getInfluences()){
 				if(rhs_ag_pos != int(key_info.first.match_root.second)){
 					rhs_ag_pos = key_info.first.match_root.second;
-					cout << "\n      Changes in RHS-Agent[" << rhs_ag_pos << "]"
-						" will produce new Injections of patterns:";
+					cout << "\n      Changes in RHS[" << rhs_ag_pos << "]"
+						" could produce new Injections of:";
 				}
-				cout << "\n\troot-agent["<< int(key_info.first.match_root.first)
-						<<"]\t" << key_info.first.cc->toString(*this);
+				cout <<"\n\t(" << j++ << ")  " <<
+					key_info.first.cc->toString(*this,key_info.first.match_root.first);
 			}
 			cout << "\n" << endl;
 			i++;

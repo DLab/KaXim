@@ -16,54 +16,57 @@
 
 namespace matching {
 
-InjRandContainer::InjRandContainer(const pattern::Pattern::Component& _cc) : cc(_cc){}
+template <typename InjType>
+InjRandContainer<InjType>::InjRandContainer(const pattern::Pattern& _ptrn) : ptrn(_ptrn){}
 
-InjRandContainer::~InjRandContainer(){
+template <typename InjType>
+InjRandContainer<InjType>::~InjRandContainer(){
 	for(auto inj_it = freeInjs.begin(); inj_it != freeInjs.end(); inj_it++){
 #ifdef DEBUG
 		for(auto inj2_it = next(inj_it); inj2_it != freeInjs.end(); inj2_it++)
 			if(*inj_it == *inj2_it)
-				throw invalid_argument("inj is repeated in freeinjs!");//TODO do not throw on destructors
+				throw invalid_argument("~InjRandContainer(): inj is repeated in freeinjs!");//TODO do not throw on destructors
 #endif
 		delete *inj_it;
 	}
 }
 
-Injection* InjRandContainer::emplace(Node& node,
-		map<int,InjSet*> &port_list,const state::State& state,small_id root) {
-	CcInjection* inj;
-	if(freeInjs.empty()){
+/*template <typename InjType> template <typename... Args>
+InjType* InjRandContainer<InjType>::emplace(const state::State& state,Args... args){
+	InjType* inj;
+	if(freeInjs.empty())
 		inj = newInj();
-		freeInjs.push_back(inj);
-	}
+	if(inj == nullptr)
+		return nullptr;
 	else {
 		inj = freeInjs.front();
+		freeInjs.pop_front();
 	}
 	CcEmbMap<expressions::Auxiliar,FL_TYPE,Node> cc_map(inj->getEmbedding());
 	state.setAuxMap(&cc_map);
-	if(inj->reuse(cc,node,port_list,state,root) == false)
+	if(inj->reuse(state,ptrn,args...) == false)
 		return nullptr;
 	insert(inj,state);
-	freeInjs.pop_front();
 
 	for(auto& s : sumList)
 		s.second += inj->evalAuxExpr(state,s.first);
 
 	return inj;
-}
+}*/
 
-Injection* InjRandContainer::emplace(Injection* base_inj,map<Node*,Node*>& mask,const state::State& state){
-	CcInjection* inj;
+template <typename InjType>
+InjType* InjRandContainer<InjType>::emplace(Injection* base_inj,map<Node*,Node*>& mask,const state::State& state){
+	InjType* inj;
 	if(freeInjs.empty()){
-		inj = static_cast<CcInjection*>(base_inj->clone(mask));
+		inj = static_cast<InjType*>(base_inj->clone(mask));
 		freeInjs.push_back(inj);
 	}
 	else
 		inj = freeInjs.front();
-	CcEmbMap<expressions::Auxiliar,FL_TYPE,Node> cc_map(inj->getEmbedding());
+	CcEmbMap<expressions::Auxiliar,FL_TYPE,Node> cc_map(*inj->getEmbedding());
 	state.setAuxMap(&cc_map);
 
-	inj->copy(static_cast<CcInjection*>(base_inj),mask);//TODO static_cast??
+	inj->copy(static_cast<InjType*>(base_inj),mask);//TODO static_cast??
 	insert(inj,state);
 	freeInjs.pop_front();
 
@@ -72,12 +75,15 @@ Injection* InjRandContainer::emplace(Injection* base_inj,map<Node*,Node*>& mask,
 	return inj;
 }
 
-void InjRandContainer::selectRule(int rid,small_id cc) const {/*do nothing*/};
-FL_TYPE InjRandContainer::getM2() const {
+template <typename InjType>
+void InjRandContainer<InjType>::selectRule(int rid,small_id cc) const {/*do nothing*/};
+template <typename InjType>
+FL_TYPE InjRandContainer<InjType>::getM2() const {
 	throw invalid_argument("calling InjRandContainer::getM2() is forbidden.");
 }
 
-FL_TYPE InjRandContainer::sumInternal(const expressions::BaseExpression* aux_func,
+template <typename InjType>
+FL_TYPE InjRandContainer<InjType>::sumInternal(const expressions::BaseExpression* aux_func,
 			const simulation::SimContext& state) const {
 	try{
 		return trackedSums.at(aux_func);
@@ -93,7 +99,7 @@ FL_TYPE InjRandContainer::sumInternal(const expressions::BaseExpression* aux_fun
 		sumList.emplace_back(aux_func,0.0);
 		auto& sum = sumList.back().second;
 		auto func = [&](const Injection* inj) -> void {
-			cc_map.setEmb(inj->getEmbedding());
+			cc_map.setEmb(*inj->getEmbedding());
 			sum += aux_func->getValue(state).valueAs<FL_TYPE>();
 		};
 		fold(func);
@@ -104,18 +110,21 @@ FL_TYPE InjRandContainer::sumInternal(const expressions::BaseExpression* aux_fun
 
 /********* MultiInjSet ********************/
 
-InjRandSet::InjRandSet(const pattern::Pattern::Component& _cc) : InjRandContainer(_cc)
+template <typename InjType>
+InjRandSet<InjType>::InjRandSet(const pattern::Pattern& _ptrn) : InjRandContainer<InjType>(_ptrn)
 		,counter(0),multiCount(0) {
 	container.reserve(100);
 }
 
-InjRandSet::~InjRandSet(){
+template <typename InjType>
+InjRandSet<InjType>::~InjRandSet(){
 	for(auto inj : container)
 		delete inj;
 }
 
 //TODO better way to count?
-size_t InjRandSet::count() const {
+template <typename InjType>
+size_t InjRandSet<InjType>::count() const {
 	return counter;
 	/*size_t c = 0;
 	for(size_t i = 0; i < multiCount; i++)
@@ -124,9 +133,10 @@ size_t InjRandSet::count() const {
 }
 
 //TODO
-const Injection& InjRandSet::chooseRandom(RNG& randGen) const{
+template <typename InjType>
+InjType& InjRandSet<InjType>::chooseRandom(RNG& randGen) const{
 	auto uni = uniform_int_distribution<size_t>(0,count()-1);
-	auto selection = uni(randGen);
+	auto selection = uni(randGen);//0; deterministic
 	if(selection < container.size() - multiCount)
 		return *container[selection + multiCount];
 	else{
@@ -140,7 +150,8 @@ const Injection& InjRandSet::chooseRandom(RNG& randGen) const{
 	}
 }
 
-const Injection& InjRandSet::choose(unsigned id) const {
+template <typename InjType>
+InjType& InjRandSet<InjType>::choose(unsigned id) const {
 	if(id < container.size() - multiCount)
 			return *container[id + multiCount];
 	else{
@@ -154,7 +165,8 @@ const Injection& InjRandSet::choose(unsigned id) const {
 	}
 }
 
-void InjRandSet::insert(CcInjection* inj,const state::State& state){
+template <typename InjType>
+void InjRandSet<InjType>::insert(InjType* inj,const state::State& state){
 	inj->alloc(container.size());
 	container.push_back(inj);
 	if(inj->count() > 1){
@@ -165,7 +177,8 @@ void InjRandSet::insert(CcInjection* inj,const state::State& state){
 		counter++;
 }
 
-void InjRandSet::del(Injection* inj){
+template <typename InjType>
+void InjRandSet<InjType>::del(Injection* inj){
 #ifdef DEBUG
 	if(container.empty())
 		throw out_of_range("InjRandSet is empty, what injection are you trying to delete?");
@@ -180,23 +193,26 @@ void InjRandSet::del(Injection* inj){
 	counter -= inj->count();
 }
 
-void InjRandSet::clear() {
+template <typename InjType>
+void InjRandSet<InjType>::clear() {
 	multiCount = 0;
 	counter = 0;
 	for(auto inj : container){
 		inj->alloc(unsigned(-1));
-		freeInjs.push_back(inj);
+		this->freeInjs.push_back(inj);
 	}
 	container.clear();
 }
 
 
-CcInjection* InjRandSet::newInj() const{
-	return new CcInjection(cc);
+template <typename InjType>
+InjType* InjRandSet<InjType>::newInj() const{
+	return new InjType(this->ptrn);
 }
 
 
-FL_TYPE InjRandSet::partialReactivity() const {
+template <typename InjType>
+FL_TYPE InjRandSet<InjType>::partialReactivity() const {
 	return counter;
 }
 
@@ -214,24 +230,143 @@ FL_TYPE InjRandSet::partialReactivity() const {
 	return sum;
 }*/
 
-void InjRandSet::fold(const function<void (const Injection*)> func) const{
+template <typename InjType>
+void InjRandSet<InjType>::fold(const function<void (const Injection*)> func) const{
 	for(auto inj : container)
 		func(inj);
 }
 
 
 
+
+//*********** InjRandSet<MixInjection> *********************//
+
+//template <> class InjRandSet<MixInjection>;
+
+InjRandSet<MixInjection>::InjRandSet(const pattern::Mixture& mix,InjRandSet<MixInjection>* nxt) :
+		InjRandContainer<MixInjection>(mix),next(nxt),counter(0),multiCount(0),
+		radius(mix.getRadius()){
+	container.reserve(100);
+}
+
+InjRandSet<MixInjection>::~InjRandSet(){
+	for(auto inj : container)
+		delete inj;
+	if(next)
+		delete next;
+}
+
+
+//TODO better way to count?
+size_t InjRandSet<MixInjection>::count() const {
+	return counter + (next? next->count() : 0);
+}
+
+//TODO
+MixInjection& InjRandSet<MixInjection>::chooseRandom(RNG& randGen) const{
+	auto uni = uniform_int_distribution<size_t>(0,count()-1);
+	auto selection = uni(randGen);
+	return choose(selection);
+}
+
+MixInjection& InjRandSet<MixInjection>::choose(unsigned id) const {
+	if(id >= counter)
+		return this->next->choose(id - counter);
+	if(id < container.size() - multiCount)
+			return *container[id + multiCount];
+	else{
+		id -= container.size() - multiCount;
+		auto it = container.begin();
+		while(id > (*it)->count()){
+			id -= (*it)->count();
+			it++;
+		}
+		return **it;
+	}
+}
+
+void InjRandSet<MixInjection>::insert(MixInjection* inj,const state::State& state){
+	if(inj->getDistance() > radius)
+		return next->insert(inj,state);
+	inj->alloc(container.size());
+	container.push_back(inj);
+	counter += inj->count();
+	if(inj->count() > 1)
+		multiCount++;
+}
+
+void InjRandSet<MixInjection>::del(Injection* inj){
+#ifdef DEBUG
+	if(container.empty())
+		throw out_of_range("InjRandSet is empty, what injection are you trying to delete?");
+#endif
+	if(inj->getAddress() < multiCount)
+		multiCount--;
+	if(container.size() > 1){
+		container.back()->alloc(inj->getAddress());
+		container[inj->getAddress()] = container.back();
+	}
+	container.pop_back();
+	counter -= inj->count();
+}
+
+void InjRandSet<MixInjection>::clear() {
+	multiCount = 0;
+	counter = 0;
+	for(auto inj : container){
+		inj->alloc(unsigned(-1));
+		InjRandContainer<MixInjection>::freeInjs.push_back(inj);
+	}
+	container.clear();
+}
+
+MixInjection* InjRandSet<MixInjection>::newInj() const{
+	return new MixInjection(static_cast<const pattern::Mixture&>(InjRandContainer<MixInjection>::ptrn));
+}
+
+
+FL_TYPE InjRandSet<MixInjection>::partialReactivity() const {
+	return counter;
+}
+
+/*FL_TYPE InjRandSet::sumInternal(const expressions::BaseExpression* aux_func,
+			const expressions::EvalArgs& _args) const {
+	expressions::AuxCcEmb aux_values;
+	expressions::EvalArgs args(&_args.getState(),&_args.getVars(),&aux_values);
+	auto func = [&](const CcInjection* inj) -> FL_TYPE {
+		aux_values.setEmb(inj->getEmbedding());
+		return aux_func->getValue(args).valueAs<FL_TYPE>();
+	};
+	FL_TYPE sum = 0;
+	for(auto inj : container)
+		sum += func(inj);
+	return sum;
+}*/
+
+void InjRandSet<MixInjection>::fold(const function<void (const Injection*)> func) const{
+	for(auto inj : container)
+		func(inj);
+	if(next)
+		next->fold(func);
+}
+
+
+
+
 /************ InjRandTree *******************/
 
-const float InjRandTree::MAX_INVALIDATIONS = 0.03;//3%
+template <typename InjType>
+const float InjRandTree<InjType>::MAX_INVALIDATIONS = 0.03;//3%
 
-InjRandTree::Root::Root(const expressions::BaseExpression* rate) :
+template <typename InjType>
+InjRandTree<InjType>::Root::Root(const expressions::BaseExpression* rate) :
 		tree(new distribution_tree::Node<CcValueInj>(1.0)),
 		partial_rate(rate),second_moment(-1.,0.),is_valid(false) {}
 
-InjRandTree::InjRandTree(const pattern::Pattern::Component& _cc,const vector<simulation::Rule::Rate*>& rates) :
-		InjRandContainer(_cc),counter(0),invalidations(0),selected_root(0,0){
-	auto& deps = cc.getRateDeps();
+template <typename InjType>
+InjRandTree<InjType>::InjRandTree(const pattern::Pattern::Component& _cc,const vector<simulation::Rule::Rate*>& rates) :
+		InjRandContainer<InjType>(_cc),counter(0),invalidations(0),selected_root(0,0){
+	auto& deps = _cc.getRateDeps();
 	//distribution_tree::Node<CcValueInj>* pointer = nullptr;
 	for(auto r_cc : deps){//
 		auto r_id = r_cc.first.getId();
@@ -254,7 +389,8 @@ InjRandTree::InjRandTree(const pattern::Pattern::Component& _cc,const vector<sim
 
 }
 
-InjRandTree::~InjRandTree(){
+template <typename InjType>
+InjRandTree<InjType>::~InjRandTree(){
 	for(auto inj : infList)
 		delete inj;
 	//roots.begin()->second->tree->deleteContent();//delete only injs inside tree
@@ -265,27 +401,48 @@ InjRandTree::~InjRandTree(){
 	}
 }
 
-void InjRandTree::insert(CcInjection* inj,const state::State& state) {
-	auto ccval_inj = static_cast<CcValueInj*>(inj);
+/*template <>
+void InjRandTree<CcValueInj>::insert(CcValueInj* inj,const state::State& state) {
+	//auto ccval_inj = static_cast<CcValueInj*>(inj);
 	for(auto& ridcc_tree : roots_to_push){// for each (rid,cc_index) that is using this cc-pattern
 		auto& r = state.getEnv().getRules()[ridcc_tree.first.first];
 		FL_TYPE val = 1.0;
 		auto ccaux_func = state.getRuleRate(r.getId()).getExpression(ridcc_tree.first.second);
-		val *= ccaux_func->getValue(state).valueAs<FL_TYPE>();//TODO at this point injection is already set in state?
+		val *= ccaux_func->getValue(state).
+				valueAs<FL_TYPE>();//TODO at this point injection is already set in state?
 		if(val < 0.)
 			throw invalid_argument("When applying rule '"+r.getName()+
 					"':\nPartial reactivities cannot be negative.");
-		ridcc_tree.second->tree->push(ccval_inj,val);//TODO static cast?
+		ridcc_tree.second->tree->push(inj,val);//TODO static cast?
+	}
+	counter += inj->count();
+	invalidations++;
+}
+*/
+
+template <typename InjType>
+void InjRandTree<InjType>::insert(InjType* _inj,const state::State& state) {
+	auto inj = dynamic_cast<CcValueInj*>(_inj);
+	for(auto& ridcc_tree : roots_to_push){// for each (rid,cc_index) that is using this cc-pattern
+		auto& r = state.getEnv().getRules()[ridcc_tree.first.first];
+		FL_TYPE val = 1.0;
+		auto ccaux_func = state.getRuleRate(r.getId()).getExpression(ridcc_tree.first.second);
+		val *= ccaux_func->getValue(state).template valueAs<FL_TYPE>();//TODO at this point injection is already set in state?
+		if(val < 0.)
+			throw invalid_argument("When applying rule '"+r.getName()+
+					"':\nPartial reactivities cannot be negative.");
+		ridcc_tree.second->tree->push(inj,val);//TODO static cast?
 	}
 	counter += inj->count();
 	invalidations++;
 }
 
 
-const Injection& InjRandTree::chooseRandom(RNG& randGen) const {
+template <typename InjType>
+InjType& InjRandTree<InjType>::chooseRandom(RNG& randGen) const {
 	distribution_tree::DistributionTree<CcValueInj> *tree = nullptr;
 	if(roots.count(selected_root)){
-		tree = roots.at(selected_root)->tree;
+		tree = this->roots.at(selected_root)->tree;
 	}
 
 	if(tree){
@@ -299,18 +456,20 @@ const Injection& InjRandTree::chooseRandom(RNG& randGen) const {
 			return cc_node.second->choose(selection);*/
 	}
 	else{
-		auto uni = uniform_int_distribution<unsigned int>(0,count());
+		auto uni = uniform_int_distribution<unsigned int>(0,count()-1);
 		auto selection = uni(randGen);
-		return *roots.begin()->second->tree->choose(selection).first;
+		return *this->roots.begin()->second->tree->choose(selection).first;
 	}
 	//throw std::out_of_range("Selected injection out of range. [InjRandTree::chooseRandom()]");
 }
 
-const Injection& InjRandTree::choose(unsigned id) const {
-	return *(roots.begin()->second->tree->choose(id).first);
+template <typename InjType>
+InjType& InjRandTree<InjType>::choose(unsigned id) const {
+	return *(this->roots.begin()->second->tree->choose(id).first);
 }
 
-void InjRandTree::del(Injection* inj){
+template <typename InjType>
+void InjRandTree<InjType>::del(Injection* inj){
 	auto val_inj = static_cast<CcValueInj*>(inj);
 	val_inj->selfRemove();
 	counter -= inj->count();
@@ -318,34 +477,39 @@ void InjRandTree::del(Injection* inj){
 }
 
 
-void InjRandTree::clear() {
+template <typename InjType>
+void InjRandTree<InjType>::clear() {
 	counter = 0;
 	invalidations = 0;
 	list<CcValueInj*> frees;
 	for(auto root : roots_to_push)
 		root.second->tree->clear(&frees);
-	freeInjs.insert(freeInjs.end(),frees.begin(),frees.end());
+	this->freeInjs.insert(this->freeInjs.end(),frees.begin(),frees.end());
 }
 
-CcInjection* InjRandTree::newInj() const{
-	return new CcValueInj(cc);
+template <typename InjType>
+InjType* InjRandTree<InjType>::newInj() const{
+	return new CcValueInj(static_cast<const pattern::Pattern::Component&>(this->ptrn));
 }
 
-size_t InjRandTree::count() const {
-	return roots.begin()->second->tree->count();
+template <typename InjType>
+size_t InjRandTree<InjType>::count() const {
+	return this->roots.begin()->second->tree->count();
 }
 
 
-FL_TYPE InjRandTree::partialReactivity() const {
+template <typename InjType>
+FL_TYPE InjRandTree<InjType>::partialReactivity() const {
 	if(roots.count(selected_root)){
-		return roots.at(selected_root)->tree->total();
+		return this->roots.at(selected_root)->tree->total();
 	}
 	else
-		return roots.begin()->second->tree->total();
+		return this->roots.begin()->second->tree->total();
 }
 
 //return an approximation of the sum(elem_i*elem_i)
-FL_TYPE InjRandTree::getM2() const {
+template <typename InjType>
+FL_TYPE InjRandTree<InjType>::getM2() const {
 	if(count() == 0)
 		return 0;
 	auto root = roots.at(selected_root);
@@ -363,23 +527,26 @@ FL_TYPE InjRandTree::getM2() const {
 }
 
 
-void InjRandTree::selectRule(int rid,small_id cc) const {
+template <typename InjType>
+void InjRandTree<InjType>::selectRule(int rid,small_id cc) const {
 	selected_root.first = rid;
 	selected_root.second = cc;
 };
 
 
-FL_TYPE InjRandTree::sumInternal(const expressions::BaseExpression* aux_func,
+template <typename InjType>
+FL_TYPE InjRandTree<InjType>::sumInternal(const expressions::BaseExpression* aux_func,
 		const simulation::SimContext& context) const {
 	for(auto& ridcc_tree : roots){
 		if((*aux_func) == (*ridcc_tree.second->partial_rate))
 			return ridcc_tree.second->tree->total();
 	}
-	return InjRandContainer::sumInternal(aux_func,context);
+	return InjRandContainer<InjType>::sumInternal(aux_func,context);
 }
 
-void InjRandTree::fold(const function<void (const Injection*)> func) const{
-	roots.begin()->second->tree->fold(func);
+template <typename InjType>
+void InjRandTree<InjType>::fold(const function<void (const Injection*)> func) const{
+	this->roots.begin()->second->tree->fold(func);
 }
 
 
@@ -390,79 +557,94 @@ void InjRandTree::fold(const function<void (const Injection*)> func) const{
 
 
 
-InjLazyContainer::InjLazyContainer(const pattern::Pattern::Component& _cc,const state::State& _state,
-			const state::SiteGraph& _graph,InjRandContainer *&_holder) :
-					InjRandContainer(_cc),state(_state),graph(_graph),holder(&_holder),loaded(false) {}
+template <typename InjType>
+InjLazyContainer<InjType>::InjLazyContainer(const pattern::Pattern::Component& _cc,const state::State& _state,
+			const state::SiteGraph& _graph,InjRandContainer<InjType> *&_holder) :
+					InjRandContainer<InjType>(_cc),state(_state),graph(_graph),holder(&_holder),loaded(false) {}
 
-InjLazyContainer::~InjLazyContainer(){
+template <typename InjType>
+InjLazyContainer<InjType>::~InjLazyContainer(){
 	if(!loaded){
-		ADD_WARN_NOLOC("The connected component ID("+to_string(cc.getId())+") was never used.");
+		ADD_WARN_NOLOC("The connected component ID("+to_string(this->ptrn.getId())+") was never used.");
 	}
 }
 
-void InjLazyContainer::loadContainer() const {
-	(*holder) = new InjRandSet(cc);
+template <typename InjType>
+void InjLazyContainer<InjType>::loadContainer() const {
+	(*holder) = new InjRandSet<InjType>(this->ptrn);
 	for(auto& node_p : graph){
 		map<int,InjSet*> port_list;
-		auto inj_p = (*holder)->emplace(*node_p,port_list,state);
+		auto inj_p = (*holder)->emplace(state,node_p,port_list);
 		if(inj_p){
-			if(port_list.empty())
-				node_p->addDep(inj_p);
-			else
-				for(auto port : port_list)
-					port.second->emplace(inj_p);
+			//if(port_list.empty())
+			node_p->addDep(inj_p);
+			//else
+			for(auto port : port_list)
+				port.second->emplace(inj_p);
 		}
 	}
 	loaded = true;
 	//cout << "cc " << cc.getId() << " loaded!" << endl;
 }
 
-const Injection& InjLazyContainer::chooseRandom(RNG& randGen) const {
+template <typename InjType>
+InjType& InjLazyContainer<InjType>::chooseRandom(RNG& randGen) const {
 	loadContainer();
 	auto& re = (*holder)->chooseRandom(randGen);
 	delete this;
 	return re;
 }
-const Injection& InjLazyContainer::choose(unsigned id) const {
+template <typename InjType>
+InjType& InjLazyContainer<InjType>::choose(unsigned id) const {
 	loadContainer();
 	auto& re = (*holder)->choose(id);
 	delete this;
 	return re;
 }
-size_t InjLazyContainer::count() const {
+template <typename InjType>
+size_t InjLazyContainer<InjType>::count() const {
 	loadContainer();
 	auto re = (*holder)->count();
 	delete this;
 	return re;
 }
-FL_TYPE InjLazyContainer::partialReactivity() const {
+template <typename InjType>
+FL_TYPE InjLazyContainer<InjType>::partialReactivity() const {
 	loadContainer();
 	auto re = (*holder)->partialReactivity();
 	delete this;
 	return re;
 }
 
-Injection* InjLazyContainer::emplace(Node& node,map<int,InjSet*> &port_lists,
+/*template <typename InjType>
+InjType* InjLazyContainer<InjType>::emplace(Node& node,map<int,InjSet*> &port_lists,
 		const state::State& state,small_id root) {
 	return nullptr;
 }
-Injection* InjLazyContainer::emplace(Injection* base_inj,map<Node*,Node*>& mask,
+template <typename InjType>
+InjType* InjLazyContainer<InjType>::emplace(Injection* base_inj,map<Node*,Node*>& mask,
 		const state::State& state) {
 	return nullptr;
-}
-void InjLazyContainer::erase(Injection* inj,const simulation::SimContext& context) {}
-void InjLazyContainer::del(Injection* inj) {}
-void InjLazyContainer::clear() {}
+}*/
+template <typename InjType>
+void InjLazyContainer<InjType>::erase(Injection* inj,const simulation::SimContext& context) {}
+template <typename InjType>
+void InjLazyContainer<InjType>::del(Injection* inj) {}
+template <typename InjType>
+void InjLazyContainer<InjType>::clear() {}
 
-void InjLazyContainer::selectRule(int rid,small_id cc) const {}
-FL_TYPE InjLazyContainer::getM2() const {
+template <typename InjType>
+void InjLazyContainer<InjType>::selectRule(int rid,small_id cc) const {}
+template <typename InjType>
+FL_TYPE InjLazyContainer<InjType>::getM2() const {
 	loadContainer();
 	auto re = (*holder)->getM2();
 	delete this;
 	return re;
 }
 
-FL_TYPE InjLazyContainer::sumInternal(const expressions::BaseExpression* aux_func,
+template <typename InjType>
+FL_TYPE InjLazyContainer<InjType>::sumInternal(const expressions::BaseExpression* aux_func,
 		const simulation::SimContext& context) const{
 	loadContainer();
 	auto re = (*holder)->sumInternal(aux_func,state);
@@ -470,16 +652,21 @@ FL_TYPE InjLazyContainer::sumInternal(const expressions::BaseExpression* aux_fun
 	return re;
 }
 
-void InjLazyContainer::fold(const function<void (const Injection*)> func) const {
+template <typename InjType>
+void InjLazyContainer<InjType>::fold(const function<void (const Injection*)> func) const {
 	loadContainer();
 	(*holder)->fold(func);
 	delete this;
 }
 
-void InjLazyContainer::insert(CcInjection* inj,const state::State& state) {}
-CcInjection* InjLazyContainer::newInj() const {return nullptr;}
+template <typename InjType>
+void InjLazyContainer<InjType>::insert(InjType* inj,const state::State& state) {}
+template <typename InjType>
+InjType* InjLazyContainer<InjType>::newInj() const {return nullptr;}
 
-
-
+template class InjLazyContainer<CcInjection>;
+template class InjRandContainer<CcInjection>;
+template class InjRandTree<CcInjection>;
+//template class InjRandTree<CcValueInj>;
 }
 

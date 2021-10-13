@@ -109,6 +109,17 @@ void EventPlot::fill(const state::State& state,const pattern::Environment& env) 
 		//cout << endl;
 		nextPoint += dE;
 	}
+	if(state.isDone() && e > (nextPoint-dE)){
+		file << state.getCounter().getTime();
+		//cout << state.getSim().getId() <<"]\t" << nextPoint;
+		for(auto var : env.getObservables()){
+			file << "\t" << state.getVarValue(var->getId());
+			//cout << "\t" << state.getVarValue(var->getId(), aux_map);
+		}
+		file << endl;
+		//cout << endl;
+		nextPoint += dE;
+	}
 }
 
 void EventPlot::fillBefore(const state::State& state,const pattern::Environment& env) {

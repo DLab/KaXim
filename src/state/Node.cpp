@@ -68,7 +68,7 @@ Node::~Node() {
 	delete deps;
 }
 
-void Node::copyDeps(const Node& node,EventInfo& ev,matching::InjRandContainer** injs,
+void Node::copyDeps(const Node& node,EventInfo& ev,CcInjRandContainer** injs,
 		const State& state) {
 	for(small_id i = 0; i < intfSize; i++){
 		auto& site_deps = node.interface[i]->getDeps();
@@ -143,9 +143,9 @@ template <> void Node::setState(small_id site_id,int value){
 
 void Node::removeFrom(State& state) {
 	state.removeNode(this);
-	for(small_id i = 0; i < intfSize; i++){
+	/*for(small_id i = 0; i < intfSize; i++){
 		interface[i]->negativeUpdate(state.ev,state.injections,state);
-	}
+	}*/
 	InternalState::negativeUpdate(state.ev,state.injections,deps,state);
 	state.ev.side_effects.erase(this);
 #ifdef DEBUG
@@ -245,8 +245,8 @@ void Node::bind(State& state){
 				state.ev.null_actions.emplace(this,-int(state.ev.act.trgt_st)-1);
 				state.ev.null_actions.emplace(lnk.first,-int(trgt_site)-1);
 #ifdef DEBUG
-			if(simulation::Parameters::get().verbose > 2)
-				cout << "[bind] null-action\n";
+				if(simulation::Parameters::get().verbose > 2)
+					cout << "[bind] null-action\n";
 #endif
 				return;
 			}
@@ -501,29 +501,34 @@ void SubNode::bind(State& state){
 
 InjSet* InternalState::EMPTY_INJSET = new InjSet();
 
-void InternalState::negativeUpdate(EventInfo& ev,matching::InjRandContainer** injs,InjSet* deps,const State& state){
+void InternalState::negativeUpdate(EventInfo& ev,InjRandContainer** injs,InjSet* deps,const State& state){
 	auto dep_it = deps->begin(),nxt = dep_it,end = deps->end();
 	while(dep_it != end){//there is still injs to delete
-		auto inj = *dep_it;
+		auto inj = static_cast<matching::CcInjection*>(*dep_it);
 		nxt = next(dep_it);
-		if(inj->isTrashed())//already deleted?
-			deps->erase(dep_it);
+		if(inj->isTrashed()){//already deleted?
+			if(!deps->erase(dep_it))
+				injs[inj->pattern().getId()]->freeInjs.emplace_back(inj);
+		}
 		else{//deleting the injection
-			auto& emb = inj->getEmbedding();
+			auto& emb = *inj->getEmbedding();
 			auto& cc = inj->pattern();
 			for(unsigned i = 0; i < emb.size(); i++){//removing deps for each node pointed by injection
-				if(emb[i]->removeDep(inj))
+				if(!emb[i]->removeDep(inj))
 					continue;//if removed from node-deps, its not in the site-deps
 				auto& mix_ag = cc.getAgent(i);
 				for(auto& site : mix_ag){//removing dep from site depsets
 					if(site.getLinkType() != pattern::Pattern::WILD)
-						emb[i]->getLifts(site.getId()).second->erase(inj);
+						if(!emb[i]->getLifts(site.getId()).second->erase(inj))
+							injs[cc.getId()]->freeInjs.emplace_back(inj);
 					if(site.getValueType() != pattern::Pattern::EMPTY)
-						emb[i]->getLifts(site.getId()).first->erase(inj);
+						if(!emb[i]->getLifts(site.getId()).first->erase(inj))
+							injs[cc.getId()]->freeInjs.emplace_back(inj);
 				}
 			}//for i
+			IF_DEBUG_LVL(4,cout << "Trashing injection: " << cc.toString(state.getEnv()) << endl )
 			injs[cc.getId()]->erase(inj,state);
-			ev.to_update.emplace(&cc);
+			//ev.to_update.emplace(&cc);
 		}//else
 		dep_it = nxt;
 	}
@@ -545,12 +550,12 @@ InternalState::~InternalState(){
 	//cout << "deps count: " << deps.first->size() << " - " << deps.second->size() << endl;
 }
 
-void InternalState::negativeUpdateByValue(EventInfo& ev,matching::InjRandContainer** injs,const State& state){
+void InternalState::negativeUpdateByValue(EventInfo& ev,InjRandContainer** injs,const State& state){
 	throw invalid_argument("calling InternalState::negativeUpdateByValue() is unexpected.");
 	//negativeUpdate(ev,injs,deps.first,state);
 }
 
-void InternalState::negativeUpdateByBind(EventInfo& ev,matching::InjRandContainer** injs,const State& state){
+void InternalState::negativeUpdateByBind(EventInfo& ev,InjRandContainer** injs,const State& state){
 	throw invalid_argument("calling InternalState::negativeUpdateByBind() is unexpected.");
 	//negativeUpdate(ev,injs,deps.second,state);
 }
@@ -563,7 +568,9 @@ void InternalState::setLink(Node* n,small_id i){
 	throw invalid_argument("Calling InternalState::setLink() is unexpected.");
 }
 pair<Node*,small_id> InternalState::getLink() const{
-	throw invalid_argument("Calling InternalState::getLink() is unexpected.");
+	static pair<Node*,small_id> empty(nullptr,0);
+	return empty;
+	//throw invalid_argument("Calling InternalState::getLink() is unexpected.");
 }
 
 /************ class ValueState *****************/
@@ -590,11 +597,11 @@ SomeValue ValueState::getValue() const{
 	return value;
 }
 
-void ValueState::negativeUpdate(EventInfo& ev,matching::InjRandContainer** injs,const State& state){
+void ValueState::negativeUpdate(EventInfo& ev,InjRandContainer** injs,const State& state){
 	InternalState::negativeUpdate(ev,injs,deps.first,state);
 }
 
-void ValueState::negativeUpdateByValue(EventInfo& ev,matching::InjRandContainer** injs,const State& state){
+void ValueState::negativeUpdateByValue(EventInfo& ev,InjRandContainer** injs,const State& state){
 	InternalState::negativeUpdate(ev,injs,deps.first,state);
 }
 
@@ -646,7 +653,7 @@ InternalState* BindState::clone(const map<Node*,Node*>& mask) const {
 	return st;
 }
 
-void BindState::negativeUpdate(EventInfo& ev,matching::InjRandContainer** injs,const State& state){
+void BindState::negativeUpdate(EventInfo& ev,InjRandContainer** injs,const State& state){
 	InternalState::negativeUpdate(ev,injs,deps.second,state);
 	/*if(target.first){
 		target.first->setInternalLink(target.second,nullptr,0);
@@ -655,7 +662,7 @@ void BindState::negativeUpdate(EventInfo& ev,matching::InjRandContainer** injs,c
 	}*/
 }
 
-void BindState::negativeUpdateByBind(EventInfo& ev,matching::InjRandContainer** injs,const State& state){
+void BindState::negativeUpdateByBind(EventInfo& ev,InjRandContainer** injs,const State& state){
 	InternalState::negativeUpdate(ev,injs,deps.second,state);
 }
 
@@ -705,7 +712,7 @@ InternalState* ValueBindState::clone(const map<Node*,Node*>& mask) const {
 	return st;
 }
 
-void ValueBindState::negativeUpdate(EventInfo& ev,matching::InjRandContainer** injs,const State& state){
+void ValueBindState::negativeUpdate(EventInfo& ev,InjRandContainer** injs,const State& state){
 	negativeUpdateByValue(ev,injs,state);
 	negativeUpdateByBind(ev,injs,state);
 }
@@ -776,7 +783,7 @@ string SubNode::toString(const pattern::Environment &env,bool show_binds,map<con
  ******* EventInfo **************
  ********************************/
 
-EventInfo::EventInfo() : emb(nullptr),cc_count(0) {//,aux_map(emb) {
+EventInfo::EventInfo() : emb(nullptr),is_unary(false),cc_count(0) {//,aux_map(emb) {
 	//TODO these numbers are arbitrary!!
 	emb = new vector<Node*>[4];
 	for(int i = 0; i < 4 ; i++)
@@ -791,6 +798,7 @@ EventInfo::~EventInfo(){
 }
 
 void EventInfo::clear(){
+	is_unary = false;
 	side_effects.clear();
 	pert_ids.clear();
 	new_cc.clear();
@@ -800,6 +808,7 @@ void EventInfo::clear(){
 	//aux_map.clear();
 	//fresh_emb.clear();
 	null_actions.clear();
+	new_injs.clear();
 	//cc_count = _cc_count;
 }
 
