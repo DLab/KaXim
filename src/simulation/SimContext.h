@@ -19,12 +19,18 @@ template <typename T> class Auxiliar;
 }
 
 namespace matching {
+template <typename T>
 class InjRandContainer;
+class CcInjection;
+class MixInjection;
 }
+
+typedef matching::InjRandContainer<matching::CcInjection> CcInjRandContainer;
+typedef matching::InjRandContainer<matching::MixInjection> MixInjRandContainer;
 
 namespace simulation {
 
-
+using namespace std;
 
 class SimContext {
 protected:
@@ -100,11 +106,17 @@ public:
 		return FL_TYPE(0.0);
 	}
 
-	virtual matching::InjRandContainer& getInjContainer(int cc_id) {
+	virtual CcInjRandContainer& getInjContainer(int cc_id) {
 		throw invalid_argument("SimContext::getInjContainer(): invalid context.");
 	}
-	virtual const matching::InjRandContainer& getInjContainer(int cc_id) const {
+	virtual const CcInjRandContainer& getInjContainer(int cc_id) const {
 		throw invalid_argument("SimContext::getInjContainer(): invalid context.");
+	}
+	virtual MixInjRandContainer& getMixInjContainer(int cc_id) {
+		throw invalid_argument("SimContext::getMixInjContainer(): invalid context.");
+	}
+	virtual const MixInjRandContainer& getMixInjContainer(int cc_id) const {
+		throw invalid_argument("SimContext::getMixInjContainer(): invalid context.");
 	}
 	virtual FL_TYPE getTokenValue(unsigned id) const {
 		throw invalid_argument("SimContext::getTokenValue(): invalid context.");

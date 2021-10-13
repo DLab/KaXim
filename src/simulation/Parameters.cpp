@@ -24,7 +24,9 @@ Parameters::Parameters() : options(nullptr),outputFile("sim"),outputFileType("ts
 #endif
 }
 
-void Parameters::makeOptions(const string &msg){
+void Parameters::makeOptions(const string &v,const string &u,const string &msg){
+	version = v;
+	usage = u;
 	options = new options_description(msg);
 
 	//allowed options
@@ -67,7 +69,11 @@ void Parameters::evalOptions(int argc, char* argv[]){
 	}
 
 	if (vm.count("help")) {
-		cout << *options << "\n";
+		cout << version << "\n" << usage << "\n\n" << *options << "\n";
+		exit(0);
+	}
+	else if(vm.count("version")){
+		cout << version << endl;
 		exit(0);
 	}
 

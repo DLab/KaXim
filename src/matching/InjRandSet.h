@@ -9,6 +9,7 @@
 #define SRC_MATCHING_INJRANDSET_H_
 
 #include "Injection.h"
+#include "CcInjection.h"
 #include "../data_structs/DistributionTree.h"
 #include "../simulation/Rule.h"
 
@@ -19,30 +20,60 @@ namespace matching {
 
 //using Node = state::Node;
 
+template <typename InjType>
 class InjRandContainer {
+	friend class state::InternalState;
 protected:
-	list<CcInjection*> freeInjs;
-	const pattern::Pattern::Component& cc;
-	virtual void insert(CcInjection* inj,const state::State& state) = 0;
-	virtual void del(Injection* inj) = 0;
-	virtual CcInjection* newInj() const = 0;
+	list<InjType*> freeInjs;			///> Empty-object pool to avoid construction
+	const pattern::Pattern& ptrn;	///> Pattern of the injections stored
 
+	/** SUMS */
 	mutable unordered_map<const expressions::BaseExpression*,FL_TYPE&> trackedSums;
 	mutable list<pair<const expressions::BaseExpression*,FL_TYPE>> sumList;
+
+	/** \brief introduce a new injection in the container. */
+	virtual void insert(InjType* inj,const state::State& state) = 0;
+	/** \brief deletes the injection from the container. */
+	virtual void del(Injection* inj) = 0;
+	/** @returns a new empty injection (not from the pool). */
+	virtual InjType* newInj() const = 0;
+
 public:
 
-	InjRandContainer(const pattern::Pattern::Component& _cc);
+	InjRandContainer(const pattern::Pattern& _ptrn);
 	virtual ~InjRandContainer();
-	virtual const Injection& chooseRandom(RNG& randGen) const = 0;
-	virtual const Injection& choose(unsigned id) const  = 0;
+	virtual InjType& chooseRandom(RNG& randGen) const = 0;
+	virtual InjType& choose(unsigned id) const  = 0;
 	virtual size_t count() const = 0;
 	virtual FL_TYPE partialReactivity() const = 0;
 
-	virtual Injection* emplace(Node& node,map<int,InjSet*> &port_list,
-			const state::State& state,small_id root = 0);
-	virtual Injection* emplace(Injection* base_inj,map<Node*,Node*>& mask,
+	template <typename... Args>
+	InjType* emplace(const state::State& state, Args&... args){
+		InjType* inj;
+		if(freeInjs.empty()){
+			inj = newInj();
+			if(inj == nullptr)
+				return nullptr;
+		}
+		else {
+			inj = freeInjs.front();
+			freeInjs.pop_front();
+		}
+		CcEmbMap<expressions::Auxiliar,FL_TYPE,Node> cc_map(*inj->getEmbedding());
+		state.setAuxMap(&cc_map);
+		if(inj->reuse(state,args...) == false)
+			return nullptr;
+		insert(inj,state);
+
+		for(auto& s : sumList)
+			s.second += inj->evalAuxExpr(state,s.first);
+
+		return inj;
+	}
+	virtual InjType* emplace(Injection* base_inj,map<Node*,Node*>& mask,
 			const state::State& state);
 	inline virtual void erase(Injection* inj,const simulation::SimContext& context);
+	//inline virtual void erase(unsigned address,const simulation::SimContext& context);
 	virtual void clear() = 0;
 
 	virtual void selectRule(int rid,small_id cc) const;
@@ -57,18 +88,18 @@ public:
 	virtual void fold(const function<void (const Injection*)> func) const = 0;
 };
 
-
-class InjRandSet : public InjRandContainer {
+template <typename InjType>
+class InjRandSet : public InjRandContainer<InjType> {
 	size_t counter;
 	size_t multiCount;
-	vector<CcInjection*> container;
-	void insert(CcInjection* inj,const state::State& state) override;
-	virtual CcInjection* newInj() const override;
+	vector<InjType*> container;
+	void insert(InjType* inj,const state::State& state) override;
+	virtual InjType* newInj() const override;
 public:
-	InjRandSet(const pattern::Pattern::Component& _cc);
+	InjRandSet(const pattern::Pattern& _cc);
 	~InjRandSet();
-	const Injection& chooseRandom(RNG& randGen) const override;
-	const Injection& choose(unsigned id) const override;
+	InjType& chooseRandom(RNG& randGen) const override;
+	InjType& choose(unsigned id) const override;
 	size_t count() const override;
 	virtual FL_TYPE partialReactivity() const;
 
@@ -86,12 +117,45 @@ public:
 };
 
 
-class InjRandTree : public InjRandContainer {
+template <>
+class InjRandSet<MixInjection> : public InjRandContainer<MixInjection> {
+	InjRandSet<MixInjection>* next;
+	size_t counter;
+	size_t multiCount;
+	vector<MixInjection*> container;
+	int radius;				///> max-radius this container can store
+	void insert(MixInjection* inj,const state::State& state) override;
+	virtual MixInjection* newInj() const override;
+public:
+	InjRandSet(const pattern::Mixture& mix,InjRandSet<MixInjection>* nxt = nullptr);
+	~InjRandSet();
+	MixInjection& chooseRandom(RNG& randGen) const override;
+	MixInjection& choose(unsigned id) const override;
+	size_t count() const override;
+	virtual FL_TYPE partialReactivity() const;
+
+	/*Injection* emplace(Node& node,two<std::list<state::Internal*> > &port_lists,
+			const state::State& state,small_id root = 0) override;*/
+	//MixInjection* emplace(Injection* inj1,Injection* inj2,int d) override;
+	void del(Injection* inj) override;
+	virtual void clear() override;
+
+	//FL_TYPE sumInternal(const expressions::BaseExpression* aux_func,
+	//		const expressions::EvalArgs& args) const override;
+	virtual void fold(const function<void (const Injection*)> func) const;
+	//vector<CcInjection*>::iterator begin();
+	//vector<CcInjection*>::iterator end();
+};
+
+
+
+template <typename InjType>
+class InjRandTree : public InjRandContainer<InjType> {
 	static const float MAX_INVALIDATIONS;//3%
 	//list<FL_TYPE> hints;
 
 	//list<CcInjection*> freeInjs;
-	list<CcInjection*> infList;
+	list<InjType*> infList;
 
 	/** \brief A root of the rule-rate associated with a CC	 */
 	struct Root {
@@ -112,14 +176,14 @@ class InjRandTree : public InjRandContainer {
 
 	mutable pair<int,small_id> selected_root;
 
-	void insert(CcInjection *inj,const state::State& state) override;
-	virtual CcInjection* newInj() const override;
+	void insert(InjType *inj,const state::State& state) override;
+	virtual InjType* newInj() const override;
 
 public:
 	InjRandTree(const pattern::Pattern::Component& cc,const vector<simulation::Rule::Rate*>& rates);
 	~InjRandTree();
-	const Injection& chooseRandom(RNG& randGen) const override;
-	const Injection& choose(unsigned id) const override;
+	InjType& chooseRandom(RNG& randGen) const override;
+	InjType& choose(unsigned id) const override;
 	size_t count() const override;
 	virtual FL_TYPE partialReactivity() const override;
 
@@ -138,33 +202,33 @@ public:
 };
 
 
-
-class InjLazyContainer : public InjRandContainer {
+template <typename InjType>
+class InjLazyContainer : public InjRandContainer<InjType> {
 	const state::State& state;
 	const state::SiteGraph& graph;
-	mutable InjRandContainer **holder;
+	mutable InjRandContainer<InjType> **holder;
 	mutable bool loaded;
 
 	void loadContainer() const;
 
 
-	virtual void insert(CcInjection* inj,const state::State& state) override;
-	virtual CcInjection* newInj() const override;
+	virtual void insert(InjType* inj,const state::State& state) override;
+	virtual InjType* newInj() const override;
 
 public:
 	InjLazyContainer(const pattern::Mixture::Component& cc,const state::State& state,
-			const state::SiteGraph& graph,InjRandContainer *&holder);
+			const state::SiteGraph& graph,InjRandContainer<InjType> *&holder);
 	~InjLazyContainer();
 
-	virtual const Injection& chooseRandom(RNG& randGen) const override;
-	virtual const Injection& choose(unsigned id) const override;
+	virtual InjType& chooseRandom(RNG& randGen) const override;
+	virtual InjType& choose(unsigned id) const override;
 	virtual size_t count() const override;
 	virtual FL_TYPE partialReactivity() const override;
 
-	virtual Injection* emplace(Node& node,map<int,InjSet*> &port_lists,
+	/*virtual InjType* emplace(Node& node,map<int,InjSet*> &port_lists,
 			const state::State& state,small_id root = 0) override;
-	virtual Injection* emplace(Injection* base_inj,map<Node*,Node*>& mask,
-			const state::State& state) override;
+	virtual InjType* emplace(Injection* base_inj,map<Node*,Node*>& mask,
+			const state::State& state) override;*/
 	virtual void erase(Injection* inj,const simulation::SimContext& context) override;
 	virtual void del(Injection* inj) override;
 	virtual void clear() override;
@@ -179,15 +243,17 @@ public:
 };
 
 
-
-inline void InjRandContainer::erase(Injection* inj,const simulation::SimContext& context){
+template <typename InjType>
+inline void InjRandContainer<InjType>::erase(Injection* inj,const simulation::SimContext& context){
 	for(auto& s : sumList)
 		s.second -= inj->evalAuxExpr(context,s.first);
 	del(inj);
-	freeInjs.push_back(static_cast<CcInjection*>(inj));
+	//freeInjs.push_back(static_cast<InjType*>(inj));
 	inj->dealloc();//dealloc
 }
 
+//template <>
+//void InjRandTree<CcValueInj>::insert(CcValueInj* inj,const state::State& state);
 
 }
 

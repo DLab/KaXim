@@ -77,7 +77,7 @@ public:
 		RAND_1,SIM_TIME,CPUTIME,ACTIVITY,		///< FLOAT
 		RUN_ID,SIM_EVENT,NULL_EVENT,PROD_EVENT,	///< INT
 		END_SIM									///< BOOL
-	};
+	};//check histogram if new bool nullary
 	/** \brief Dependencies that an expression can have. */
 	enum VarDep {
 		CONSTS = 1,RUN = 2,AUX = 4,SPATIAL = 8,TIME = 16,EVENT = 32,RAND = 64,VARDEP = 128

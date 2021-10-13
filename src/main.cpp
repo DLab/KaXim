@@ -31,7 +31,7 @@ using namespace simulation;
 using namespace std;
 
 int main(int argc, char* argv[]){
-	const string version("2.1.04");
+	const string version("2.2.09");
 	const string v_msg("KaXim "+version);
 	const string usage_msg("Simple usage is \n$ "
 			"KaXim ([-i] kappa_file)+ -t time [-p points] [-r runs]");
@@ -43,7 +43,7 @@ int main(int argc, char* argv[]){
 
 	//eval given arguments to the program
 	auto& params = simulation::Parameters::singleton;
-	params.makeOptions(v_msg + "\n" + usage_msg + "\n\nAllowed options");
+	params.makeOptions(v_msg,usage_msg,"Allowed options");
 	params.evalOptions(argc, argv);
 
 	//Reading kappa-model files (if any)
@@ -80,7 +80,7 @@ int main(int argc, char* argv[]){
 		ast.evaluateInits(env,base_context);
 	}
 	catch(const exception &e){
-		cerr << "An exception found while building the environment:\n" << e.what() << endl;
+		cerr << "An exception found while building the environment.\n" << e.what() << endl;
 		exit(1);
 	}
 	env.buildFreeSiteCC();
@@ -134,14 +134,14 @@ int main(int argc, char* argv[]){
 #	pragma omp parallel for
 	for(int i = 0; i < params.runs; i++){
 		Simulation sim(base_context,i);
-		try{
+		//try{
 			sim.initialize(cells,ast);
-		}
+		/*}
 		catch(const exception &e){
 			cerr << "An exception found on initialization of simulation["
 					<< i << "]: " << e.what() << endl;
 			exit(1);
-		}
+		}*/
 
 		if(i == 0)
 			WarningStack::getStack().show();

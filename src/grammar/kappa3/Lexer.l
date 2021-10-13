@@ -117,7 +117,7 @@ real		([0-9]+\.[0-9]*|[0-9]*\.[0-9]+)(([eE][+-][0-9]+)|([eE][0-9]+))?
 	else if(!strcmp(yytext,"$SNAPSHOT"))
 		return Parser::make_SNAPSHOT(loc);
 	else if(!strcmp(yytext,"$HISTOGRAM"))
-		return Parser::make_SNAPSHOT(loc);
+		return Parser::make_HIST(loc);
 	else if(!strcmp(yytext,"$STOP"))
 		return Parser::make_STOP(loc);
 	else if(!strcmp(yytext,"$FLUX"))

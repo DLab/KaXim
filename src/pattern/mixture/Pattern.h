@@ -65,7 +65,8 @@ public:
 	virtual void addInclude(small_id id){
 		includes.emplace(id);
 	}
-	virtual string toString(const Environment& env) const = 0;
+	virtual ag_st_id follow(small_id ag_id,small_id site) const = 0;
+	virtual string toString(const Environment& env,int mark = -1) const = 0;
 };
 
 class Mixture;

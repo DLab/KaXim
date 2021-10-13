@@ -6,7 +6,7 @@
  */
 
 #include "DistributionTree.h"
-#include "../matching/Injection.h"
+#include "../matching/CcInjection.h"
 #include <iostream>
 #include <string>
 #include <algorithm>
@@ -177,7 +177,7 @@ void Node<T>::decrease(FL_TYPE val,unsigned n){
 }
 
 template <typename T>
-const T& Node<T>::choose(FL_TYPE sel) const {
+T& Node<T>::choose(FL_TYPE sel) const {
 	if(smaller){
 		if(sel < smaller->total())
 			return smaller->choose(sel);
@@ -201,8 +201,28 @@ const T& Node<T>::choose(FL_TYPE sel) const {
 }
 
 template <typename T>
-const pair<T*,FL_TYPE>& Node<T>::choose(unsigned sel) const {
-	throw std::invalid_argument("Node<T>::choose() not available");
+pair<T*,FL_TYPE> Node<T>::choose(unsigned sel) const {
+	//throw std::invalid_argument("Node<T>::choose() not available");
+	if(smaller){
+		if(sel < smaller->count())
+			return smaller->choose(sel);
+		else
+			sel -= smaller->count();
+	}
+	if(greater){
+		if(sel < greater->count())
+			return greater->choose(sel);
+		else
+			sel -= greater->count();
+	}
+	for(auto inj : multi_injs){
+		auto r_multi = inj->count();
+		if(sel < r_multi)
+			return make_pair(inj,this->value);
+		else
+			sel -= r_multi;
+	}
+	return make_pair(this->injs[sel],this->value);
 }
 
 template <typename T>
@@ -456,7 +476,7 @@ void Leaf<T>::clear(list<T*>* free){
 }
 
 template <typename T>
-const T& Leaf<T>::choose(FL_TYPE sel) const {
+T& Leaf<T>::choose(FL_TYPE sel) const {
 	/*auto p = injs[int(count() * sel / this->sum)].first;
 	if(p == nullptr){
 		std::cout << "BAD!!!" << std::endl;
@@ -467,7 +487,7 @@ const T& Leaf<T>::choose(FL_TYPE sel) const {
 
 
 template <typename T>
-const pair<T*,FL_TYPE>& Leaf<T>::choose(unsigned i) const {
+pair<T*,FL_TYPE> Leaf<T>::choose(unsigned i) const {
 	return injs[i];
 }
 
@@ -518,6 +538,14 @@ bool Leaf<T>::testBalance() const {
 template class DistributionTree<matching::CcValueInj>;
 template class Node<matching::CcValueInj>;
 template class Leaf<matching::CcValueInj>;
+/*
+template class DistributionTree<matching::CcInjection>;
+template class Node<matching::CcInjection>;
+template class Leaf<matching::CcInjection>;
 
+template class DistributionTree<matching::MixInjection>;
+template class Node<matching::MixInjection>;
+template class Leaf<matching::MixInjection>;
+*/
 }
 

@@ -62,7 +62,7 @@
 %token END NEWLINE SEMICOLON
 %token SIGNATURE INIT LET CONST PARAMS PARAM ASSIGN ASSIGN2 APPLY
 %token AT ATD FIX OP_CUR CL_CUR OP_PAR CL_PAR OP_BRA CL_BRA COMMA DOTS DOT TYPE LAR KAPPA_RAR JOIN FREE
-%token PERT DO UNTIL INTRO DELETE SET PLOT OBS TRACK CONFIG REPEAT DIFF PRINT PRINTF STOP SNAPSHOT
+%token PERT DO UNTIL INTRO DELETE SET PLOT OBS TRACK CONFIG REPEAT DIFF PRINT PRINTF STOP SNAPSHOT HIST
 %token KAPPA_WLD KAPPA_SEMI KAPPA_INTER KAPPA_VALUE 
 %token FLUX TOKEN KAPPA_LNK PIPE KAPPA_LRAR  /*CAT VOLUME*/
 %token <std::string> ID LABEL KAPPA_MRK NAME 
@@ -88,7 +88,7 @@
 
 %type <Declaration>				variable_declaration
 %type <std::list<Id>>			variable_list
-%type <Expression*>				alg_expr bool_expr constant variable where_expr
+%type <Expression*>				alg_expr bool_expr constant variable where_expr opt_param
 %type <bool>					rate_sep boolean join arrow
 %type <std::list<std::string>>			value_list
 %type <SiteState>				internal_state
@@ -107,7 +107,7 @@
 %type <std::list<StringExpression>>		print_expr print_expr_list
 %type <Effect>					effect
 %type <std::list<Effect>>			effect_list
-%type <Radius>					alg_with_radius   
+%type <two<const Expression*>>					alg_with_radius   
 %type <Rate>					rate
 %type <Pert*>				perturbation_declaration
 %type <std::list<Token>>			sum_token token_expr
@@ -351,16 +351,23 @@ effect:
 	{}
 | SNAPSHOT print_expr_list non_empty_mixture alg_expr
 	{}*/
-| SNAPSHOT OP_PAR alg_expr CL_PAR print_expr_list OP_BRA variable_list CL_BRA
-	{ $$ = Effect(@$,$5,VarValue(@3,Id(@2,"bins"),$3),$7);}
-| SNAPSHOT OP_PAR alg_expr CL_PAR print_expr_list OP_CUR alg_expr CL_CUR OP_BRA variable_list CL_BRA 
-	{ $$ = Effect(@$,$5,VarValue(@3,Id(@2,"bins"),$3),$10,$7);}
+| HIST opt_param print_expr_list OP_BRA variable_list CL_BRA
+	{ $$ = Effect(@$,$3,VarValue(@2,Id(@2,"bins"),$2),$5);}
+| HIST opt_param print_expr_list OP_CUR alg_expr CL_CUR OP_BRA variable_list CL_BRA 
+	{ $$ = Effect(@$,$3,VarValue(@2,Id(@2,"bins"),$2),$8,$5);}
 | PRINT print_expr_list 
 	{ $$ = Effect(@$,Effect::PRINT,$2); }
 | PRINTF print_expr_list print_expr_list 
 	{ $$ = Effect(@$,Effect::PRINTF,$2,$3); }
 ;
 
+opt_param:
+	{ $$ = nullptr; }
+| OP_PAR CL_PAR
+	{ $$ = nullptr; }
+| OP_PAR alg_expr CL_PAR
+	{ $$ = $2; }
+;
 
 print_expr_list: // list
   STRING
@@ -640,7 +647,7 @@ alg_expr:
 
 rate:
   rate_sep alg_expr OP_PAR alg_with_radius CL_PAR 
-	{$$=Rate(@$,$2,$1,&$4);}
+	{$$=Rate(@$,$2,$1,$4);}
 | rate_sep alg_expr 
 	{$$=Rate(@$,$2,$1);}
 | rate_sep alg_expr COMMA alg_expr 
@@ -649,8 +656,8 @@ rate:
 
 
 alg_with_radius:
-  alg_expr {$$=Radius(@$,$1);}
-| alg_expr TYPE alg_expr {$$=Radius(@$,$1,$3);}
+  alg_expr {$$=two<const Expression*>($1,nullptr);}
+| alg_expr TYPE alg_expr {$$=two<const Expression*>($1,$3);}
 ;
 
 /*

@@ -64,12 +64,16 @@ protected:
 	vector<Compartment> compartments;
 	vector<list<Channel> > channels;
 	vector<UseExpression> useExpressions;
-	list<Mixture*> mixtures;
-	list<Mixture::Component*> components;
+	vector<Mixture*> mixtures;
+	vector<Mixture::Component*> components;
 	vector<list<Mixture::Agent*> > agentPatterns;
 	vector<simulation::Rule> rules;
+	map<int,list<two<int>>> unaryCC;			///> cc_id[0] -> [radius,cc_id[1]]
+	map<two<int>,list<two<int>>> unaryMix;		///> (cc1,cc2) -> [radius,mix_id]
+	int max_radius;
 	vector<simulation::Perturbation*> perts;
 	list<state::Variable*> observables;
+	multimap<two<int>,pair<const Pattern::Component&,small_id>> auxSiteDeps;
 	map<string,tuple<Mixture*,small_id,small_id>> auxTemp;
 	map<const Mixture*,list<expressions::Auxiliar<FL_TYPE>*>> auxExpressions;
 	mutable Dependencies deps;//mutable because [] accessing
@@ -122,6 +126,7 @@ public:
 	void declareAgentPattern(Mixture::Agent* &new_agent);
 	simulation::Rule& declareRule(const grammar::ast::Id &name,Mixture& mix,
 			const yy::location& loc);
+	void declareUnaryMix(Mixture& mix,int radius);
 	void declarePert(simulation::Perturbation* pert);
 
 	void declareMixInit(int use_id,expressions::BaseExpression* n,Mixture* mix);
@@ -129,6 +134,12 @@ public:
 
 	void declareObservable(state::Variable* obs);
 
+	void addAuxSiteInfl(int ag_id, int st_id,small_id ag_pos,const Pattern::Component& cc){
+		auxSiteDeps.emplace(make_pair(ag_id,st_id),pair<const Pattern::Component&,small_id>(cc,ag_pos));
+	}
+	auto getAuxSiteInfl(two<int> ag_st) const {
+		return auxSiteDeps.equal_range(ag_st);
+	}
 	void buildInfluenceMap(const simulation::SimContext &context);
 	void buildFreeSiteCC();
 	const list<pair<const Mixture::Component*,small_id> >& getFreeSiteCC(small_id ag,small_id site) const;
@@ -142,10 +153,22 @@ public:
 	const Compartment& getCompartment(short id) const;
 	const UseExpression& getUseExpression(short id) const;
 	//const Mixture& getMixture(small_id id) const;
-	const list<Mixture*>& getMixtures() const;
-	const list<Mixture::Component*>& getComponents() const;
+	const vector<Mixture*>& getMixtures() const;
+	const vector<Mixture::Component*>& getComponents() const;
 	const list<Mixture::Agent*>& getAgentPatterns(small_id id) const;
 	const vector<simulation::Rule>& getRules() const;
+	/** \brief The list of unary CCs, the radius and the CC pair.
+	 *
+	 * @returns a map of [unary-cc1-id] -> { (radius,cc2-id) }  */
+	auto& getUnaryCCs() const{
+		return unaryCC;
+	}
+	auto& getUnaryMixtures() const {
+		return unaryMix;
+	}
+	int getMaxRadius() const {
+		return max_radius;
+	}
 	const vector<simulation::Perturbation*>& getPerts() const;
 	const list<Init>& getInits() const;
 	const list<state::Variable*>& getObservables() const;

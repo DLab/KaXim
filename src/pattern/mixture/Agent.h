@@ -10,7 +10,7 @@
 
 #include "Pattern.h"
 #include "../../grammar/location.hh"
-#include "../../matching/Injection.h"
+//#include "../../matching/Injection.h"
 #include "../Action.h"
 
 
@@ -18,13 +18,17 @@ namespace state {
 class Node;
 class InternalState;
 }
-
+namespace matching {
+class Injection;
+class InjSet;
+}
 namespace pattern {
 
 class Environment;
 
 using InjSet = matching::InjSet;
 
+//typedef set<matching::Injection*> InjSet;
 
 
 

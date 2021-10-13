@@ -18,7 +18,7 @@ namespace pattern {
 
 /***************** class Mixture ************************/
 
-Mixture::Mixture(short agent_count,yy::location _loc) : loc(_loc),id(-1){
+Mixture::Mixture(short agent_count,yy::location _loc) : loc(_loc),radius(0),id(-1){
 	agents.reserve(agent_count);
 }
 
@@ -50,9 +50,9 @@ Mixture::~Mixture() {
 void Mixture::setId(short_id i){
 	id = i;
 }
-const short_id& Mixture::getId() const {
+/*const short_id& Mixture::getId() const {
 	return id;
-}
+}*/
 void Mixture::addAgent(Mixture::Agent *a){
 	if(isSet())
 		throw std::invalid_argument("Mixture::addAgent(): "
@@ -95,10 +95,13 @@ void Mixture::declareComponents(Environment &env){
 			mixAgPos[pos_coords.second] = pos_coords.first;
 		cc_pos++;
 	}
-	for(auto& coord : auxCoords){
-		auto ag_pos = coord.second.ag_pos;
-		coord.second.cc_pos = ccAgPos.at(ag_pos).first;
-		coord.second.ag_pos = ccAgPos.at(ag_pos).second;
+	for(auto& aux_coord : auxCoords){
+		auto& coord = aux_coord.second;
+		auto ag_pos = coord.ag_pos;
+		coord.cc_pos = ccAgPos.at(ag_pos).first;
+		coord.ag_pos = ccAgPos.at(ag_pos).second;
+		if(coord.is_ptrn)
+			env.addAuxSiteInfl(getAgent(ag_pos).getId(),coord.st_id,coord.ag_pos,*comps[coord.cc_pos]);
 	}
 	for(auto aux : auxRefs)
 		aux->coords = auxCoords.at(aux->toString());
@@ -204,7 +207,17 @@ Mixture::Component& Mixture::getComponent(small_id cc_pos) {
 }
 
 bool Mixture::addAuxCoords(string aux_name,small_id agent_pos,small_id site_id) {
-	return auxCoords.emplace(aux_name,AuxCoord{0,agent_pos,site_id}).second;
+	auto aux_it = auxCoords.find(aux_name);
+	if(aux_it != auxCoords.end()){	//aux_name was declared before
+		auto& coord = aux_it->second;
+		if(coord.cc_pos != small_id(-1)) { //aux_name was used in other site pattern-value
+			coord.cc_pos = 0;coord.ag_pos = agent_pos;
+			coord.st_id = site_id;
+			return true;
+		}
+		return false;//aux_name used before in same mixture
+	}
+	return auxCoords.emplace(aux_name,AuxCoord{0,agent_pos,site_id,false}).second;
 }
 
 void Mixture::addAuxRef(expressions::Auxiliar<FL_TYPE>* expre) const {
@@ -234,12 +247,12 @@ const vector<Pattern::Component*>::const_iterator Mixture::end() const {
 	return comps.end();
 }
 
-string Mixture::toString(const Environment& env) const {
+string Mixture::toString(const Environment& env,int mark) const {
 	string out;
 	short i = 0;
 	if(comps.size())
 		for( auto c : comps ) {
-			out += " {" + c->toString(env) + "},";
+			out += " {" + c->toString(env,mark) + "},";
 			i++;
 		}
 	else

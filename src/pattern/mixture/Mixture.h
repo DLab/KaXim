@@ -32,16 +32,17 @@ using namespace std;
  * Then setComponents(env) must be called to end initialization and declare components
  * in the environment. After that, the mixture is ready to be declare in the environment.
  * Any attempt to add links or agents to the mixture after setComponents() will
- * throw exceptions.
- */
+ * throw exceptions.  */
 class Mixture : public Pattern {
 public:
 	using Agent = Pattern::Agent;
 	using Site = Pattern::Site;
 	using LinkType = Pattern::LinkType;
+	static const int MAX_RADIUS = 100;
 
 	struct AuxCoord{
 		small_id cc_pos,ag_pos,st_id;
+		bool is_ptrn;	///> This aux is used in a pattern expression of other site (in the same cc?).
 		bool operator==(const AuxCoord& c) const {
 			return cc_pos == c.cc_pos && ag_pos == c.ag_pos
 					&& st_id == c.st_id;
@@ -58,7 +59,27 @@ public:
 	~Mixture();
 
 	void setId(short_id id);
-	const short_id& getId() const override;
+	const short_id& getId() const override {
+		return id;
+	}
+
+	void setRadius(int r) {
+		radius = r;
+	}
+	const int getRadius() const {
+		return radius;
+	}
+	pair<int,int> getUnaryKey() const {
+		return make_pair(comps[0]->getId(),comps[1]->getId() );
+	}
+/*#ifdef DEBUG
+		if(compsCount() < 2)
+			throw invalid_argument("Mixture::getUnaryKey(): invalid call.");
+#endif
+		return comps[0]->getId() < comps[1]->getId() ?
+				make_pair(comps[0]->getId(),comps[1]->getId() ):
+				make_pair(comps[1]->getId(),comps[0]->getId() );
+	}*/
 
 	/** \brief Declare an auxiliary variable for this Mixture.
 	 * @param aux_name auxiliary variable name.
@@ -66,6 +87,15 @@ public:
 	 * @param site_id the signature-id of the agent's site.
 	 * @returns false if the aux is already declared in Mixture.		*/
 	bool addAuxCoords(string aux_name,small_id agent_pos,small_id site_id);
+
+	void setPatternAux(string aux_name){
+		auto aux_it = auxCoords.find(aux_name);
+		if(aux_it == auxCoords.end())
+			auxCoords.emplace(aux_name,AuxCoord{small_id(-1),small_id(0),small_id(0),true});
+		else {
+			aux_it->second.is_ptrn = true;
+		}
+	}
 
 	/** \brief Returns a const reference to the coordinates of an Auxiliary variable.
 	 * @param aux_name auxiliary variable name.
@@ -148,6 +178,14 @@ public:
 	ag_st_id follow(ag_st_id cc_ag_pos,small_id site) const {
 		return comps[cc_ag_pos.first]->follow(cc_ag_pos.second,site);
 	}
+	ag_st_id follow(small_id agpos, small_id site) const override {
+		auto cc_ag_pos(ccAgPos.at(agpos));
+		return comps[cc_ag_pos.first]->follow(cc_ag_pos.second,site);
+	}
+
+	inline const map<string,AuxCoord>& getAuxCoords() const {
+		return auxCoords;
+	}
 
 	/** \brief Returns the number of agents added.	 */
 	inline size_t size() const {return agents.size();};
@@ -159,12 +197,13 @@ public:
 	/** \brief returns a string representation of this mixture.
 	 *
 	 * @param env the environment of simulation.	 */
-	string toString(const Environment &env) const;
+	string toString(const Environment &env,int mark = -1) const;
 	string toString(const Environment &env,const vector<ag_st_id> &mask) const;
 
 private:
 	vector<Agent*> agents;				///< Mixture's agents. The order is important for LHS
 	vector<Component*> comps;			///< Connected components are created with setComponents() methods.
+	int radius;							///< CC's max distance to be unary.
 	map<small_id,ag_st_id> ccAgPos;		///< agent-position -> (cc-position,agent-position in cc)
 	map<ag_st_id,small_id> mixAgPos;	///< (cc-position,agent-position in cc) -> agent-position
 	map<string,AuxCoord> auxCoords;		///< every Auxiliary declared in the mixture.

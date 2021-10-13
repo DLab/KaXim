@@ -42,13 +42,15 @@ class Parameters {
 	Parameters();
 	/** \brief Constructs the boost::option_description object to evaluate program arguments.
 	 */
-	void makeOptions(const string &msg);
+	void makeOptions(const string &v,const string &u,const string &msg);
 
 	/** \brief Set simulation parameters from arguments vector.
 	 */
 	void evalOptions(int argc, char* argv[]);
 public:
 	options_description *options;	//!< boost object to manipulate program options. Created on makeOptions() call.
+
+	string version,usage;
 
 	vector<string> inputFiles;		//!< Kappa files of the the model.
 	string outputFile;				//!< Output file name. Default is "output". PExKa will add a simulation number if needed.

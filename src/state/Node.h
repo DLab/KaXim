@@ -11,24 +11,48 @@
 #include <utility>
 #include <map>
 #include <queue>
+#include <set>
 #include <unordered_set>
+#include "../matching/Injection.h"
 #include "../pattern/Signature.h"
 #include "../data_structs/SimpleSet.h"
 #include "../pattern/mixture/Mixture.h"
 #include "../expressions/Vars.h"
 #include "../pattern/Action.h"
-#include "../matching/Injection.h"
+#include "../data_structs/DebugPtrSet.h"
+
+//#include "../matching/Injection.h"
 //#include <boost/fusion/container/set.hpp>
 //#include <boost/fusion/include/set.hpp>
 //#include <boost/fusion/container/set/set_fwd.hpp>
 //#include <boost/fusion/include/set_fwd.hpp>
 
 
-/*namespace matching {
-class Injection;
-class InjRandContainer;
-class InjSet;
-}*/
+namespace matching {
+class CcInjection;
+template <typename T> class InjRandContainer;
+
+class InjSet : public std::set<Injection*> {
+public:
+	inline auto emplace(Injection* inj) {
+#ifdef DEBUG
+		for(auto dep : *this)
+			if(*inj == *dep)
+				throw invalid_argument("Node::addDep(): cannot add same dependency (cc->emb).");
+#endif
+		inj->incDeps();
+		return set<Injection*>::emplace(inj);
+	}
+	inline unsigned erase(Injection* inj) {
+		set<Injection*>::erase(inj);
+		return inj->decDeps();
+	}
+	inline unsigned erase(iterator inj_it) {
+		set<Injection*>::erase(inj_it);
+		return (*inj_it)->decDeps();
+	}
+};
+}
 
 //typedef data_structs::SimpleSet<matching::Injection*> InjSet;
 //typedef unordered_set<matching::Injection*> InjSet;
@@ -43,8 +67,9 @@ class Node;
 
 using namespace std;
 using namespace expressions;
-using InjSet = matching::InjSet;
 
+using InjSet = matching::InjSet;//DebugPtrSet<matching::Injection>;
+using InjRandContainer = matching::InjRandContainer<matching::CcInjection>;
 
 class InternalState {
 protected:
@@ -54,7 +79,7 @@ protected:
 public:
 	InternalState(InjSet*,InjSet*);
 	static InternalState* createState(char type);
-	static void negativeUpdate(EventInfo& ev,matching::InjRandContainer** injs,InjSet* deps,const State& state);
+	static void negativeUpdate(EventInfo& ev,InjRandContainer** injs,InjSet* deps,const State& state);
 
 	virtual ~InternalState();
 
@@ -68,9 +93,9 @@ public:
 
 	inline two<InjSet*>& getDeps() const { return deps; }
 
-	virtual void negativeUpdateByValue(EventInfo& ev,matching::InjRandContainer** injs,const State& state);
-	virtual void negativeUpdateByBind(EventInfo& ev,matching::InjRandContainer** injs,const State& state);
-	virtual void negativeUpdate(EventInfo& ev,matching::InjRandContainer** injs,const State& state) = 0;
+	virtual void negativeUpdateByValue(EventInfo& ev,InjRandContainer** injs,const State& state);
+	virtual void negativeUpdateByBind(EventInfo& ev,InjRandContainer** injs,const State& state);
+	virtual void negativeUpdate(EventInfo& ev,InjRandContainer** injs,const State& state) = 0;
 
 
 	virtual string toString(const pattern::Signature::Site& s,bool show_binds = false,map<const Node*,bool> *visit = nullptr) const = 0;
@@ -99,7 +124,7 @@ public:
 	Node(const Node& node,const map<Node*,Node*>& mask);
 	virtual ~Node();
 
-	void copyDeps(const Node& node,EventInfo& ev,matching::InjRandContainer** injs,
+	void copyDeps(const Node& node,EventInfo& ev,InjRandContainer** injs,
 			const State& state);//unsafe
 	void alloc(big_id addr);
 	big_id getAddress() const;
@@ -145,6 +170,9 @@ public:
 	inline void setInternalLink(small_id st,Node* lnk,small_id site_trgt){
 		interface[st]->setLink(lnk,site_trgt);
 	}
+	inline InjSet& getLifts(){
+		return *deps;
+	}
 	inline two<InjSet*>& getLifts(small_id st){
 		return interface[st]->getDeps();
 	}
@@ -167,8 +195,8 @@ public:
 	virtual void setValue(SomeValue val) override;
 	virtual SomeValue getValue() const override;
 
-	virtual void negativeUpdateByValue(EventInfo& ev,matching::InjRandContainer** injs,const State& state) override;
-	virtual void negativeUpdate(EventInfo& ev,matching::InjRandContainer** injs,const State& state) override;
+	virtual void negativeUpdateByValue(EventInfo& ev,InjRandContainer** injs,const State& state) override;
+	virtual void negativeUpdate(EventInfo& ev,InjRandContainer** injs,const State& state) override;
 
 	virtual string toString(const pattern::Signature::Site& s,bool show_binds = false,map<const Node*,bool> *visit = nullptr) const override;
 };
@@ -183,8 +211,8 @@ public:
 	virtual void setLink(Node* n,small_id i) override;
 	virtual pair<Node*,small_id> getLink() const override;
 
-	virtual void negativeUpdateByBind(EventInfo& ev,matching::InjRandContainer** injs,const State& state) override;
-	virtual void negativeUpdate(EventInfo& ev,matching::InjRandContainer** injs,const State& state) override;
+	virtual void negativeUpdateByBind(EventInfo& ev,InjRandContainer** injs,const State& state) override;
+	virtual void negativeUpdate(EventInfo& ev,InjRandContainer** injs,const State& state) override;
 
 	virtual string toString(const pattern::Signature::Site& s,bool show_binds = false,map<const Node*,bool> *visit = nullptr) const override;
 };
@@ -195,7 +223,7 @@ public:
 
 	virtual InternalState* clone(const map<Node*,Node*>& mask) const override;
 
-	virtual void negativeUpdate(EventInfo& ev,matching::InjRandContainer** injs,const State& state) override;
+	virtual void negativeUpdate(EventInfo& ev,InjRandContainer** injs,const State& state) override;
 
 	virtual string toString(const pattern::Signature::Site& s,bool show_binds = false,map<const Node*,bool> *visit = nullptr) const override;
 };
@@ -250,6 +278,7 @@ struct EventInfo {
 	pattern::Action act;
 	//map of emb LHS [cc_id][ag_id]
 	vector<Node*>* emb;
+	bool is_unary;
 	small_id cc_count;
 	//map of new_nodes RHS
 	//vector<Node*> fresh_emb;
@@ -270,10 +299,12 @@ struct EventInfo {
 	map<matching::Injection*,matching::Injection*> inj_mask;
 	//aux_values
 	//AuxMixEmb aux_map;
-	MixEmbMap<expressions::Auxiliar,FL_TYPE,Node> mix_map;
+	//MixEmbMap<expressions::Auxiliar,FL_TYPE,Node> mix_map;
+	NamesMap<expressions::Auxiliar,FL_TYPE> mix_map;
 
 	set<const pattern::Pattern*> to_update;
 	set<small_id> rule_ids;
+	list<matching::Injection*> new_injs;
 
 	EventInfo();
 	~EventInfo();

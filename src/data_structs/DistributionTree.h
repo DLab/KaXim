@@ -54,9 +54,9 @@ public:
 	virtual void decrease(FL_TYPE val,unsigned n = 1) = 0;
 
 	/** \brief Returns an element of the tree corresponding with the value of r. */
-	virtual const T& choose(FL_TYPE r) const = 0;
+	virtual T& choose(FL_TYPE r) const = 0;
 	/** \brief Returns the i-th element in the tree. */
-	virtual const pair<T*,FL_TYPE>& choose(unsigned i) const = 0;
+	virtual pair<T*,FL_TYPE> choose(unsigned i) const = 0;
 	/** \brief Returns the number of elements in this subtree. */
 	virtual unsigned count() const = 0;
 	/** \brief Adds the element inj to the subtree based on val. */
@@ -111,8 +111,8 @@ public:
 	Node(Leaf<T>* leaf,FL_TYPE val = 0.0);
 	virtual ~Node();
 	virtual void deleteContent() override;
-	virtual const T& choose(FL_TYPE r) const override;
-	virtual const pair<T*,FL_TYPE>& choose(unsigned i) const override;
+	virtual T& choose(FL_TYPE r) const override;
+	virtual pair<T*,FL_TYPE> choose(unsigned i) const override;
 	virtual unsigned count() const override;
 
 	virtual void push(T* inj,FL_TYPE val) override;
@@ -163,8 +163,8 @@ public:
 	Leaf(Node<T>* _parent);
 	virtual ~Leaf();
 	virtual void deleteContent();
-	const T& choose(FL_TYPE r) const override;
-	virtual const pair<T*,FL_TYPE>& choose(unsigned r) const override;
+	T& choose(FL_TYPE r) const override;
+	virtual pair<T*,FL_TYPE> choose(unsigned r) const override;
 	virtual unsigned count() const override;
 
 	virtual void push(T* elem,FL_TYPE val) override;

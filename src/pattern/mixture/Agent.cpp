@@ -20,12 +20,12 @@ Pattern::Agent::~Agent(){};
 
 
 const Pattern::Site& Pattern::Agent::addSite(Site* site){
-	if(interface.count(*site))
+	auto it_ins = interface.emplace(*site);
+	if(!it_ins.second)
 		throw SemanticError("The site is already declared in this Agent.",yy::location());
-	auto& new_site = *interface.emplace(*site).first;
 	site->id = -1;
 	delete site;
-	return new_site;
+	return *it_ins.first;
 }
 
 const Pattern::Site& Pattern::Agent::getSite(Site* site) {
@@ -690,7 +690,7 @@ string Pattern::Site::toString(small_id sign_id, small_id ag_pos,
 		out += "!*";
 		break;
 	case LinkType::WILD :
-		//if(sign.getType() & Signature::Site::BIND)
+		if(sign.getType() & Signature::Site::BIND)
 			out += "?";
 		break;
 	}

@@ -51,7 +51,7 @@ public:
 
 	//vector<small_id> setGraph();
 	const map<ag_st_id,ag_st_id>& getGraph() const;
-	string toString(const Environment& env) const;
+	string toString(const Environment& env,int mark = -1) const;
 
 	const Agent& getAgent(small_id ag_id ) const override;
 

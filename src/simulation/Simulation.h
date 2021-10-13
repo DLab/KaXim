@@ -72,7 +72,7 @@ public:
 	static vector<list<unsigned int> > allocCells(int n_cpus, const vector<double> &w_vertex,
 			const map<pair<int,int>,double> &w_edges, int tol);
 
-	bool isDone() const;
+	bool isDone() const override;
 
 	void print() const;
 
