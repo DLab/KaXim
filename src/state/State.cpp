@@ -16,6 +16,7 @@
 #include "../pattern/mixture/Component.h"
 #include "../pattern/mixture/Agent.h"
 #include "../simulation/Simulation.h"
+#include "../data_structs/DataTable.h"
 #include <cmath>
 
 namespace state {
@@ -359,17 +360,13 @@ void State::advanceUntil(FL_TYPE sync_t,UINT_TYPE max_e) {
 			const NullEvent ex(event());//next-event
 			if(ex.error){
 				counter.incNullEvents(ex.error);
-				#ifdef DEBUG
-					cout << "  | Null-Event (" << ex.what() << ")" << endl;
-				#endif
+				IF_DEBUG_LVL(2,	cout << "  | Null-Event (" << ex.what() << ")" << endl;)
 			}
 			else
 				counter.incEvents();
 		}
 		catch(const NullEvent &ex){
-			#ifdef DEBUG
-				cout << "  | Null-Event (" << ex.what() << ")" << endl;
-			#endif
+			IF_DEBUG_LVL(2,cout << "  | Null-Event (" << ex.what() << ")" << endl;)
 			counter.incNullEvents(ex.error);
 		}
 		activityUpdate();
@@ -796,6 +793,22 @@ void State::plotOut() const {
 	plot.fill(*this,env);
 }
 
+data_structs::DataTable* State::getTrajectory() const {
+	auto tab = new data_structs::DataTable(plot.getData(),true);
+	//tab->col_names.emplace_back("Time");
+	for(auto var : env.getObservables())
+		tab->col_names.emplace_back(var->toString());
+	return tab;
+}
+
+void State::collectRawData(map<string,list<const vector<FL_TYPE>*>> &raw_list) const {
+	for(auto pert : perts)
+		pert.second.collectRawData(raw_list);
+}
+void State::collectTabs(map<string,list<const data_structs::DataTable*>> &tab_list) const {
+	for(auto& pert : perts)
+		pert.second.collectTabs(tab_list);
+}
 
 void State::print() const {
 	graph.print(env);

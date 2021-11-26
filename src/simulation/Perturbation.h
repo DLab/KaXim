@@ -15,9 +15,8 @@
 #include <fstream>
 
 
-namespace state {
-	class State;
-}
+namespace state { class State; }
+namespace data_structs { class DataTable; }
 
 namespace simulation {
 
@@ -61,6 +60,9 @@ public:
 	void apply(state::State &state) const;
 
 	void addEffect(Effect* eff,const simulation::SimContext &context,const Environment& env);
+
+	void collectRawData(map<string,list<const vector<FL_TYPE>*>> &raw_list) const;
+	void collectTabs(map<string,list<const data_structs::DataTable*>> &tab_list) const;
 
 	float nextStopTime() const;
 
@@ -107,7 +109,7 @@ public:
 };
 
 class UpdateToken : public Perturbation::Effect {
-	unsigned varId;
+	unsigned tokId;
 	const expressions::BaseExpression* value;
 
 public:
@@ -129,6 +131,7 @@ public:
 };
 
 class Histogram : public Perturbation::Effect {
+	friend class Perturbation;
 	mutable vector<unsigned> bins;
 	mutable vector<FL_TYPE> points;
 	mutable float min, max;
@@ -137,6 +140,8 @@ class Histogram : public Perturbation::Effect {
 	list<const state::KappaVar*> kappaList;
 	mutable bool newLim;
 	bool fixedLim;
+	mutable map<string,list<data_structs::DataTable>> tabs;
+	mutable map<string,list<vector<FL_TYPE>>> rawData;
 
 public:
 	Histogram(const Environment& env,int _bins,string file_name,
@@ -148,7 +153,7 @@ public:
 	void setPoints() const;
 	void tag(FL_TYPE val) const;
 
-	void printHeader(ofstream &file) const;
+	void printHeader(ofstream &file,const string& kappa) const;
 
 };
 

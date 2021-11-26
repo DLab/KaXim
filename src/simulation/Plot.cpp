@@ -16,6 +16,9 @@ using namespace boost::filesystem;
 
 Plot::Plot(const pattern::Environment& env,int run_id) {
 	auto& params = Parameters::get();
+	//if(params.outputFileType.find("data") != string::npos)
+	if(params.outputFile == "")
+		return; //no outputfile
 	try {
 		path p(params.outputDirectory);
 		if(!exists(p))
@@ -61,9 +64,13 @@ void TimePlot::fill(const state::State& state,const pattern::Environment& env) {
 	//AuxMixEmb aux_map;
 	while(t >= nextPoint){
 		file << nextPoint;
+		data.emplace_back();
+		data.back().emplace_back(nextPoint);
 		//cout << state.getSim().getId() <<"]\t" << nextPoint;
 		for(auto var : env.getObservables()){
-			file << "\t" << state.getVarValue(var->getId());
+			auto val = state.getVarValue(var->getId());
+			file << "\t" << val;
+			data.back().emplace_back(val.valueAs<FL_TYPE>());
 			//cout << "\t" << state.getVarValue(var->getId(), aux_map);
 		}
 		file << endl;
@@ -77,9 +84,13 @@ void TimePlot::fillBefore(const state::State& state,const pattern::Environment& 
 	//AuxMixEmb aux_map;
 	while(t >= nextPoint){
 		file << nextPoint;
+		data.emplace_back();
+		data.back().emplace_back(nextPoint);
 		//cout << state.getSim().getId() <<"]\t" << nextPoint;
 		for(auto var : env.getObservables()){
-			file << "\t" << state.getVarValue(var->getId());
+			auto val = state.getVarValue(var->getId());
+			data.back().emplace_back(val.valueAs<FL_TYPE>());
+			file << "\t" << val;
 			//cout << "\t" << state.getVarValue(var->getId(), aux_map);
 		}
 		file << endl;
@@ -100,9 +111,13 @@ void EventPlot::fill(const state::State& state,const pattern::Environment& env) 
 	//AuxMixEmb aux_map;
 	while(e >= nextPoint){
 		file << state.getCounter().getTime();
+		data.emplace_back();
+		data.back().emplace_back(state.getCounter().getTime());
 		//cout << state.getSim().getId() <<"]\t" << nextPoint;
 		for(auto var : env.getObservables()){
-			file << "\t" << state.getVarValue(var->getId());
+			auto val = state.getVarValue(var->getId());
+			data.back().emplace_back(val.valueAs<FL_TYPE>());
+			file << "\t" << val;
 			//cout << "\t" << state.getVarValue(var->getId(), aux_map);
 		}
 		file << endl;
@@ -111,9 +126,13 @@ void EventPlot::fill(const state::State& state,const pattern::Environment& env) 
 	}
 	if(state.isDone() && e > (nextPoint-dE)){
 		file << state.getCounter().getTime();
+		data.emplace_back();
+		data.back().emplace_back(state.getCounter().getTime());
 		//cout << state.getSim().getId() <<"]\t" << nextPoint;
 		for(auto var : env.getObservables()){
-			file << "\t" << state.getVarValue(var->getId());
+			auto val = state.getVarValue(var->getId());
+			data.back().emplace_back(val.valueAs<FL_TYPE>());
+			file << "\t" << val;
 			//cout << "\t" << state.getVarValue(var->getId(), aux_map);
 		}
 		file << endl;

@@ -22,8 +22,12 @@
 #include "../matching/Injection.h"
 #include "../grammar/ast/KappaAst.h"
 
+
+namespace data_structs { class DataTable; }
+
 namespace simulation {
 using namespace std;
+
 
 class Simulation : public SimContext {
 	//int id;
@@ -32,6 +36,7 @@ class Simulation : public SimContext {
 	pattern::RuleSet rules;
 	//GlobalCounter counter;
 	Plot* plot;
+	mutable map<string,list<const vector<FL_TYPE>*>> rawList;
 
 	set<matching::Injection*> *ccInjections;//[cc_env_id].at(node_id)
 	set<matching::Injection*> *mixInjections;//[mix_id].at(node_id)[cc_mix_id]
@@ -72,7 +77,14 @@ public:
 	static vector<list<unsigned int> > allocCells(int n_cpus, const vector<double> &w_vertex,
 			const map<pair<int,int>,double> &w_edges, int tol);
 
-	bool isDone() const override;
+	bool isDone() const override {
+		return done;
+	}
+
+	data_structs::DataTable* getTrajectory() const;
+
+	void collectRawData() const;
+	void collectTabs(map<string,list<const data_structs::DataTable*>> &tab_list) const;
 
 	void print() const;
 

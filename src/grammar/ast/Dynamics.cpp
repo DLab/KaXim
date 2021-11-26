@@ -559,7 +559,15 @@ simulation::Perturbation::Effect* Effect::eval(pattern::Environment& env,
 			upd_eff->setValueUpdate();
 		return upd_eff;
 	}
-	case UPDATE_TOK:
+	case UPDATE_TOK:{
+		auto id = env.getTokenId(set.var.getString());
+		pattern::DepSet deps;
+		auto set_expr = set.value->eval(env, context, nullptr);
+		auto upd_eff = new simulation::UpdateToken(id,set_expr);
+		//if(deps.count(pattern::Dependency(pattern::Dependency::VAR,id)))
+		//	upd_eff->setValueUpdate();
+		return upd_eff;
+	}
 	case STOP:
 	case SNAPSHOT:
 		break;

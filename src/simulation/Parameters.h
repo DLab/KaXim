@@ -16,9 +16,11 @@
 
 #include "Counter.h"
 
-int main(int argc, char* argv[]);
+namespace simulation {class Results;}
+simulation::Results run(int argc, const char * const argv[]);
 
 namespace simulation {
+
 
 using namespace boost::program_options;
 
@@ -33,7 +35,7 @@ using namespace boost::program_options;
  */
 class Parameters {
 	//friend class Counter;
-	friend int ::main(int argc, char* argv[]); ///< Easier manipulation of Parameters from main.
+	friend Results (::run)(int argc, const char * const argv[]); ///< Easier manipulation of Parameters from main.
 
 	static Parameters singleton; //!< the singleton instance of the class
 
@@ -46,7 +48,7 @@ class Parameters {
 
 	/** \brief Set simulation parameters from arguments vector.
 	 */
-	void evalOptions(int argc, char* argv[]);
+	void evalOptions(int argc, const char * const argv[]);
 public:
 	options_description *options;	//!< boost object to manipulate program options. Created on makeOptions() call.
 

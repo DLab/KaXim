@@ -17,15 +17,22 @@ namespace simulation {
 
 using namespace std;
 
+
 class Plot {
 protected:
+	//TODO class outputs {op<<()}
 	ofstream file;
+	list<list<FL_TYPE>> data;
 public:
 	Plot(const pattern::Environment& env,int run_id = 0);
 	virtual ~Plot();
 
 	virtual void fill(const state::State& state,const pattern::Environment& env) = 0;
 	virtual void fillBefore(const state::State& state,const pattern::Environment& env) = 0;
+
+	const list<list<FL_TYPE>>& getData() const {
+		return data;
+	}
 };
 
 class TimePlot : public Plot {

@@ -2,7 +2,7 @@
 #ifndef PARAMS_H
 #define PARAMS_H
 
-//#define DEBUG true //in make command
+#define DEBUG true //in make command
 
 #include <utility>
 #include <stdexcept>

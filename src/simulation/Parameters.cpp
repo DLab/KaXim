@@ -55,7 +55,7 @@ void Parameters::makeOptions(const string &v,const string &u,const string &msg){
 	;
 }
 
-void Parameters::evalOptions(int argc, char* argv[]){
+void Parameters::evalOptions(int argc, const char * const argv[]){
 	positional_options_description pos;
 	pos.add("input-file",-1);
 	variables_map vm;

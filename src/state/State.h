@@ -27,6 +27,8 @@ namespace simulation {
 	class Simulation;
 }
 
+namespace data_structs { class DataTable; }
+
 namespace state {
 struct EventInfo;
 
@@ -59,7 +61,7 @@ class State : public SimContext {
 	CcInjRandContainer** injections;
 	map<int,matching::InjRandContainer<matching::MixInjection>*> nlInjections;
 
-	simulation::LocalCounter counter;
+	//simulation::LocalCounter counter;
 	simulation::Plot& plot;
 	mutable EventInfo ev;
 	mutable unordered_map<small_id,simulation::Perturbation> perts;
@@ -97,13 +99,14 @@ public:
 
 	//void del(Node* node);
 
-	const simulation::Counter& getCounter() const;
+	//const simulation::Counter& getCounter() const;
 
 	/** \brief Add tokens population to the state.
 	 * @param n count of tokens (can be negative).
 	 * @param tok_id token id type to add.
 	 */
 	void addTokens(float n,unsigned tok_id);
+	void setTokens(float n,unsigned tok_id);
 
 	const simulation::Rule::Rate& getRuleRate(int id) const;
 	SomeValue getVarValue(short_id var_id) const;
@@ -176,6 +179,10 @@ public:
 		return parent->isDone();
 	}
 
+	data_structs::DataTable* getTrajectory() const ;
+	void collectRawData(map<string,list<const vector<FL_TYPE>*>> &raw_list) const;
+	void collectTabs(map<string,list<const data_structs::DataTable*>> &tab_list) const;
+
 	/** \brief Print the state for debugging purposes.
 	 **/
 	void print() const;
@@ -187,11 +194,14 @@ public:
 /*inline const simulation::Simulation& State::getSim() const {
 	return sim;
 }*/
-inline const simulation::Counter& State::getCounter() const {
+/*inline const simulation::Counter& State::getCounter() const {
 	return counter;
-}
+}*/
 inline void State::addTokens(float n,unsigned tok_id){
 	tokens[tok_id] += n;
+}
+inline void State::setTokens(float n,unsigned tok_id){
+	tokens[tok_id] = n;
 }
 inline FL_TYPE State::getTokenValue(unsigned tok_id) const{
 	return tokens[tok_id];

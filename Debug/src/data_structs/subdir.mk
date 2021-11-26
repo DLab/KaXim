@@ -4,6 +4,7 @@
 
 # Add inputs and outputs from these tool invocations to the build variables 
 CPP_SRCS += \
+../src/data_structs/DataTable.cpp \
 ../src/data_structs/DistributionTree.cpp \
 ../src/data_structs/MaskedBinaryRandomTree.cpp \
 ../src/data_structs/MyMaskedBinaryRandomTree.cpp \
@@ -12,6 +13,7 @@ CPP_SRCS += \
 ../src/data_structs/SimpleTree.cpp 
 
 OBJS += \
+./src/data_structs/DataTable.o \
 ./src/data_structs/DistributionTree.o \
 ./src/data_structs/MaskedBinaryRandomTree.o \
 ./src/data_structs/MyMaskedBinaryRandomTree.o \
@@ -20,6 +22,7 @@ OBJS += \
 ./src/data_structs/SimpleTree.o 
 
 CPP_DEPS += \
+./src/data_structs/DataTable.d \
 ./src/data_structs/DistributionTree.d \
 ./src/data_structs/MaskedBinaryRandomTree.d \
 ./src/data_structs/MyMaskedBinaryRandomTree.d \
@@ -32,7 +35,7 @@ CPP_DEPS += \
 src/data_structs/%.o: ../src/data_structs/%.cpp
 	@echo 'Building file: $<'
 	@echo 'Invoking: Cross G++ Compiler'
-	g++ -DDEBUG -O0 -g3 -Wall -c -fmessage-length=0 -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@)" -o "$@" "$<"
+	g++ -DDEBUG -I/usr/include/eigen3/ -O0 -g3 -Wall -c -fmessage-length=0 -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@)" -o "$@" "$<"
 	@echo 'Finished building: $<'
 	@echo ' '
 

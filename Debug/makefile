@@ -20,6 +20,7 @@ RM := rm -rf
 -include src/grammar/subdir.mk
 -include src/expressions/subdir.mk
 -include src/data_structs/subdir.mk
+-include src/bindings/subdir.mk
 -include src/subdir.mk
 -include subdir.mk
 -include objects.mk

@@ -8,6 +8,7 @@
 #include "Perturbation.h"
 #include "Parameters.h"
 #include "Simulation.h"
+#include "../data_structs/DataTable.h"
 #include "../state/State.h"
 #include "../state/Node.h"
 #include "../pattern/mixture/Agent.h"
@@ -73,7 +74,7 @@ Perturbation::Perturbation(BaseExpression* cond,BaseExpression* unt,
 					auto val2 = expr3->getValueSafe(context).valueAs<FL_TYPE>();
 					if(val1 < 0)
 						throw SemanticError("Comparing time with negative values will generate unexpected behavior.",loc);
-					nextStop = std::signbit(val1) ? val1 : val2;
+					nextStop = std::signbit(val1) ? val1 : val2+val1;
 					incStep = val2;
 					return;
 				}
@@ -167,6 +168,31 @@ void Perturbation::addEffect(Effect* eff,
 float Perturbation::nextStopTime() const {
 	return nextStop;
 }
+
+
+void Perturbation::collectRawData(map<string,list<const vector<FL_TYPE>*>> &raw_list) const {
+	for(auto effect : effects){
+		auto hist = dynamic_cast<Histogram*>(effect);
+		if(hist)
+			for(auto raws : hist->rawData){
+				auto l = raw_list[raws.first];
+				for(auto& raw : raws.second)
+					l.emplace_back(&raw);
+			}
+	}
+}
+void Perturbation::collectTabs(map<string,list<const data_structs::DataTable*>> &tab_list) const {
+	for(auto effect : effects){
+		auto hist = dynamic_cast<Histogram*>(effect);
+		if(hist)
+			for(auto& tabs : hist->tabs){
+				auto& l = tab_list[tabs.first];
+				for(auto& tab : tabs.second)
+					l.emplace_back(&tab);
+			}
+	}
+}
+
 
 string Perturbation::toString(const state::State& state) const {
 	string ret;
@@ -269,7 +295,6 @@ void Delete::apply(state::State& state) const {
 
 /***** Update **************************/
 
-
 Update::Update(const state::Variable& _var,expressions::BaseExpression* expr) : var(nullptr),byValue(false){
 	var = state::Variable::makeAlgVar(_var.getId(), _var.toString(), expr);
 }
@@ -287,6 +312,19 @@ void Update::setValueUpdate() {
 }
 
 
+/***** Update Token ***********************/
+
+UpdateToken::UpdateToken(unsigned tok_id,expressions::BaseExpression* val) :
+		tokId(tok_id),value(val)  {}
+UpdateToken::~UpdateToken(){
+	delete value;
+}
+void UpdateToken::apply(state::State &state) const {
+	state.setTokens(value->getValue(state).valueAs<FL_TYPE>(),tokId);
+	state.updateDeps(pattern::Dependency(pattern::Dependency::Dep::TOK,tokId));
+}
+
+
 /***** Histogram **************************/
 
 Histogram::Histogram(const Environment& env,int _bins,string _prefix,
@@ -296,6 +334,8 @@ Histogram::Histogram(const Environment& env,int _bins,string _prefix,
 	const map<string,pattern::Mixture::AuxCoord>* p_auxs(nullptr);
 	for(auto kappa : kappaList){
 		auto& mix = kappa->getMix();
+		tabs.emplace(kappa->toString(),0);
+		rawData.emplace(kappa->toString(),0);
 		if(mix.compsCount() != 1)
 			throw invalid_argument("Mixture must contain exactly one Connected Component.");
 		auto& cc = mix.getComponent(0);
@@ -332,8 +372,19 @@ Histogram::Histogram(const Environment& env,int _bins,string _prefix,
 		}
 	}
 
-
-	auto& folder = simulation::Parameters::get().outputDirectory;
+	if(_bins && min != max && !isinf(max) && !isinf(min)){
+		fixedLim = true;
+		newLim = true;
+		setPoints();
+	}
+	auto& params = simulation::Parameters::get();
+	if(params.outputFile == "" && params.outputFileType.find("data") != string::npos){
+		if(prefix != "")
+			ADD_WARN_NOLOC("Histograms will not be printed to files. Use returned results.");
+		prefix = "";
+		return;
+	}
+	auto& folder = params.outputDirectory;
 	auto pos = _prefix.rfind('/');
 	if(pos != string::npos){
 		boost::filesystem::path p(folder + "/" + _prefix.substr(0,pos));
@@ -353,14 +404,6 @@ Histogram::Histogram(const Environment& env,int _bins,string _prefix,
 		filetype = file_name.substr(pos+1);
 	}
 */
-	if(!_bins)
-		return;
-
-	if(min != max && !isinf(max) && !isinf(min)){
-		fixedLim = true;
-		newLim = true;
-		setPoints();
-	}
 }
 
 Histogram::~Histogram(){
@@ -374,21 +417,24 @@ void Histogram::apply(state::State& state) const {
 	FL_TYPE sum(0.0);
 	auto& params = simulation::Parameters::get();
 
-	if(Parameters::get().runs > 1)
-		sprintf(file_name,("%s/%s(%s-%0"+to_string(int(log10(params.runs-1)+1))+"d).%s").c_str(),
-				params.outputDirectory.c_str(),prefix.c_str(),params.outputFile.c_str(),
-				state.getParentContext().getId(),params.outputFileType.c_str());
-	else
-		sprintf(file_name,"%s/%s(%s).%s",params.outputDirectory.c_str(),prefix.c_str(),
-				params.outputFile.c_str(),params.outputFileType.c_str());
-	ofstream file(file_name,ios_base::app);
-	if(file.fail()){
-		ADD_WARN_NOLOC("Cannot open the file "+string(file_name)+" to print the histogram.");
-		return;
+	ofstream file;
+	if(prefix != ""){
+		if(Parameters::get().runs > 1)
+			sprintf(file_name,("%s/%s(%s-%0"+to_string(int(log10(params.runs-1)+1))+"d).%s").c_str(),
+					params.outputDirectory.c_str(),prefix.c_str(),params.outputFile.c_str(),
+					state.getParentContext().getId(),params.outputFileType.c_str());
+		else
+			sprintf(file_name,"%s/%s(%s).%s",params.outputDirectory.c_str(),prefix.c_str(),
+					params.outputFile.c_str(),params.outputFileType.c_str());
+		file.open(file_name,ios_base::app);
+		if(file.fail()){
+			ADD_WARN_NOLOC("Cannot open the file "+string(file_name)+" to print the histogram.");
+			return;
+		}
 	}
 
 	if(newLim){
-		printHeader(file);
+		printHeader(file,kappaList.front()->toString());
 		setPoints();
 		newLim = false;
 	}
@@ -398,29 +444,54 @@ void Histogram::apply(state::State& state) const {
 	for(auto kappa : kappaList){
 		auto& mix = kappa->getMix();
 		auto& cc = mix.getComponent(0);
-
-		if(state.getInjContainer(cc.getId()).count() == 0){
-			file << kappa->toString() << "\t" << state.getCounter().getTime() << "\tNo values\n";
+		auto& injs = state.getInjContainer(cc.getId());
+		auto count = injs.count();
+		rawData.at(kappa->toString()).emplace_back(count+1);
+		auto& raw = rawData.at(kappa->toString()).back();
+		auto time = state.getCounter().getTime();
+		raw[0] = time;
+		if(count == 0){
+			auto& dt = tabs.at(kappa->toString()).back();
+			file << kappa->toString() << "\t" << time << "\tNo values\n";
+			dt.data.conservativeResize(dt.data.rows()+1,Eigen::NoChange);
+			dt.row_names.emplace_back(to_string(time));
+			//cout << "1) dt.data(" << dt.data.rows()-1 << "," << 0 << "= nan" << endl;
+			dt.data(dt.data.rows()-1,0) = nan("");
 			continue;
 		}
 
 		sum = 0;
+		int i = 0;
+		int col = 0;
 		if(bins.size() == 2){//no-bins | print only once at end-sim
 			map<FL_TYPE,int> values;
+			list<string> col_names;
 			function<void (const matching::Injection*)> f = [&](const matching::Injection* inj) -> void {
 				cc_map.setEmb(*inj->getEmbedding());
 				auto val = func->getValue(state).valueAs<FL_TYPE>();
 				sum += val;
 				values[val]++;
+				raw[i++] = val;
 			};
-			state.getInjContainer(cc.getId()).fold(f);
+			injs.fold(f);
 			file << "\ttime";
-			for(auto val : values)
+			for(auto val : values){
 				file << "\t" << val.first;
-			file << "\tAverage\n" << kappa->toString() << "\t" << state.getCounter().getTime();
-			for(auto val : values)
+				col_names.emplace_back(to_string(val.first));
+			}
+			col_names.emplace_back("Average");
+			tabs.at(kappa->toString()).emplace_back(list<string>({to_string(time)}),col_names);
+			auto& dt = tabs.at(kappa->toString()).back();
+			file << "\tAverage\n" << kappa->toString() << "\t" << time;
+			for(auto val : values){
 				file << "\t" << val.second;
-			file << "\t" << sum / state.getInjContainer(cc.getId()).count() << endl;
+				//cout << "2) dt.data(" << dt.data.rows()-1 << "," << col << ") = " << val.second << endl;
+				dt.data(dt.data.rows()-1,col++) = val.second;
+			}
+			auto avg = sum / injs.count();
+			file << "\t" << avg << endl;
+			//cout << "3) dt.data(" << dt.data.rows()-1 << "," << col << ") = " << avg << endl;
+			dt.data(dt.data.rows()-1,col) = avg;
 			continue;
 		}
 
@@ -437,15 +508,17 @@ void Histogram::apply(state::State& state) const {
 					max = val;
 				values.push_back(val);
 				sum += val;
+				raw[i++] = val;
 			};
-			state.getInjContainer(cc.getId()).fold(f);
+			injs.fold(f);
 			bins.assign(bins.size(),0);
 			setPoints();
-			printHeader(file);
+			printHeader(file,kappa->toString());
 			newLim = false;
 			if(min != max)
-				for(auto v : values)
+				for(auto v : values){
 					tag(v);
+				}
 		}
 		else{
 			function<void (const matching::Injection*)> f = [&](const matching::Injection* inj) -> void {
@@ -463,16 +536,27 @@ void Histogram::apply(state::State& state) const {
 				sum += val;
 			};
 			bins.assign(bins.size(),0);
-			state.getInjContainer(cc.getId()).fold(f);
+			injs.fold(f);
 		}
 		file << kappa->toString() << "\t";
 		file << state.getCounter().getTime() << "\t";
-		if(min == max)
-			file << state.getInjContainer(cc.getId()).count() << "\t";
+		auto& dt = tabs.at(kappa->toString()).back();
+		dt.data.conservativeResize(dt.data.rows()+1,Eigen::NoChange);
+		dt.row_names.emplace_back(to_string(time));
+		if(min == max){
+			file << injs.count() << "\t";
+			//cout << "4) dt.data(" << dt.data.rows()-1 << "," << 0 << ") = " << injs.count() << endl;
+			dt.data(dt.data.rows()-1,0) = injs.count();
+		}
 		else
-			for(auto bin : bins)
+			for(auto bin : bins) {
 				file << bin << "\t";
-		file << sum / state.getInjContainer(cc.getId()).count() << "\n";
+				//cout << "5) dt.data(" << dt.data.rows()-1 << "," << col << ") = " << bin << endl;
+				dt.data(dt.data.rows()-1,col++) = bin;
+			}
+		file << sum / injs.count() << "\n";
+		//cout << "6) dt.data(" << dt.data.rows()-1 << "," << col << ") = " << sum/injs.count() << endl;
+		dt.data(dt.data.rows()-1,col) = sum / injs.count();
 	}
 	if(kappaList.size() > 1)
 		file << endl;
@@ -506,30 +590,41 @@ void Histogram::tag(FL_TYPE val) const {
 	}
 }
 
-void Histogram::printHeader(ofstream& file) const {
+void Histogram::printHeader(ofstream& file,const string& kappa) const {
 	char s1[100];
-
+	list<string> col_names;
+	file << "\ttime\t";
 	if(isinf(min) || isinf(max)){
-		sprintf(s1,"\ttime\t[%.5g,%.5g]\tAverage",min,max);
-		file << s1 << "\n";
+		sprintf(s1,"[%.5g,%.5g]",min,max);
+		file << s1;
+		col_names.emplace_back(s1);
 	}
 	else if(min == max){
-		sprintf(s1,"\ttime\t%.5g\tAverage",min);
-		file << s1 << "\n";
+		sprintf(s1,"%.5g",min);
+		file << s1;
+		col_names.emplace_back(s1);
 	}
 	else{
 		auto dif = (max - min) / (bins.size()-2);
-		sprintf(s1,"\ttime\tx < %.5g",min);
+		sprintf(s1,"x < %.5g",min);
 		file << s1;
+		col_names.emplace_back(s1);
 		for(unsigned i = 0; i < bins.size()-2; i++){
-			if(i)
-				file << ")";
-			sprintf(s1,"\t[%.5g,%.5g",min+dif*i,min+dif*(i+1));
-			file << s1;
+			sprintf(s1,"[%.5g,%.5g%s",min+dif*i,min+dif*(i+1),i == bins.size()-3 ? "]" : ")");
+			file << "\t" << s1;
+			col_names.emplace_back(s1);
 		}
-		sprintf(s1,"]\t%.5g < x\tAverage\n",max);
-		file << s1 ;
+		sprintf(s1,"%.5g < x",max);
+		file << "\t" << s1 ;
+		col_names.emplace_back(s1);
 	}
+	file << "\tAverage\n";
+	col_names.emplace_back("Average");
+	tabs.at(kappa).emplace_back(list<string>(),col_names);
+	/*cout << "COL_NAMES:" << endl;
+	for(auto n : col_names)
+		cout << n << ", ";
+	cout << endl;*/
 	newLim = false;
 }
 

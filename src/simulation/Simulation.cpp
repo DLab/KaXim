@@ -7,6 +7,7 @@
 
 #include "Simulation.h"
 #include "../state/Variable.h"
+#include "../data_structs/DataTable.h"
 #include <set>
 #include <boost/random.hpp>
 
@@ -366,9 +367,40 @@ int Simulation::searchCompartment(vector<list<unsigned int>> assigned, unsigned 
 	return -1;
 }
 
-bool Simulation::isDone() const {
+/*bool Simulation::isDone() const {
 	return done;
+}*/
+
+data_structs::DataTable* Simulation::getTrajectory() const {
+	data_structs::DataTable* tab = nullptr;
+	if(cells.size() == 1){
+		tab = cells.at(0).getTrajectory();
+	}
+	return tab;
 }
+
+
+void Simulation::collectRawData() const {
+	if(cells.size() == 1) {
+		cells.at(0).collectRawData(rawList);
+		return;
+	}//else
+	for(auto& cell : cells){
+		//TODO
+		throw invalid_argument("Simulation::collectRawData(): spatial not implemented yet.");
+	}
+}
+void Simulation::collectTabs(map<string,list<const data_structs::DataTable*>> &tab_list) const {
+	if(cells.size() == 1) {
+		cells.at(0).collectTabs(tab_list);
+		return;
+	}//else
+	for(auto& cell : cells){
+		//TODO
+		throw invalid_argument("Simulation::collectTabs(): spatial not implemented yet.");
+	}
+}
+
 
 void Simulation::print() const {
 	cout << "========= Simulation[" << id << "] =========" << endl;

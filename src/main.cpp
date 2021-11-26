@@ -5,38 +5,31 @@
  *      Author: naxo
  */
 
-//#include "grammar/KappaLexer.h"
-//#include "grammar/KappaParser.hpp"
-#include <boost/program_options/options_description.hpp>
-#include <boost/program_options/positional_options.hpp>
-#include <boost/program_options/parsers.hpp>
-#include <boost/program_options/variables_map.hpp>
-#include <omp.h>
-#include <vector>
-#include "grammar/KappaDriver.h"
-#include "grammar/ast/KappaAst.h"
-#include "pattern/Environment.h"
-#include "simulation/Simulation.h"
-#include "simulation/Parameters.h"
-#include "util/Warning.h"
-
-
-
-#include <ctime>
-#include <random>
-#include <time.h>
+#include "main.h"
 
 using namespace boost::program_options;
 using namespace simulation;
 using namespace std;
 
-int main(int argc, char* argv[]){
+int main(int argc, char* argv[]){;
+
+	auto t = time(nullptr);
+
+
+	//auto res =
+	run(argc,argv);
+
+
+	cout << "Total running time: " << difftime(time(nullptr),t)  << " seconds." << endl;
+
+	return 0;
+}
+
+Results run(int argc, const char * const argv[]){
 	const string version("2.2.09");
 	const string v_msg("KaXim "+version);
 	const string usage_msg("Simple usage is \n$ "
 			"KaXim ([-i] kappa_file)+ -t time [-p points] [-r runs]");
-
-	auto t = time(nullptr);
 
 	//printing program name and all arguments
 	for(int i = 0; i < argc; i++) cout << argv[i] << " "; cout << endl;
@@ -62,7 +55,7 @@ int main(int argc, char* argv[]){
 	//ast.show();cout << "\n\n" ;
 
 	//building the environment and (global) vars
-	pattern::Environment env;//just to delete vars after env
+	auto& env =  *new pattern::Environment();//just to delete vars after env
 	SimContext base_context(env,params.seed);
 	NamesMap<expressions::Auxiliar,FL_TYPE> empty_aux_values;
 	base_context.setAuxMap(&empty_aux_values);
@@ -119,7 +112,7 @@ int main(int argc, char* argv[]){
 
 	//initialize number of thread (TODO a better way?)
 #ifdef DEBUG
-	omp_set_num_threads(1);
+	//omp_set_num_threads(1);
 #endif
 	int k = 1;
 #	pragma omp parallel
@@ -127,15 +120,16 @@ int main(int argc, char* argv[]){
 		k = omp_get_num_threads();
 	}
 
-#ifndef DEBUG
+//#ifndef DEBUG
 	omp_set_num_threads(min(params.runs,k));
-#endif
+//#endif
 
+	Results result;
 #	pragma omp parallel for
 	for(int i = 0; i < params.runs; i++){
-		Simulation sim(base_context,i);
+		auto sim = new Simulation(base_context,i);
 		//try{
-			sim.initialize(cells,ast);
+			sim->initialize(cells,ast);
 		/*}
 		catch(const exception &e){
 			cerr << "An exception found on initialization of simulation["
@@ -151,25 +145,24 @@ int main(int argc, char* argv[]){
 		}
 		if(params.verbose > 0){//only print this if if verbose is set for init or more
 			if(i == 0){
-				sim.print();
-				cout << difftime(time(nullptr),t) << " seconds loading initial state.\n";
+				sim->print();
+				//cout << difftime(time(nullptr),t) << " seconds loading initial state.\n";
 				cout << "------------------------------------\n";
 			}
 			if(params.runs > 1){
-				cout << difftime(time(nullptr),t) << " seconds loading initial state";
-				cout << " of sim[" << i << "]\n";
+				//cout << difftime(time(nullptr),t) << " seconds loading initial state";
+				cout << " of sim[" << i << "]" << endl;
 			}
 		}
 
 		try{
-			sim.run(params);
+			sim->run(params);
 		}catch(exception &e){
 			cerr << "An exception found when running simulation[" << i <<"]:\n" << e.what() << endl;
 			exit(1);
 		}
+		result.append(sim);
 	}
-
-	cout << "Total running time: " << difftime(time(nullptr),t)  << " seconds." << endl;
 
 	/*delete &env;
 	for(auto var_it = vars.rbegin(); var_it != vars.rend() ; var_it++)
@@ -184,6 +177,6 @@ int main(int argc, char* argv[]){
 	 * state.run(env) ?
 	 */
 
-	delete driver;
-	return 0;
+	//delete driver;
+	return result;
 }
