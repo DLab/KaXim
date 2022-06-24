@@ -53,6 +53,10 @@ public:
 	void allocate(SubNode* n);
 	void remove(Node* n);
 	void remove(SubNode* n);
+	/** \brief Insert nodes in this SiteGraph, and returns
+	 * the set of injections of this nodes. */
+	void moveIn(set<Node*> nodes);
+	void moveOut(set<Node*> nodes,InjSet& injs);
 	size_t getNodeCount() const;
 	vector<Node*>::iterator begin();
 	vector<Node*>::iterator end();
@@ -91,6 +95,7 @@ public:
 	}
 	bool areConnected(list<Node*> &to_visit,set<Node*>& to_find,int max_dist) const;
 	void print(const pattern::Environment& env) const;
+	string toString(const pattern::Environment& env) const;
 
 
 protected:

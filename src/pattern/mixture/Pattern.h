@@ -51,6 +51,7 @@ public:
 		AUTOFILL,	///< The RHS-site value have no difference with the LHS (...).
 		LABEL,		///< The site have a label value (s~lbl).
 		EQUAL,		///< The site have a numeric value (s~{[aux=]val}).
+		DIFF,		///< The site have a (different) numeric value (s~{[aux<>]val}).
 		GREATER,	///< The site num. value is no less than X (s~{X <= aux}).
 		SMALLER,	///< The site num. value is no more than Y (s~{aux} <= Y).
 		BETWEEN		///< The site num. value is between X and Y (s~{X <= aux <= Y}).(LAST)

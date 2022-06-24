@@ -252,11 +252,11 @@ string Mixture::toString(const Environment& env,int mark) const {
 	short i = 0;
 	if(comps.size())
 		for( auto c : comps ) {
-			out += " {" + c->toString(env,mark) + "},";
+			out += "{" + c->toString(env,mark) + "},";
 			i++;
 		}
 	else
-		out = " {}";
+		out = "{}";
 
 	return out;
 }

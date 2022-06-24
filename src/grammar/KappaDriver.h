@@ -20,6 +20,9 @@
 //#include "kappa4/Lexer.h"
 //#include "kappa4/Parser.hpp"
 
+namespace simulation {
+class SimContext;
+}
 using namespace std;
 
 /** \namespace grammar
@@ -46,13 +49,13 @@ public:
 	 *
 	 * After that, you must use the parse()
 	 * method to read each file and store the Kappa AST internally.			*/
-	KappaDriver(const vector<string> &files);
+	KappaDriver(const vector<string> &files,const simulation::SimContext& context);
 
 	/** \brief Construct an empty KappaDriver object.
 	 *
 	 * Then the parse() method will read a kappa model from
 	 * stdin and store the kappa AST internally.			*/
-	KappaDriver();
+	KappaDriver(const simulation::SimContext& context);
 
 	/** \brief Destroy this object.	 */
 	virtual ~KappaDriver();

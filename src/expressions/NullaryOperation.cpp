@@ -18,7 +18,7 @@ namespace expressions {
 /***********************************************/
 
 
-std::string n_ops[] = {"RAND_1","SIM_TIME","CPUTIME","ACTIVITY","RUN_ID",
+std::string n_ops[] = {"RAND_1","SIM_TIME","CPUTIME","ACTIVITY","RUN_ID","RUNS_COUNT"
 		"SIM_EVENT","NULL_EVENT","PROD_EVENT","END_SIM"};
 
 template<>
@@ -30,8 +30,9 @@ FL_TYPE (*NullaryOperations<FL_TYPE>::funcs[4])(const SimContext&)= {
 };
 
 template<>
-int (*NullaryOperations<int>::funcs[4])(const SimContext& context)= {
+int (*NullaryOperations<int>::funcs[5])(const SimContext& context)= {
 	[](const SimContext& context) {return int(context.getId());},
+	[](const SimContext& context) {return int(context.params->runs);},
 	[](const SimContext& context) {return int(context.getCounter().getEvent());},
 	[](const SimContext& context) {return int(context.getCounter().getNullEvent());},
 	[](const SimContext& context) {return int(context.getCounter().getProdEvent());}
@@ -85,6 +86,9 @@ BaseExpression* NullaryOperation<R>::clone() const {
 
 template<typename R>
 bool NullaryOperation<R>::operator==(const BaseExpression& exp) const {
+	auto nl_exp = dynamic_cast<const NullaryOperation<R>*>(&exp);
+	if(nl_exp)
+		return nl_exp->op == op;
 	return false;
 }
 
@@ -113,7 +117,9 @@ char NullaryOperation<R>::getVarDeps() const{
 
 template<typename R>
 std::string NullaryOperation<R>::toString() const {
-	return "(" + n_ops[(int)op] +")";
+	int op_txt = op % (sizeof(NullaryOperations<FL_TYPE>::funcs)+sizeof(NullaryOperations<int>::funcs))
+		% sizeof(NullaryOperations<FL_TYPE>::funcs);
+	return "(" + n_ops[(int)op_txt] +")";
 }
 
 /*template<bool, typename T1, typename T2>

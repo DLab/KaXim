@@ -16,7 +16,7 @@
 
 #include "../spatial/Compartment.h"
 
-namespace pattern {
+namespace spatial {
 
 /** \brief A directed connection between compartments.
  *
@@ -28,10 +28,13 @@ namespace pattern {
  */
 class Channel {
 	std::string name;
-	const CompartmentExpr *source,*target;
-	const state::AlgExpression<bool> *filter;
-	//std::map<std::string,int*> varValues;
-	const state::BaseExpression* delay;
+	struct Link {
+		const CompartmentExpr *source,*target;
+		const state::AlgExpression<bool> *filter;
+		//std::map<std::string,int*> varValues;
+		const state::BaseExpression* delay;
+	};
+	std::list<Link> links;
 
 public:
 	/** \brief Channel constructor.

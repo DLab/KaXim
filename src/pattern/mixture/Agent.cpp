@@ -228,9 +228,12 @@ void Pattern::Site::setValuePattern(BaseExpression** vals){
 	values[0] = vals[0];
 	values[1] = vals[2];
 	if(vals[0]){
-		if(vals[2])
-			value_type = BETWEEN;
-		else
+		if(vals[2]){
+			if(vals[1])
+				value_type = DIFF;
+			else
+				value_type = BETWEEN;
+		} else
 			value_type = GREATER;
 	}
 	else{
@@ -526,6 +529,10 @@ list<Pattern::Site::Diff> Pattern::Site::difference(const Pattern::Site& rhs) co
 	if(values[0]->getValueSafe(context).valueAs<FL_TYPE>() != st->getValue().valueAs<FL_TYPE>()) \
 		return nullptr; \
 	ADD_DEP(id,first)
+#define TEST_DIFF\
+	if(values[0]->getValueSafe(context).valueAs<FL_TYPE>() == st->getValue().valueAs<FL_TYPE>()) \
+		return nullptr; \
+	ADD_DEP(id,first)
 #define TEST_GREATER \
 	if(values[0]->getValueSafe(context).valueAs<FL_TYPE>() > st->getValue().valueAs<FL_TYPE>()) \
 		return nullptr; \
@@ -584,6 +591,11 @@ TEST_EMBED_OPT(EQUAL,FREE)
 TEST_EMBED_OPT(EQUAL,BND)
 TEST_EMBED_OPT(EQUAL,BND_PTRN)
 TEST_EMBED_OPT(EQUAL,BND_ANY)
+TEST_EMBED_OPT(DIFF,WILD)
+TEST_EMBED_OPT(DIFF,FREE)
+TEST_EMBED_OPT(DIFF,BND)
+TEST_EMBED_OPT(DIFF,BND_PTRN)
+TEST_EMBED_OPT(DIFF,BND_ANY)
 TEST_EMBED_OPT(GREATER,WILD)
 TEST_EMBED_OPT(GREATER,FREE)
 TEST_EMBED_OPT(GREATER,BND)
@@ -623,6 +635,7 @@ void Pattern::Site::setMatchFunction(){
 		CASE(EMPTY)
 		CASE(LABEL)
 		CASE(EQUAL)
+		CASE(DIFF)
 		CASE(GREATER)
 		CASE(SMALLER)
 		CASE(BETWEEN)

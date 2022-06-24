@@ -18,6 +18,7 @@
 #include "../expressions/NullaryOperation.h"
 #include "../expressions/Vars.h"
 #include "../util/Warning.h"
+#include "../pattern/Dependencies.h"
 
 #include <limits>
 #include <float.h>
@@ -34,6 +35,7 @@ Perturbation::Perturbation(BaseExpression* cond,BaseExpression* unt,
 		throw invalid_argument("Perturbation: condition cannot be null.");
 #endif
 	if(cond->getVarDeps() & BaseExpression::TIME){
+		//cout << " a time dependant pertubation" << endl;
 		const BaseExpression *expr1 = nullptr,*expr2 = nullptr,*expr3 = nullptr;
 		char op1,op2;
 		auto ff_expr = dynamic_cast<BinaryOperation<bool,FL_TYPE,FL_TYPE>*>(cond);//opt1 [T] = x ?
@@ -50,10 +52,10 @@ Perturbation::Perturbation(BaseExpression* cond,BaseExpression* unt,
 				op1 = fi_expr->op;
 			}
 		}
-		if(expr1 && op1 == BaseExpression::EQUAL){
+		if(expr1 && (op1 == BaseExpression::EQUAL || op1 == BaseExpression::GREATER)){
 			float val1 = expr2->getValueSafe(context).valueAs<FL_TYPE>();
 			auto time_expr = dynamic_cast<const NullaryOperation<FL_TYPE>*>(expr1);
-			if(time_expr && (time_expr->getVarDeps() & BaseExpression::TIME) && op1 != BaseExpression::EQUAL ){
+			if(time_expr && (time_expr->getVarDeps() & BaseExpression::TIME) ){
 				nextStop = val1;
 				return;
 			}
@@ -81,6 +83,9 @@ Perturbation::Perturbation(BaseExpression* cond,BaseExpression* unt,
 			}
 		}
 		ADD_WARN("Optimized time-perturbations should be expressed like [T] = x or ([T] % x) = n",loc);
+	}
+	else {
+		//cout << "not a time dependant pertubation" << endl;
 	}
 }
 
@@ -122,19 +127,18 @@ bool Perturbation::test(const SimContext& context) const {
 	return condition->getValue(context).valueAs<bool>();
 }
 
-FL_TYPE Perturbation::timeTest(const SimContext& context) const {
+FL_TYPE Perturbation::timeTest(const SimContext& context,FL_TYPE f) const {
 	static const FL_TYPE min_inc = numeric_limits<FL_TYPE>::epsilon();
 	if(nextStop >= 0)
-		return nextStop > context.getCounter().getTime() ? 0.0 : nextStop+min_inc;
+		return nextStop > context.getCounter().getTime()+f ? 0.0 : nextStop+min_inc;
 	else
 		return condition->getValue(context).valueAs<bool>() ? -1.0 : 0.0;
 }
 
-void Perturbation::apply(state::State& state) const {
-#ifdef DEBUG
-	if(Parameters::get().verbose > 0)
-		cout << "Applying perturbation " << id << " at time " << state.getCounter().getTime() << endl;
-#endif
+void Perturbation::apply(Simulation& state) const {
+	auto params = state.params;
+	IF_DEBUG_LVL(2,state.log_msg += "|| Applying perturbation ["
+			+ to_string(id) + "] at time " + to_string(state.getCounter().getTime()) + " ||\n");
 	for(auto eff : effects)
 		eff->apply(state);
 	state.positiveUpdate(influence);
@@ -174,8 +178,8 @@ void Perturbation::collectRawData(map<string,list<const vector<FL_TYPE>*>> &raw_
 	for(auto effect : effects){
 		auto hist = dynamic_cast<Histogram*>(effect);
 		if(hist)
-			for(auto raws : hist->rawData){
-				auto l = raw_list[raws.first];
+			for(auto& raws : hist->rawData){
+				auto& l = raw_list[raws.first];
 				for(auto& raw : raws.second)
 					l.emplace_back(&raw);
 			}
@@ -194,12 +198,13 @@ void Perturbation::collectTabs(map<string,list<const data_structs::DataTable*>> 
 }
 
 
-string Perturbation::toString(const state::State& state) const {
+string Perturbation::toString(const SimContext& state) const {
 	string ret;
 	if(until)
-		ret += "While "+ until->toString()+" ";
-	ret += "Apply effects: -";
-	ret += " whenever "+condition->toString();
+		ret += "As long as {"+ until->toString()+" remains False} And ";
+	ret += "If {"+condition->toString()+"} condition triggers, apply effects:\n";
+	for(auto effect : effects)
+		ret += "\t"+effect->toString(state) +"\n";
 	return ret;
 }
 
@@ -219,7 +224,7 @@ Intro::~Intro(){
 	delete mix;
 }
 
-void Intro::apply(state::State& state) const {
+void Intro::apply(Simulation& state) const {
 	auto nn = n->getValue(state).valueAs<int>();
 	if(nn < 0)
 		throw invalid_argument("A perturbation is trying to add a negative number of Agents.");
@@ -245,6 +250,11 @@ int Intro::addInfluences(int current,Rule::CandidateMap& map,
 	return mix->size();
 }
 
+string Intro::toString(const SimContext& context) const {
+	string ret("Create "+n->toString());
+	return ret + " new instances of "+mix->toString(context.getEnv());
+}
+
 /****** Delete *************************/
 Delete::Delete(const BaseExpression* n, const Mixture& mix ) : n(n),mix(mix) {
 	if(mix.compsCount() != 1)
@@ -255,9 +265,9 @@ Delete::~Delete(){
 	delete n;
 }
 
-void Delete::apply(state::State& state) const {
-	auto& inj_cont = state.getInjContainer(mix.getId());
-	auto total = inj_cont.count();
+void Delete::apply(Simulation& state) const {
+	//auto& inj_cont = state.getInjContainer(mix.getId());
+	auto total = state.count(mix.getId());
 	auto some_del = n->getValue(state);
 	size_t del;
 	if(some_del.t == Type::FLOAT){
@@ -275,7 +285,7 @@ void Delete::apply(state::State& state) const {
 		throw invalid_argument("A perturbation is trying to delete a negative number ("+
 			to_string(del)+") of instances of "+mix.getComponent(0).toString(state.getEnv()));
 	if(total <= del){
-		inj_cont.clear();
+		state.clearInstances(mix);
 		if(total < del && del != numeric_limits<size_t>::max())
 			ADD_WARN_NOLOC("Trying to delete "+to_string(del)+" instances of "+
 				mix.getComponent(0).toString(state.getEnv())+" but there are "+
@@ -283,14 +293,14 @@ void Delete::apply(state::State& state) const {
 		return;
 	}
 
-	auto distr = uniform_int_distribution<unsigned>();
-	for(size_t i = 0; i < del; i++){
-		auto j = distr(state.getRandomGenerator());
-		auto& inj = inj_cont.choose(j);
-		for(auto node : *inj.getEmbedding()){
-			node->removeFrom(state);
-		}
-	}
+	state.removeInstances(del,mix);
+
+
+}
+
+string Delete::toString(const SimContext& context) const {
+	string ret("Delete "+n->toString());
+	return ret + " instances of "+mix.toString(context.getEnv());
 }
 
 /***** Update **************************/
@@ -302,13 +312,18 @@ Update::~Update(){
 	delete var;
 }
 
-void Update::apply(state::State &state) const {
+void Update::apply(Simulation &state) const {
 	//cout << "updating var " << var->toString() << " to value " << var->getValue(state) << endl;
 	state.updateVar(*var,byValue);
+	state.updateDeps(pattern::Dependency(pattern::Dependency::VAR,var->getId()));
 }
 
 void Update::setValueUpdate() {
 	byValue= true;
+}
+string Update::toString(const SimContext& context) const {
+	string ret("Update variable "+var->toString());
+	return ret + " to value "+var->getValue(context).toString();
 }
 
 
@@ -319,19 +334,25 @@ UpdateToken::UpdateToken(unsigned tok_id,expressions::BaseExpression* val) :
 UpdateToken::~UpdateToken(){
 	delete value;
 }
-void UpdateToken::apply(state::State &state) const {
-	state.setTokens(value->getValue(state).valueAs<FL_TYPE>(),tokId);
+void UpdateToken::apply(Simulation &state) const {
+	state.setTokenValue(value->getValue(state).valueAs<FL_TYPE>(),tokId);
 	state.updateDeps(pattern::Dependency(pattern::Dependency::Dep::TOK,tokId));
+}
+
+string UpdateToken::toString(const SimContext& context) const {
+	string ret("Update token "+context.getEnv().getTokenName(tokId));
+	return ret + " to value "+value->toString();
 }
 
 
 /***** Histogram **************************/
 
-Histogram::Histogram(const Environment& env,int _bins,string _prefix,
+Histogram::Histogram(const SimContext& sim,int _bins,string _prefix,
 			list<const state::KappaVar*> k_vars,BaseExpression* f) :
 		bins(_bins+2),points(_bins+1),min(-numeric_limits<float>::infinity()),max(-min),
 		prefix(_prefix),func(f),kappaList(k_vars),newLim(false),fixedLim(false){
 	const map<string,pattern::Mixture::AuxCoord>* p_auxs(nullptr);
+	auto& env = sim.getEnv();
 	for(auto kappa : kappaList){
 		auto& mix = kappa->getMix();
 		tabs.emplace(kappa->toString(),0);
@@ -377,7 +398,7 @@ Histogram::Histogram(const Environment& env,int _bins,string _prefix,
 		newLim = true;
 		setPoints();
 	}
-	auto& params = simulation::Parameters::get();
+	auto& params = *sim.params;
 	if(params.outputFile == "" && params.outputFileType.find("data") != string::npos){
 		if(prefix != "")
 			ADD_WARN_NOLOC("Histograms will not be printed to files. Use returned results.");
@@ -412,20 +433,24 @@ Histogram::~Histogram(){
 }
 
 
-void Histogram::apply(state::State& state) const {
-	char file_name[180];
+void Histogram::apply(Simulation& context) const {
+	char file_name[2000];
 	FL_TYPE sum(0.0);
-	auto& params = simulation::Parameters::get();
+	int comp_id = 0;
+	auto& state = context.getCell(comp_id);//TODO for every cell
+	auto& params = *state.params;
 
 	ofstream file;
 	if(prefix != ""){
-		if(Parameters::get().runs > 1)
+		if(params.runs > 1)
 			sprintf(file_name,("%s/%s(%s-%0"+to_string(int(log10(params.runs-1)+1))+"d).%s").c_str(),
 					params.outputDirectory.c_str(),prefix.c_str(),params.outputFile.c_str(),
 					state.getParentContext().getId(),params.outputFileType.c_str());
 		else
 			sprintf(file_name,"%s/%s(%s).%s",params.outputDirectory.c_str(),prefix.c_str(),
 					params.outputFile.c_str(),params.outputFileType.c_str());
+		if(strlen(file_name) > 1999)
+			throw invalid_argument("Histogram file name is too long!");
 		file.open(file_name,ios_base::app);
 		if(file.fail()){
 			ADD_WARN_NOLOC("Cannot open the file "+string(file_name)+" to print the histogram.");
@@ -434,6 +459,8 @@ void Histogram::apply(state::State& state) const {
 	}
 
 	if(newLim){
+		if(kappaList.size() > 1)
+			throw invalid_argument("FIX HERE!!! perturbation, apply!");
 		printHeader(file,kappaList.front()->toString());
 		setPoints();
 		newLim = false;
@@ -444,20 +471,21 @@ void Histogram::apply(state::State& state) const {
 	for(auto kappa : kappaList){
 		auto& mix = kappa->getMix();
 		auto& cc = mix.getComponent(0);
+		auto count = state.getInjContainer(cc.getId()).count();
 		auto& injs = state.getInjContainer(cc.getId());
-		auto count = injs.count();
+		state.setAuxMap(&cc_map);//Fixing bug with lazy init
 		rawData.at(kappa->toString()).emplace_back(count+1);
 		auto& raw = rawData.at(kappa->toString()).back();
 		auto time = state.getCounter().getTime();
 		raw[0] = time;
 		if(count == 0){
-			auto& dt = tabs.at(kappa->toString()).back();
+			/*auto& dt = tabs.at(kappa->toString()).back();
 			file << kappa->toString() << "\t" << time << "\tNo values\n";
 			dt.data.conservativeResize(dt.data.rows()+1,Eigen::NoChange);
 			dt.row_names.emplace_back(to_string(time));
 			//cout << "1) dt.data(" << dt.data.rows()-1 << "," << 0 << "= nan" << endl;
 			dt.data(dt.data.rows()-1,0) = nan("");
-			continue;
+			*/continue;
 		}
 
 		sum = 0;
@@ -471,13 +499,15 @@ void Histogram::apply(state::State& state) const {
 				auto val = func->getValue(state).valueAs<FL_TYPE>();
 				sum += val;
 				values[val]++;
-				raw[i++] = val;
+				raw[++i] = val;
 			};
 			injs.fold(f);
 			file << "\ttime";
 			for(auto val : values){
-				file << "\t" << val.first;
-				col_names.emplace_back(to_string(val.first));
+				int vi(val.first);
+				string vs(val.first == vi ? to_string(vi) : to_string(val.first));
+				file << "\t" << vs;
+				col_names.emplace_back(vs);
 			}
 			col_names.emplace_back("Average");
 			tabs.at(kappa->toString()).emplace_back(list<string>({to_string(time)}),col_names);
@@ -508,7 +538,7 @@ void Histogram::apply(state::State& state) const {
 					max = val;
 				values.push_back(val);
 				sum += val;
-				raw[i++] = val;
+				raw[++i] = val;
 			};
 			injs.fold(f);
 			bins.assign(bins.size(),0);
@@ -534,6 +564,7 @@ void Histogram::apply(state::State& state) const {
 				}
 				tag(val);
 				sum += val;
+				raw[++i] = val;
 			};
 			bins.assign(bins.size(),0);
 			injs.fold(f);
@@ -626,6 +657,13 @@ void Histogram::printHeader(ofstream& file,const string& kappa) const {
 		cout << n << ", ";
 	cout << endl;*/
 	newLim = false;
+}
+
+string Histogram::toString(const SimContext& context) const {
+	string ret("Histogram of { ");
+	for(auto kappa : kappaList)
+		ret += kappa->toString()+", ";
+	return ret + "}";
 }
 
 

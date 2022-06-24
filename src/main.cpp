@@ -6,6 +6,7 @@
  */
 
 #include "main.h"
+//#include "bindings/PythonBind.h"
 
 using namespace boost::program_options;
 using namespace simulation;
@@ -16,16 +17,27 @@ int main(int argc, char* argv[]){;
 	auto t = time(nullptr);
 
 
-	//auto res =
-	run(argc,argv);
+	auto& res = *run(argc,argv,std::map<std::string,float>());
+	//auto& res = binds::run_kappa_model(map<string,string>());
 
+	res.collectHistogram();
+	auto comps = res.getSpatialTrajectories(0);
 
+	for(auto tab : comps){
+		cout << tab.second->data << endl;
+	}
+
+	delete &res;
+
+	//res = run(argc,argv,std::map<std::string,float>());
+
+	//delete res;
 	cout << "Total running time: " << difftime(time(nullptr),t)  << " seconds." << endl;
 
 	return 0;
 }
 
-Results run(int argc, const char * const argv[]){
+Results* run(int argc, const char * const argv[],const map<string,float>& ka_params){
 	const string version("2.2.09");
 	const string v_msg("KaXim "+version);
 	const string usage_msg("Simple usage is \n$ "
@@ -35,52 +47,54 @@ Results run(int argc, const char * const argv[]){
 	for(int i = 0; i < argc; i++) cout << argv[i] << " "; cout << endl;
 
 	//eval given arguments to the program
-	auto& params = simulation::Parameters::singleton;
-	params.makeOptions(v_msg,usage_msg,"Allowed options");
-	params.evalOptions(argc, argv);
+	auto params = new simulation::Parameters();
+	params->makeOptions(v_msg,usage_msg,"Allowed options");
+	params->evalOptions(argc, argv);
+
+	//building the environment and (global) vars
+	auto& env =  *new pattern::Environment();//just to delete vars after env
+	SimContext base_context(env,params);
 
 	//Reading kappa-model files (if any)
 	grammar::KappaDriver *driver;
-	driver = new grammar::KappaDriver(params.inputFiles);
+	driver = new grammar::KappaDriver(params->inputFiles,base_context);
 
 	//Parsing and building AST
 	try{
 		driver->parse();
 	} catch(const exception &e) {
-		cerr << "A parser error found: " << e.what() << endl;
+		cerr << "A parser error found:\n\t" << e.what() << endl;
 		exit(1);
 	}
 
-	grammar::ast::KappaAst &ast = driver->getAst();
+	auto &ast = driver->getAst();
 	//ast.show();cout << "\n\n" ;
 
-	//building the environment and (global) vars
-	auto& env =  *new pattern::Environment();//just to delete vars after env
-	SimContext base_context(env,params.seed);
+
 	NamesMap<expressions::Auxiliar,FL_TYPE> empty_aux_values;
 	base_context.setAuxMap(&empty_aux_values);
 	//auto& vars = base_context.getVars();
 	try{
-		ast.evaluateParams(env,base_context,params.modelParams);
+		ast.evaluateParams(env,base_context,params->modelParams,ka_params);
 		ast.evaluateDeclarations(env,base_context,true);//constants
 		ast.evaluateCompartments(env,base_context);
 		ast.evaluateUseExpressions(env,base_context);
 		ast.evaluateSignatures(env,base_context);
 		ast.evaluateDeclarations(env,base_context,false);//vars
 		ast.evaluateChannels(env,base_context);
-		ast.evaluateRules(env,base_context);
+		ast.evaluateRules(env,base_context);//and transports
 		ast.evaluatePerts(env,base_context);
 		ast.evaluateInits(env,base_context);
 	}
 	catch(const exception &e){
-		cerr << "An exception found while building the environment.\n" << e.what() << endl;
+		cerr << "An exception found while building the environment:\n\t" << e.what() << endl;
 		exit(1);
 	}
 	env.buildFreeSiteCC();
 	env.buildInfluenceMap(base_context);
 
 	//TODO building the connection map for compartments
-	map<pair<int,int>,double> edges;
+	/*map<pair<int,int>,double> edges;
 	for(size_t i = 0; i < env.size<pattern::Channel>(); i++ ){
 		for(auto& channel : env.getChannels(i)){
 			for(auto cells : channel.getConnections(base_context)){
@@ -91,11 +105,11 @@ Results run(int argc, const char * const argv[]){
 				}
 			}
 		}
-	}
+	}*/
 	//cout << "total cells: " << pattern::Compartment::getTotalCells() << endl;
 	//for(auto edge : edges)
 	//	cout << edge.first.first << "->" << edge.first.second << ": " << edge.second << endl;
-	auto cells = Simulation::allocCells(1,vector<double>(pattern::Compartment::getTotalCells(),1.0),edges,-1);
+	//auto cells = Simulation::allocCells(1,vector<double>(env.getCellCount(),1.0),edges,-1);
 	//simulation::Simulation sim(env);
 	//for(auto i : cells[0])
 	//	cout << i << ", ";
@@ -104,16 +118,16 @@ Results run(int argc, const char * const argv[]){
 
 
 
-	if(params.verbose)//verbose > 0
+	if(params->verbose)//verbose > 0
 		env.show(base_context);
 
 
 	//auto sims = new simulation::Simulation*[params.runs];
 
 	//initialize number of thread (TODO a better way?)
-#ifdef DEBUG
-	//omp_set_num_threads(1);
-#endif
+//#ifdef DEBUG
+//	omp_set_num_threads(1);
+//#endif
 	int k = 1;
 #	pragma omp parallel
 	{
@@ -121,47 +135,50 @@ Results run(int argc, const char * const argv[]){
 	}
 
 //#ifndef DEBUG
-	omp_set_num_threads(min(params.runs,k));
+//	omp_set_num_threads(min(params.runs,k));
 //#endif
 
-	Results result;
+	Results* result = new Results();
+	cout << "initializing threads: " << k << endl;
 #	pragma omp parallel for
-	for(int i = 0; i < params.runs; i++){
+	for(int i = 0; i < params->runs; i++){
 		auto sim = new Simulation(base_context,i);
-		//try{
-			sim->initialize(cells,ast);
-		/*}
+		try{
+			sim->initialize();
+		}
 		catch(const exception &e){
-			cerr << "An exception found on initialization of simulation["
+			cout << "An exception found on initialization of simulation["
 					<< i << "]: " << e.what() << endl;
 			exit(1);
-		}*/
+		}
 
-		if(i == 0)
+		if(i == 0){
+//#			pragma omp critical
 			WarningStack::getStack().show();
+		}
 		if( env.getRules().size() < 1){
 			cout << "No rules to execute a simulation. Aborting." << endl;
 			exit(1);
 		}
-		if(params.verbose > 0){//only print this if if verbose is set for init or more
+		if(params->verbose > 0){//only print this if verbose is set for init or more
 			if(i == 0){
+#			pragma omp critical
+				if(params->runs > 1)
+					cout << "[Sim 0]: ";
+				cout << "=== Initial-State ===\n";
 				sim->print();
-				//cout << difftime(time(nullptr),t) << " seconds loading initial state.\n";
-				cout << "------------------------------------\n";
-			}
-			if(params.runs > 1){
-				//cout << difftime(time(nullptr),t) << " seconds loading initial state";
-				cout << " of sim[" << i << "]" << endl;
+				cout << "=========================" << endl;
 			}
 		}
 
-		try{
-			sim->run(params);
-		}catch(exception &e){
-			cerr << "An exception found when running simulation[" << i <<"]:\n" << e.what() << endl;
-			exit(1);
-		}
-		result.append(sim);
+		//try{
+			sim->run();
+		//}catch(exception &e){
+			//cerr << "An exception found when running simulation[" << i <<"]:\n" << e.what() << endl;
+			//exit(1);
+		//}
+		WarningStack::getStack().show();
+		result->append(sim);
 	}
 
 	/*delete &env;

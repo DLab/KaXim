@@ -14,7 +14,8 @@ namespace simulation { class Results;}
 
 namespace binds {
 
-simulation::Results run_kappa_model(std::map<std::string,std::string> params);
+simulation::Results& run_kappa_model(std::map<std::string,std::string> args,
+		std::map<std::string,float> ka_params = std::map<std::string,float>());
 
 } /* namespace matching */
 

@@ -10,34 +10,33 @@
 
 #include "../util/Exceptions.h"
 
-namespace pattern {
+namespace spatial {
 
 /*****************************************
  *********** Class Compartment ***********
  ****************************************/
-unsigned int Compartment::TOTAL_CELLS = 0;
-unsigned int Compartment::getTotalCells(){
+//unsigned int Compartment::TOTAL_CELLS = 0;
+/*unsigned int Compartment::getTotalCells(){
 	return TOTAL_CELLS;
-}
+}*/
 Compartment::Compartment(const std::string &nme)
 		:name(nme),dimensions(1,1),volume(nullptr) {//TODO initialize dims with (1,1)??
-	firstCell = TOTAL_CELLS;
+	firstCell = 0;
 	cellsCount = 1;
-	TOTAL_CELLS += 1;
 }
 
 Compartment::~Compartment() {
 	delete volume;
 }
 
-void Compartment::setDimensions(const std::vector<short> &dims){
+int Compartment::setDimensions(const std::vector<short> &dims,int first){
 	//TODO first cell?
-	TOTAL_CELLS -= cellsCount;
+	firstCell = first;
 	dimensions = dims;
 	cellsCount = 1;
 	for(unsigned int i = 0; i < dimensions.size(); i++)
 		cellsCount *= dimensions[i];
-	TOTAL_CELLS += cellsCount;
+	return cellsCount;
 }
 void Compartment::setVolume(const state::BaseExpression *vol){
 	if(volume)
@@ -116,7 +115,7 @@ CompartmentExpr::CompartmentExpr(const Compartment& c,const std::list<const stat
 	: comp(c),cellExpr(expr),b(expr.size())
 {
 	if(c.getDimensions().size() < cellExpr.size())
-		throw invalid_argument("Compartment "+comp.getName()+" has not enough dimensions.");
+		throw std::invalid_argument("Compartment "+comp.getName()+" has not enough dimensions.");
 }
 
 
@@ -159,7 +158,7 @@ std::list<int> CompartmentExpr::getCells(const AuxNames& aux_values,const simula
 			if(factors.size() > 1)
 				throw std::exception();//Cannot solve this equation
 			for(int i = 0; i < comp.getDimensions()[dim];i++){
-				auto value = (b + i) / (FL_TYPE)factors.begin()->second;
+				auto value = (b + i) / (FL_TYPE)comp.getDimensions()[dim];//TODO
 				if(value == (int)value)
 					cell_values[dim].push_back(i);
 			}
@@ -238,12 +237,12 @@ void CompartmentExpr::setEquation(){
 		//b = prod(At,b);
 	}
 	else if (A.size1() < A.size2())//if there are more vars than eqs
-		throw invalid_argument("Cannot solve the implicit equation system for this expression.");
+		throw std::invalid_argument("Cannot solve the implicit equation system for this expression.");
 
 	inverseA = matrix<FL_TYPE>(A.size1(),A.size2());
 	bool invertible = InvertMatrix(A,inverseA);
 	if(!invertible)
-		throw invalid_argument("Cannot solve the implicit equation system for this expression.");
+		throw std::invalid_argument("Cannot solve the implicit equation system for this expression.");
 }
 
 
@@ -309,17 +308,15 @@ std::set<int> UseExpression::ALL_CELLS;
 //TODO filter
 UseExpression::UseExpression(size_t comps_count,const state::BaseExpression* where):
 		filter(dynamic_cast<const state::AlgExpression<bool>* >(where) ),isComplete(false) {
-	if(comps_count > 0){
-		reserve(comps_count);
-		cells = new std::set<int>();
-	}
-	else{
-		if(ALL_CELLS.size() == 0)
-			for(unsigned i = 0; i < Compartment::getTotalCells(); i++)
-				ALL_CELLS.insert(i);
-		cells = &ALL_CELLS;
-		isComplete = true;
-	}
+	reserve(comps_count);
+	cells = new std::set<int>();
+}
+UseExpression::UseExpression(size_t total_cell) : filter(nullptr){
+	if(ALL_CELLS.size() == 0)
+		for(unsigned i = 0; i < total_cell; i++)
+			ALL_CELLS.insert(i);
+	cells = &ALL_CELLS;
+	isComplete = true;
 }
 //TODO filter
 UseExpression::~UseExpression(){

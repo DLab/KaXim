@@ -142,69 +142,63 @@ template <> void Node::setState(small_id site_id,int value){
 
 
 void Node::removeFrom(State& state) {
+	auto params = state.params;
 	state.removeNode(this);
 	/*for(small_id i = 0; i < intfSize; i++){
 		interface[i]->negativeUpdate(state.ev,state.injections,state);
 	}*/
 	InternalState::negativeUpdate(state.ev,state.injections,deps,state);
 	state.ev.side_effects.erase(this);
-#ifdef DEBUG
-	if(simulation::Parameters::get().verbose > 2){
+	IF_DEBUG_LVL(3,
 		auto& ag_sign = state.getEnv().getSignature(signId);
-		cout << "[remove] " << ag_sign.getName() << "()\n";
-	}
-#endif
+		state.log_msg += "\t[remove] "+ ag_sign.getName() +"()\n";
+	)
 	delete this;//TODO do not delete, reuse nodes
 }
 
 void Node::changeIntState(State& state){
+	auto params = state.params;
 	auto old_val = interface[state.ev.act.trgt_st]->getValue().smallVal;
 	if(old_val == state.ev.act.new_label){
 		state.ev.null_actions.emplace(this,state.ev.act.trgt_st);
-#ifdef DEBUG
-	if(simulation::Parameters::get().verbose > 2)
-		cout << "[null-action] ";
-#endif
+		IF_DEBUG_LVL(3,
+		state.log_msg += "\t[null-action] ";
+)
 	} else {
 		interface[state.ev.act.trgt_st]->setValue(state.ev.act.new_label);
 		interface[state.ev.act.trgt_st]->negativeUpdateByValue(state.ev,state.injections,state);
 	}
-#ifdef DEBUG
-	if(simulation::Parameters::get().verbose > 2){
+	IF_DEBUG_LVL(3,
 		auto& agent = state.getEnv().getSignature(signId);
 		auto& site_sign = dynamic_cast<const pattern::Signature::LabelSite&>(
 				agent.getSite(state.ev.act.trgt_st));
-		cout << "[change] " << agent.getName() << "(" << site_sign.getName()
-				<< "~{ " << site_sign.getLabel(old_val)
-				<< " -> " << site_sign.getLabel(state.ev.act.new_label) << " })\n";
-	}
-#endif
+		state.log_msg += "\t[change] " + agent.getName() + "(" + site_sign.getName()
+				+ "~{ " + site_sign.getLabel(old_val)
+				+ " -> " + site_sign.getLabel(state.ev.act.new_label) + " })\n";
+	)
 }
 
 void Node::assign(State& state){
+	auto params = state.params;
 	auto val = state.ev.act.new_value->getValue(state);
 	auto old_val = interface[state.ev.act.trgt_st]->getValue();
 	if(old_val == val){
 		state.ev.null_actions.emplace(this,state.ev.act.trgt_st);
-#ifdef DEBUG
-		if(simulation::Parameters::get().verbose > 2)
-			cout << "[null-action] ";
-#endif
+		IF_DEBUG_LVL(3,state.log_msg += "\t[null-action] ");
 	} else {
 		interface[state.ev.act.trgt_st]->setValue(val);
 		interface[state.ev.act.trgt_st]->negativeUpdateByValue(state.ev,state.injections,state);
 	}
-#ifdef DEBUG
-	if(simulation::Parameters::get().verbose > 2){
+	IF_DEBUG_LVL(3,
 		auto& agent = state.getEnv().getSignature(signId);
 		auto& site_sign = agent.getSite(state.ev.act.trgt_st);
-		cout << "[assign] " << agent.getName() << "(" << site_sign.getName()
-				<< "~{ " << old_val	<< " -> " << val.valueAs<FL_TYPE>() << " })\n";
-	}
-#endif
+		state.log_msg += "\t[assign] " + agent.getName() + "(" + site_sign.getName()
+				+ "~{ " + old_val.toString() + " -> " + val.toString() + " })\n";
+	)
 }
 
 void Node::unbind(State& state){
+	auto params = state.params;
 	auto lnk = interface[state.ev.act.trgt_st]->getLink();
 	if(lnk.first){
 		if(state.ev.act.side_eff)//when unbinding s!_ or s? pattern
@@ -215,26 +209,22 @@ void Node::unbind(State& state){
 			lnk.first->setInternalLink(lnk.second,nullptr,0);
 		//}
 		interface[state.ev.act.trgt_st]->setLink(nullptr,0);
-#ifdef DEBUG
-		if(simulation::Parameters::get().verbose > 2){
+		IF_DEBUG_LVL(3,
 			auto& agent = state.getEnv().getSignature(signId);
 			auto& site_sign = agent.getSite(state.ev.act.trgt_st);
 			auto& trgt_ag = state.getEnv().getSignature(lnk.first->getId());
-			cout << "[unbind] " << agent.getName() << "." << site_sign.getName()
-					<< "!" << trgt_ag.getSite(lnk.second).getName() << "."
-					<< trgt_ag.getName() << "\n";
-		}
-#endif
+			state.log_msg += "\t[unbind] " + agent.getName() + "." + site_sign.getName()
+					+ "!" + trgt_ag.getSite(lnk.second).getName() + "."
+					+ trgt_ag.getName() + "\n";
+		)
 	}
 	else{//unbinding s? pattern
 		state.ev.null_actions.emplace(this,-int(state.ev.act.trgt_st)-1);
-#ifdef DEBUG
-		if(simulation::Parameters::get().verbose > 2)
-			cout << "[unbind] null-action\n";
-#endif
+		IF_DEBUG_LVL(3,state.log_msg += "\t[unbind] null-action\n");
 	}
 }
 void Node::bind(State& state){
+	auto params = state.params;
 	auto chain = state.ev.act.chain;
 	auto trgt_node = state.ev.emb[chain->trgt_ag.first][chain->trgt_ag.second];
 	auto trgt_site = chain->trgt_st;
@@ -244,41 +234,34 @@ void Node::bind(State& state){
 			if(lnk.first == trgt_node && lnk.second == trgt_site){//WILD/ANY and no unary rate
 				state.ev.null_actions.emplace(this,-int(state.ev.act.trgt_st)-1);
 				state.ev.null_actions.emplace(lnk.first,-int(trgt_site)-1);
-#ifdef DEBUG
-				if(simulation::Parameters::get().verbose > 2)
-					cout << "[bind] null-action\n";
-#endif
+				IF_DEBUG_LVL(3,state.log_msg += "\t[bind] null-action\n");
 				return;
 			}
 			state.ev.side_effects.emplace(lnk);
 		}
 		lnk.first->interface[lnk.second]->negativeUpdateByBind(state.ev,state.injections,state);
 		lnk.first->setInternalLink(lnk.second,nullptr,0);
-#ifdef DEBUG
-		if(simulation::Parameters::get().verbose > 2){
+		IF_DEBUG_LVL(3,
 			auto& agent = state.getEnv().getSignature(signId);
 			auto& site_sign = agent.getSite(state.ev.act.trgt_st);
 			auto& trgt_ag = state.getEnv().getSignature(lnk.first->getId());
-			cout << "[unbind(bind-swap)] " << agent.getName() << "." << site_sign.getName()
-					<< "!" << trgt_ag.getSite(lnk.second).getName() << "."
-					<< trgt_ag.getName() << "\n";
-		}
-#endif
+			state.log_msg += "\t[unbind(bind-swap)] " + agent.getName() + "." + site_sign.getName()
+					+ "!" + trgt_ag.getSite(lnk.second).getName() + "."
+					+ trgt_ag.getName() + "\n";
+		)
 	}
 	interface[state.ev.act.trgt_st]->negativeUpdateByBind(state.ev,state.injections,state);
 	interface[state.ev.act.trgt_st]->setLink(trgt_node,trgt_site);
 	trgt_node->interface[trgt_site]->negativeUpdateByBind(state.ev,state.injections,state);
 	trgt_node->interface[trgt_site]->setLink(this,state.ev.act.trgt_st);
-#ifdef DEBUG
-	if(simulation::Parameters::get().verbose > 2){
+	IF_DEBUG_LVL(3,
 		auto& agent = state.getEnv().getSignature(signId);
 		auto& site_sign = agent.getSite(state.ev.act.trgt_st);
 		auto& trgt_ag = state.getEnv().getSignature(trgt_node->getId());
-		cout << "[bind] " << agent.getName() << "." << site_sign.getName()
-				<< "_" << trgt_ag.getSite(trgt_site).getName() << "."
-				<< trgt_ag.getName() << "\n";
-	}
-#endif
+		state.log_msg += "\t[bind] " + agent.getName() + "." + site_sign.getName()
+				+ "_" + trgt_ag.getSite(trgt_site).getName() + "."
+				+ trgt_ag.getName() + "\n";
+	)
 }
 
 InternalState** Node::begin(){
@@ -502,6 +485,7 @@ void SubNode::bind(State& state){
 InjSet* InternalState::EMPTY_INJSET = new InjSet();
 
 void InternalState::negativeUpdate(EventInfo& ev,InjRandContainer** injs,InjSet* deps,const State& state){
+	auto params = state.params;
 	auto dep_it = deps->begin(),nxt = dep_it,end = deps->end();
 	while(dep_it != end){//there is still injs to delete
 		auto inj = static_cast<matching::CcInjection*>(*dep_it);
@@ -526,9 +510,9 @@ void InternalState::negativeUpdate(EventInfo& ev,InjRandContainer** injs,InjSet*
 							injs[cc.getId()]->freeInjs.emplace_back(inj);
 				}
 			}//for i
-			IF_DEBUG_LVL(4,cout << "Trashing injection: " << cc.toString(state.getEnv()) << endl )
+			IF_DEBUG_LVL(4,state.log_msg += "Trashing injection: " + cc.toString(state.getEnv()) +"\n" );
 			injs[cc.getId()]->erase(inj,state);
-			//ev.to_update.emplace(&cc);
+			ev.to_update.emplace(&cc);
 		}//else
 		dep_it = nxt;
 	}
@@ -783,11 +767,11 @@ string SubNode::toString(const pattern::Environment &env,bool show_binds,map<con
  ******* EventInfo **************
  ********************************/
 
-EventInfo::EventInfo() : emb(nullptr),is_unary(false),cc_count(0) {//,aux_map(emb) {
+EventInfo::EventInfo() : comp_id(-1),emb(nullptr),is_unary(false),cc_count(0) {//,aux_map(emb) {
 	//TODO these numbers are arbitrary!!
-	emb = new vector<Node*>[4];
+	emb = new vector<Node*>[4];//max_arity
 	for(int i = 0; i < 4 ; i++)
-		emb[i].resize(12);
+		emb[i].resize(12);		//max-agents per CC
 	//aux_map.setEmb(emb);
 }
 
@@ -798,6 +782,7 @@ EventInfo::~EventInfo(){
 }
 
 void EventInfo::clear(){
+	comp_id =-1;
 	is_unary = false;
 	side_effects.clear();
 	pert_ids.clear();

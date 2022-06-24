@@ -104,16 +104,18 @@ FL_TYPE AlgebraicVar<T>::auxFactors(std::unordered_map<std::string,FL_TYPE> &aux
 template <typename T>
 BaseExpression::Reduction AlgebraicVar<T>::factorize(const std::map<std::string,small_id> &aux_cc) const {
 	BaseExpression::Reduction r;
-	r.factor = this->clone();
+	r.factor = this->makeVarLabel();//->clone();
 	return r;
 }
 
 template <typename T>
 BaseExpression* AlgebraicVar<T>::reduce(SimContext& context) {
-	auto r = expression->reduce(context);
-	if(expression != r)
-		delete expression;
-	expression = dynamic_cast<AlgExpression<T>*>(r);
+	if(!reduced){
+		auto r = expression->reduce(context);
+		if(expression != r)
+			delete expression;
+		expression = dynamic_cast<AlgExpression<T>*>(r);
+	}
 	return this;
 }
 
@@ -129,7 +131,10 @@ BaseExpression* AlgebraicVar<T>::makeVarLabel() const{
 
 template <typename T>
 bool AlgebraicVar<T>::operator==(const BaseExpression& exp) const {
-	return *expression == exp;
+	auto alg_var = dynamic_cast<const AlgebraicVar<T>*>(&exp);
+	if(alg_var)
+		return alg_var->name == name;
+	return false;
 }
 
 
@@ -234,14 +239,14 @@ BaseExpression* KappaVar::clone() const {
 int KappaVar::evaluate(const SimContext& context) const {
 	UINT_TYPE  count = 1;
 	for(const auto cc : *mixture){
-		count *= context.getInjContainer(cc->getId()).count();
+		count *= context.count(cc->getId());
 	}
 	return count;
 }
 int KappaVar::evaluateSafe(const SimContext& context) const {
 	UINT_TYPE  count = 1;
 	for(const auto cc : *mixture){
-		count *= context.getInjContainer(cc->getId()).count();
+		count *= context.count(cc->getId());
 	}
 	return count;
 }
@@ -318,14 +323,14 @@ template <typename T>
 T DistributionVar<T>::evaluate(const SimContext& context) const {
 	auto& injs = context.getInjContainer(mixture->getComponent(0).getId());
 	return injs.sumInternal(auxFunc,context)
-			/ (op? injs.count() : 1);
+			/ (op? context.getInjContainer(mixture->getComponent(0).getId()).count() : 1);
 	//throw invalid_argument("DistributionVar::evaluate(): invalid");
 }
 template <typename T>
 T DistributionVar<T>::evaluateSafe(const SimContext& context) const {
 	auto& injs = context.getInjContainer(mixture->getComponent(0).getId());
 	return injs.sumInternal(auxFunc,context)
-			/ (op? injs.count() : 1);
+			/ (op? context.getInjContainer(mixture->getComponent(0).getId()).count() : 1);
 }
 
 template <typename T>

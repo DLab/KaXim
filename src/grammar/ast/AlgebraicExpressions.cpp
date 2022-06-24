@@ -269,16 +269,21 @@ BaseExpression* Var::eval(const pattern::Environment& env,
 	}
 	case AUX:
 		if(flags & AUX_ALLOW){
+			if(deps)//TODO set deps TODO only if lhs rhs pattern???
+				deps->emplace(name.getString());
 			if( (flags & LHS) || (flags & RHS) || (flags & PATTERN) ){
 				//TODO maybe change to Aux<type> depending on valued_site type?
 				auto aux_expr = new Auxiliar<FL_TYPE>(name.getString());
-				if(mix)
-					mix->addAuxRef(aux_expr);
-				else
-					env.getMixtures().back()->addAuxRef(aux_expr);
+				try {
+					if(mix)
+						mix->addAuxRef(aux_expr);
+					else
+						env.getMixtures().back()->addAuxRef(aux_expr);
+				}
+				catch(out_of_range& e) {
+					throw invalid_argument("Auxiliar "+ name.getString() +" not found.");
+				}
 				expr = aux_expr;
-				if(deps)//TODO set deps
-					deps->emplace(name.getString());
 			}
 			else//is compartment
 				expr = new Auxiliar<int>(name.getString());//comp aux || aux_map->at(name.getString()));

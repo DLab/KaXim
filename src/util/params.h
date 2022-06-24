@@ -2,7 +2,7 @@
 #ifndef PARAMS_H
 #define PARAMS_H
 
-#define DEBUG true //in make command
+//#define DEBUG true //in make command
 
 #include <utility>
 #include <stdexcept>
@@ -35,11 +35,18 @@ class False : public std::exception {
 
 #ifdef DEBUG
 	#define IF_DEBUG_LVL(lvl,to_do) \
-		if(simulation::Parameters::get().verbose >= lvl) { to_do; }
+		if(params->verbose >= lvl) { to_do; }
 #else
 	#define IF_DEBUG_LVL(lvl,to_do) /* do not debug */
 #endif
 
-
+#ifdef DEBUG
+	#define DEBUG_LOG(lvl,id,msg) \
+		if(simulation::Parameters::get().verbose >= lvl)\
+			std::clog << "[Sim " << id << "]: " << msg << std::endl;
+#else
+	#define DEBUG_LOG(lvl,id,msg) /*do not log*/
 #endif
+
+#endif //params.h
 

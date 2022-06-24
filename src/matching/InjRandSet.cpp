@@ -55,6 +55,24 @@ InjType* InjRandContainer<InjType>::emplace(const state::State& state,Args... ar
 }*/
 
 template <typename InjType>
+InjType* InjRandContainer<InjType>::selectInj(const state::State& state) {
+	InjType* inj;
+	if(freeInjs.empty()){
+		inj = newInj();
+		if(inj == nullptr)
+			return nullptr;
+	}
+	else {
+		inj = freeInjs.front();
+		freeInjs.pop_front();
+	}
+	state.setAuxMap(*inj->getEmbedding());
+	return inj;
+}
+
+template MixInjection* InjRandContainer<MixInjection>::selectInj(const state::State& state);
+
+template <typename InjType>
 InjType* InjRandContainer<InjType>::emplace(Injection* base_inj,map<Node*,Node*>& mask,const state::State& state){
 	InjType* inj;
 	if(freeInjs.empty()){
@@ -166,7 +184,7 @@ InjType& InjRandSet<InjType>::choose(unsigned id) const {
 }
 
 template <typename InjType>
-void InjRandSet<InjType>::insert(InjType* inj,const state::State& state){
+list<pair<const BE*,FL_TYPE>>& InjRandSet<InjType>::insert(InjType* inj,const state::State& state){
 	inj->alloc(container.size());
 	container.push_back(inj);
 	if(inj->count() > 1){
@@ -175,6 +193,7 @@ void InjRandSet<InjType>::insert(InjType* inj,const state::State& state){
 	}
 	else
 		counter++;
+	return this->sumList;
 }
 
 template <typename InjType>
@@ -285,7 +304,7 @@ MixInjection& InjRandSet<MixInjection>::choose(unsigned id) const {
 	}
 }
 
-void InjRandSet<MixInjection>::insert(MixInjection* inj,const state::State& state){
+list<pair<const BE*,FL_TYPE>>& InjRandSet<MixInjection>::insert(MixInjection* inj,const state::State& state){
 	if(inj->getDistance() > radius)
 		return next->insert(inj,state);
 	inj->alloc(container.size());
@@ -293,6 +312,7 @@ void InjRandSet<MixInjection>::insert(MixInjection* inj,const state::State& stat
 	counter += inj->count();
 	if(inj->count() > 1)
 		multiCount++;
+	return sumList;
 }
 
 void InjRandSet<MixInjection>::del(Injection* inj){
@@ -421,10 +441,10 @@ void InjRandTree<CcValueInj>::insert(CcValueInj* inj,const state::State& state) 
 */
 
 template <typename InjType>
-void InjRandTree<InjType>::insert(InjType* _inj,const state::State& state) {
+list<pair<const BE*,FL_TYPE>>& InjRandTree<InjType>::insert(InjType* _inj,const state::State& state) {
 	auto inj = dynamic_cast<CcValueInj*>(_inj);
 	for(auto& ridcc_tree : roots_to_push){// for each (rid,cc_index) that is using this cc-pattern
-		auto& r = state.getEnv().getRules()[ridcc_tree.first.first];
+		auto& r = state.getEnv().getRule(ridcc_tree.first.first);
 		FL_TYPE val = 1.0;
 		auto ccaux_func = state.getRuleRate(r.getId()).getExpression(ridcc_tree.first.second);
 		val *= ccaux_func->getValue(state).template valueAs<FL_TYPE>();//TODO at this point injection is already set in state?
@@ -435,6 +455,7 @@ void InjRandTree<InjType>::insert(InjType* _inj,const state::State& state) {
 	}
 	counter += inj->count();
 	invalidations++;
+	return this->sumList;
 }
 
 
@@ -571,6 +592,7 @@ InjLazyContainer<InjType>::~InjLazyContainer(){
 
 template <typename InjType>
 void InjLazyContainer<InjType>::loadContainer() const {
+	//cout << "loading container" << endl;
 	(*holder) = new InjRandSet<InjType>(this->ptrn);
 	for(auto& node_p : graph){
 		map<int,InjSet*> port_list;
@@ -585,6 +607,13 @@ void InjLazyContainer<InjType>::loadContainer() const {
 	}
 	loaded = true;
 	//cout << "cc " << cc.getId() << " loaded!" << endl;
+}
+
+template <typename InjType>
+void InjLazyContainer<InjType>::loadEmptyContainer() const {
+	//cout << "loading empty container" << endl;
+	(*holder) = new InjRandSet<InjType>(this->ptrn);
+	loaded = true;
 }
 
 template <typename InjType>
@@ -610,7 +639,8 @@ size_t InjLazyContainer<InjType>::count() const {
 }
 template <typename InjType>
 FL_TYPE InjLazyContainer<InjType>::partialReactivity() const {
-	loadContainer();
+	if(!loaded)
+		loadContainer();
 	auto re = (*holder)->partialReactivity();
 	delete this;
 	return re;
@@ -634,7 +664,10 @@ template <typename InjType>
 void InjLazyContainer<InjType>::clear() {}
 
 template <typename InjType>
-void InjLazyContainer<InjType>::selectRule(int rid,small_id cc) const {}
+void InjLazyContainer<InjType>::selectRule(int rid,small_id cc) const {
+	loadContainer();
+	(*holder)->selectRule(rid,cc);
+}
 template <typename InjType>
 FL_TYPE InjLazyContainer<InjType>::getM2() const {
 	loadContainer();
@@ -648,6 +681,7 @@ FL_TYPE InjLazyContainer<InjType>::sumInternal(const expressions::BaseExpression
 		const simulation::SimContext& context) const{
 	loadContainer();
 	auto re = (*holder)->sumInternal(aux_func,state);
+	//cout << "lazy sum internal = " << re << endl;
 	delete this;
 	return re;
 }
@@ -660,9 +694,21 @@ void InjLazyContainer<InjType>::fold(const function<void (const Injection*)> fun
 }
 
 template <typename InjType>
-void InjLazyContainer<InjType>::insert(InjType* inj,const state::State& state) {}
+list<pair<const BE*,FL_TYPE>>& InjLazyContainer<InjType>::insert(InjType* inj,const state::State& state) {
+	if(!loaded)
+		throw invalid_argument("InjLazyContainer::insert(): invalid call.");
+	auto hold = (*holder);
+	hold->insert(inj,state);
+	delete this;
+	return hold->sumList;
+}
 template <typename InjType>
-InjType* InjLazyContainer<InjType>::newInj() const {return nullptr;}
+InjType* InjLazyContainer<InjType>::newInj() const {
+	loadEmptyContainer();
+	auto re = (*holder)->newInj();
+	//delete this;//TODO delete this will invalidate [this] in emplace
+	return re;
+}
 
 template class InjLazyContainer<CcInjection>;
 template class InjRandContainer<CcInjection>;

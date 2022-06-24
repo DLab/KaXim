@@ -8,6 +8,8 @@
 #include "Simulation.h"
 #include "../state/Variable.h"
 #include "../data_structs/DataTable.h"
+#include "../data_structs/MyMaskedBinaryRandomTree.h"
+#include "../state/Node.h"
 #include <set>
 #include <boost/random.hpp>
 
@@ -18,17 +20,19 @@ namespace simulation {
 		ccInjections(nullptr),mixInjections(nullptr),done(false){}*/
 
 Simulation::Simulation(SimContext& context,int _id) :
-		SimContext(_id,&context),ccInjections(nullptr),
-		mixInjections(nullptr),done(false){
-	auto& params = Parameters::get();
-	if(params.maxTime >= std::numeric_limits<FL_TYPE>::infinity())
-		if(params.maxEvent == std::numeric_limits<UINT_TYPE>::infinity())
+		SimContext(_id,&context,&counter),activityTree(nullptr),
+		ccInjections(nullptr),mixInjections(nullptr),done(false){
+	if(params->maxTime >= std::numeric_limits<FL_TYPE>::infinity())
+		if(params->maxEvent == std::numeric_limits<UINT_TYPE>::infinity())
 			throw invalid_argument("No limit to stop or control simulation.");
 		else
-			plot = new EventPlot(env,_id);
+			plot = new EventPlot(*this);
 	else
-		plot = new TimePlot(env,_id);
+		plot = new TimePlot(*this);
 
+	for(auto pert : env.getPerts()){
+		perts.emplace(pert->getId(),*pert);
+	}
 }
 
 /*Simulation::Simulation() : SimContext(0,Parameters::get().seed),
@@ -36,95 +40,383 @@ Simulation::Simulation(SimContext& context,int _id) :
 		done(false) {}
 */
 Simulation::~Simulation() {
-	cout << "Simulation[" << id << "] finished." << endl;
-	// TODO Auto-generated destructor stub
-	//delete[] ccInjections;
-	//delete[] mixInjections;
+//	cout << "deleting Simulation[" << id << "]." << endl;
+	delete[] ccInjections;
+	delete[] mixInjections;
+	for(auto cell : cells)
+		delete cell;
 }
 
 //void Simulation::setCells(const list<unsigned int>& _cells,const VarVector& vars){}
 
-const state::State& Simulation::getCell(int id) const {
-	return cells.at(id);
-}
-
-void Simulation::initialize(const vector<list<unsigned int>>& _cells,grammar::ast::KappaAst& ast){
-	int id = 0;
-	for(auto& param : env.getParams()){
+void Simulation::initialize(){
+	int pid = 0;
+	/*for(auto& param : env.getParams()){
 		auto var = getVars()[env.getVarId(param.first)];
 		//if(var == nullptr)
-			var = new state::ConstantVar<FL_TYPE>(id,param.first,
+			var = new state::ConstantVar<FL_TYPE>(pid,param.first,
 					param.second->getValue(*this).valueAs<FL_TYPE>());
-		id++;
+		pid++;
 	}
 	for(auto var : parent->getVars()){
 		//todo set sim-vars
-	}
-	auto distr = uniform_int_distribution<int>();
-	for(auto cell_id : _cells.at(0)){//TODO all cells
-		cells.emplace(piecewise_construct,forward_as_tuple(cell_id),
+	}*/
+	//auto distr = uniform_int_distribution<int>();
+	for(int i = 0; i < env.getCellCount(); i++){//TODO all cells
+		/*cells.emplace(piecewise_construct,forward_as_tuple(cell_id),
 				forward_as_tuple((int)cell_id,*this,
-				env.getCompartmentByCellId(cell_id).getVolume(),*plot));
+				env.getCompartmentByCellId(cell_id).getVolume(),*plot));*/
+		cells.push_back(new state::State(i,*this,env.getCompartmentByCellId(i).getVolume(),
+				/**new expressions::Constant<int>(1)*/plot->getType() == "Event"));
 	}
+	IF_DEBUG_LVL(4,cout << "[Sim "+to_string(id)+ "]: Agent Initialization" << endl);
 	for(auto& init : env.getInits()){
 		auto &cells = env.getUseExpression(init.use_id).getCells();
 		auto n_value = init.n->getValueSafe(*this);
+		//cout << n_value << " init agents or tok\n" << endl;
 		if(init.mix){
 			int n;
 			if(n_value.t == Type::FLOAT){
 				n = round(n_value.fVal);
 				if(n != n_value.fVal)
-					ADD_WARN_NOLOC("Making approximation of a float value in agent initialization to "+to_string(n));
+					ADD_WARN_NOLOC("Making approximation of a float value in agent initialization to "+
+							to_string(n)+" ("+to_string(n_value.fVal)+")");
 			}
 			else
 				n = n_value.valueAs<int>();
+			if(n < 0)
+				throw invalid_argument("Initializing "+to_string(n)+" Agent(s) " + init.mix->toString(env));
 			addAgents(cells,n,*init.mix);
 		}
-		else
+		else {
 			addTokens(cells,n_value.valueAs<FL_TYPE>(),init.tok_id);
+		}
 	}
-	for(auto& id_state : cells){
-		//env.buildInfluenceMap(id_state.second);
-		//id_state.second.buildInfluenceMap();
-		id_state.second.initInjections();
-		id_state.second.initUnaryInjections();
-		id_state.second.initActTree();
+	IF_DEBUG_LVL(4,cout << "[Sim "+to_string(id)+ "]: Activity Tree Initialization" << endl);
+	if(activityTree)
+		delete activityTree;
+	int rule_count = env.getRules().size();
+	//spatial activity tree
+	activityTree = new data_structs::MyMaskedBinaryRandomTree<stack>(rule_count*cells.size(),rng);
+	list<const simulation::Rule*> rules;
+
+	env.buildInfluenceMap(*this);
+	for(auto cell : cells){
+		//env.buildInfluenceMap(*cell);
+		cell->initInjections();
+		cell->initUnaryInjections();
+		cell->initActTree();
+		for(int i = 0; i < rule_count; i++)
+			activityTree->add(maskSpatialRule(cell->getId(),i),cell->activityTree->find(i));
+		cell->plot->fill();
+	}
+	plot->fill();
+}
+
+
+void Simulation::run(){
+	FL_TYPE pert_t,stop_t = params->maxTime;
+	counter.next_sync_at = stop_t;
+	auto stop_e = params->maxEvent;
+	while(counter.getTime() < stop_t && counter.getEvent() < stop_e){
+		try{
+			pert_t = advanceTime();
+			tryPerturbate();
+			if(!pert_t){
+				auto cid_rid = drawRule();
+				if(cid_rid.first >= 0){
+					plot->fillBefore();
+					cells[cid_rid.first]->plot->fillBefore();
+					auto& rule = env.getRule(cid_rid.second);
+					cells[cid_rid.first]->apply(rule);
+					cells[cid_rid.first]->positiveUpdate(rule.getInfluences());
+					log_msg += cells[cid_rid.first]->log_msg;
+					cells[cid_rid.first]->log_msg = "";
+					counter.incEvents();
+				}
+				else {
+					NullEvent ex(cid_rid.second);
+					counter.incNullEvents(cid_rid.second);
+					IF_DEBUG_LVL(2,	log_msg = "Null-"+log_msg + "\n---"+ex.what()+"---\n\n");
+				}
+			}
+			else {
+				NullEvent ex(6);
+				counter.incNullEvents(6);
+				IF_DEBUG_LVL(2,	log_msg = "Null-"+log_msg + "\n---"+ex.what()+"---\n\n");
+			}
+		}
+		catch(const NullEvent &ex){
+			IF_DEBUG_LVL(2,log_msg = "Null-"+log_msg+"\n---"+ ex.what()+ "---\n");
+			counter.incNullEvents(ex.error);
+		}
+		/*catch(const exception &e){
+			std::cout << "[" << log_msg << e.what() << std::endl;
+			exit(1);
+		}*/
+		activityUpdate();
+#ifdef DEBUG
+		if((counter.getEvent()+counter.getNullEvent()) % 100 == 0 && params->verbose > 4){
+			log_msg += "---------------------------------------------\n";
+			//log_msg += this->toString();
+			log_msg += "\n---------------------------------------------\n";
+		}
+		size_t pos = 0;
+		auto sim_str = "[Sim " + to_string(parent->getId()) + "]: ";
+		if(log_msg != "" && params->runs > 1){
+			log_msg = sim_str + log_msg;
+			while((pos = log_msg.find("\n",pos+1)) != string::npos)
+				if(log_msg[pos+1] != '\n' && log_msg[pos+1] != '\0')
+					log_msg.insert(pos+1,sim_str);
+		}
+		std::cout << "[" << log_msg << std::endl;
+		log_msg = "";
+#endif
+		WarningStack::getStack().show(false);
+		plot->fill();
+		if(ev.comp_id != -1)
+			cells[ev.comp_id]->plot->fill();
+	}
+	done = true;
+	for(auto cell : cells){
+		cell->tryPerturbate();
+		cell->plotOut();
+	}
+	#pragma omp critical
+	if(params->verbose > 0 && id == 0){
+		if(params->runs > 1)
+			cout << "[Sim 0]: ";
+		cout << "=== Final-State === \n";
+		print();
+		cout << "============================ \n";
+	}
+}
+
+FL_TYPE Simulation::advanceTime() {
+	//if(counter.getEvent() == xx) cout << "bad event!!!" << endl;
+	FL_TYPE dt,act;
+	act = activityTree->total();
+	IF_DEBUG_LVL(2,
+		char buf[300];
+		sprintf(buf,"Event %3lu | Time %.4f | Reactivity = %.4f]\n",
+				counter.getEvent(),counter.getTime(),act);
+		log_msg += buf;
+	)
+	IF_DEBUG_LVL(4,
+		for(auto cell : cells)
+			log_msg += env.cellIdToString(cell->getId())+" | " + cell->activeRulesStr() + "\n";
+	)
+	if(act < 0.)
+		throw invalid_argument("Activity falls below zero.");
+	auto exp_distr = exponential_distribution<FL_TYPE>(act);
+	dt = exp_distr(rng);
+
+	//cout << "advance time" << dt << endl;
+	counter.advanceTime(dt);
+	if(act == 0 || std::isinf(dt))
+		throw NullEvent(0);
+	//timePerts = pertIds;
+	//pertIds.clear();
+	FL_TYPE stop_t = 0.0;
+#ifdef DEBUG
+	if(params->verbose > 1){
+		char buf[35];
+		sprintf(buf,"|| Time Step: %.4f ||\n",dt);
+		log_msg += buf;
+	}
+#endif
+	updateDeps(pattern::Dependency(pattern::Dependency::TIME));
+	for(auto& time_dPert : timePerts){//fixed-time-perts
+		//cout << "checking time-perts" << endl;
+		if(time_dPert.first > counter.getTime())
+			break;
+		auto p_id = time_dPert.second.id;
+		bool abort = false;
+		auto& pert = perts.at(p_id);
+		stop_t = pert.timeTest(*this);
+		IF_DEBUG_LVL(2,dt = stop_t - counter.getTime() + dt;)
+		counter.setTime( (stop_t > 0) ? stop_t : counter.getTime());
+		plot->fillBefore();
+		cells[ev.comp_id]->plot->fillBefore();
+		pert.apply(*this);
+		counter.setTime( std::nextafter(counter.getTime(),counter.getTime() + 1.0));//TODO inf?
+		abort = pert.testAbort(*this,true);
+		if(!abort)
+			activeDeps.addTimePertDependency(p_id, pert.nextStopTime());
+#ifdef DEBUG
+		if(params->verbose > 1){
+			char buf[35];
+			sprintf(buf,"|| Corrected Time Step: %.4f ||\n",dt);
+			log_msg += buf;
+		}
+#endif
+	}
+	timePerts.clear();
+	return stop_t;
+}
+
+pair<int,int> Simulation::drawRule() {
+	auto id_a = activityTree->chooseRandom();
+	auto comp_rid = unmaskSpatialRule(id_a.first);
+
+	ev.comp_id = comp_rid.first;
+	IF_DEBUG_LVL(2,char buf[200];
+		sprintf(buf,"|| Rule: %-20.20s |",env.getRule(comp_rid.second).getName().c_str());
+		if(cells.size() > 1)
+			log_msg += "|| " + env.cellIdToString(ev.comp_id) +" ";
+		log_msg = log_msg + buf;
+	)
+
+	auto a1a2 = cells[comp_rid.first]->getRuleActivity(comp_rid.second);
+	auto alpha = a1a2.first + a1a2.second;
+
+	if(alpha == 0.)
+		activityTree->add(id_a.first,0.);
+
+	if(alpha < numeric_limits<FL_TYPE>::max()){
+		if(alpha > id_a.second){
+			//TODO if IntSet.mem rule_id state.silenced then (if !Parameter.debugModeOn then Debug.tag "Real activity is below approximation... but I knew it!") else invalid_arg "State.draw_rule: activity invariant violation"
+		}
+		auto rd = uniform_real_distribution<FL_TYPE>(0.0,1.0)(rng);
+		//auto rd = 0.95; //deterministic
+		if(rd > (alpha / id_a.second) ){
+			activityTree->add(id_a.first,alpha);
+			throw NullEvent(4);//TODO (Null_event 4)) (*null event because of over approximation of activity*)
+		}
+	}
+	int radius = 0;//TODO
+	//EventInfo* ev_p;
+	cells[comp_rid.first]->selectInjection(comp_rid.second,make_pair(a1a2.first,radius),
+			make_pair(a1a2.second,radius));
+	return comp_rid;
+}
+
+
+void Simulation::tryPerturbate() {
+	while(pertIds.size()){
+		auto curr_perts = pertIds;
+		pertIds.clear();
+		for(auto p_id : curr_perts){
+			bool abort = false;
+			auto& pert = perts.at(p_id);
+			auto trigger = pert.test(*this);
+			if(trigger){
+				pert.apply(*this);
+				abort = pert.testAbort(*this,true);
+			}
+			if(!abort)
+				abort = pert.testAbort(*this,false);
+			//if(abort)
+			//	perts.erase(p_id);
+
+		}
 	}
 }
 
 
-void Simulation::run(const Parameters& params){
+using Deps = pattern::Dependency::Dep;
+
+void Simulation::updateDeps(const pattern::Dependency& d){
+	list<pattern::Dependency> deps;//TODO try with references
+	deps.emplace_front(d);
+	pattern::Dependency last_dep;
+	auto dep_it = deps.begin();
+	while(!deps.empty()){
+		//auto& dep = *deps.begin();
+		IF_DEBUG_LVL(5,log_msg += "\t#Triggering updates from " + dep_it->toString() + " Dependency.\n";)
+		switch(dep_it->type){
+		case Deps::RULE:
+			IF_DEBUG_LVL(4,log_msg += "Updating '"+env.getRule(dep_it->id).getName()+"' rule's rate.\n";)
+			ev.rule_ids.emplace(dep_it->id);
+			break;
+		case Deps::KAPPA:
+			break;
+		case Deps::VAR:
+			break;
+		case Deps::PERT:
+			if(perts.count(dep_it->id))
+				pertIds.push_back(dep_it->id);
+			else //pert was aborted
+				activeDeps.erase(*dep_it,last_dep);
+			break;
+		case Deps::TIME:{
+			auto& deps = activeDeps.getDependencies(*dep_it).ordered_deps;
+			if(deps.size() && deps.begin()->first <= counter.getTime() ){
+				auto nextDeps = deps.equal_range(deps.begin()->first);
+				timePerts.insert(timePerts.begin(),nextDeps.first,nextDeps.second);
+				activeDeps.eraseTimePerts(nextDeps.first,nextDeps.second);
+			}
+			}break;
+		case Deps::NONE://simulation ends
+			break;
+		case Deps::AUX:
+			break;
+		}
+		auto& more_deps = activeDeps.getDependencies(*dep_it).deps;
+		deps.insert(deps.end(),more_deps.begin(),more_deps.end());
+		last_dep = *dep_it;
+		dep_it = deps.erase(dep_it);
+	}
+}
+
+
+void Simulation::activityUpdate(){
+	//prepare positive_update
+	//set<small_id> rule_ids;
+	for(auto ptrn : ev.to_update){
+		for(auto r_id : ptrn->includedIn())
+			ev.rule_ids.emplace(r_id);
+		updateDeps(pattern::Dependency(pattern::Dependency::KAPPA,ptrn->getId()));
+	}
+	//total update
+	//cout << "rules to update: ";
+	if(ev.act.t == ActionType::TRANSPORT){
+		//auto& dest = static_cast<simulation::Simulation*>(parent)->getCell(ev.act.trgt_st);
+		for(auto r_id : ev.rule_ids){
+			//cout << env.getRules()[r_id].getName() << ", ";
+			updateActivity(ev.comp_id,r_id);
+			updateActivity(ev.act.trgt_st,r_id);
+		}
+	}
+	else
+		for(auto r_id : ev.rule_ids)
+			updateActivity(ev.comp_id,r_id);
+	//cout << endl;
+	counter.incNullActions(ev.null_actions.size());
+
+	ev.clear();
+}
+
+/*
+void simulation::parallelRun(){
 	//updates
 	//TODO while(counter.getTime() < params.limitTime()){
 		//calculate Tau-Leaping
 			//calculate map [species -> diffusion-to-cells array]
 			//map-diffusion-in = scatter map-diffusion-to?
-		auto tau = params.maxTime;// = calculate-tau( map-diffusion-in )
+		auto tau = params->maxTime;// = calculate-tau( map-diffusion-in )
 		//parallel
 		for(auto& id_state : cells){
-			id_state.second.advanceUntil(counter.getTime()+tau,params.maxEvent);
-			id_state.second.updateDeps(pattern::Dependency());
+			id_state.second->advanceUntil(counter.getTime()+tau,params->maxEvent);
+			id_state.second->updateDeps(pattern::Dependency());
 		}
 		done = true;
 		for(auto& id_state : cells){
-			id_state.second.tryPerturbate();
-			id_state.second.plotOut();
+			id_state.second->tryPerturbate();
+			id_state.second->plotOut();
 		}
-#ifdef DEBUG
-		if(params.verbose > 0 && id == 0){
-			cout << "=== Final-State ";
+		#pragma omp critical
+		if(params->verbose > 0 && id == 0){
+			if(params->runs > 1)
+				cout << "[Sim 0]: ";
+			cout << "=== Final-State === \n";
 			print();
-			cout << "------------------------------------\n";
+			cout << "============================ \n";
 		}
-#else
-		cout << "------------------------------------\n";
-		cout << cells.at(0).getCounter().toString() << endl;
-		cout << "------------------------------------\n";
-#endif
 		counter.advanceTime(tau);
 	//}
 }
-
+*/
 int Simulation::getId() const {
 	return id;
 }
@@ -191,7 +483,7 @@ void Simulation::addTokens(const Range<int,Args...> &cell_ids,float count,short 
 	//auto ids_it = cell_ids.begin();
 	for(auto id : cell_ids){
 		try{
-			cells.at(id).addTokens(count/cell_ids.size(),token_id);
+			cells.at(id)->addTokens(count/cell_ids.size(),token_id);
 		}
 		catch(out_of_range &e){
 			//other mpi_process will add this tokens.
@@ -209,7 +501,7 @@ void Simulation::addAgents(const Range<int,Args...> &cell_ids,unsigned count,con
 		if(n == 0)
 			continue;
 		try{
-			cells.at(*ids_it).initNodes(n,mix);
+			cells.at(*ids_it)->initNodes(n,mix);
 		}
 		catch(out_of_range &e){
 			//other mpi_process will add this tokens.
@@ -372,45 +664,70 @@ int Simulation::searchCompartment(vector<list<unsigned int>> assigned, unsigned 
 }*/
 
 data_structs::DataTable* Simulation::getTrajectory() const {
-	data_structs::DataTable* tab = nullptr;
-	if(cells.size() == 1){
-		tab = cells.at(0).getTrajectory();
-	}
+	auto tab = new data_structs::DataTable(plot->getData(),true);
+	//tab->col_names.emplace_back("Time");
+	for(auto var : env.getObservables())
+		tab->col_names.emplace_back(var->toString());
 	return tab;
+}
+
+data_structs::DataTable* Simulation::getTrajectory(int i) const {
+	return cells.at(i)->getTrajectory();
 }
 
 
 void Simulation::collectRawData() const {
-	if(cells.size() == 1) {
-		cells.at(0).collectRawData(rawList);
-		return;
-	}//else
-	for(auto& cell : cells){
-		//TODO
-		throw invalid_argument("Simulation::collectRawData(): spatial not implemented yet.");
-	}
+	rawList.clear();
+	for(auto& pert : perts)
+		pert.second.collectRawData(rawList);
 }
 void Simulation::collectTabs(map<string,list<const data_structs::DataTable*>> &tab_list) const {
-	if(cells.size() == 1) {
-		cells.at(0).collectTabs(tab_list);
-		return;
-	}//else
+	for(auto& pert : perts)
+		pert.second.collectTabs(tab_list);
 	for(auto& cell : cells){
-		//TODO
-		throw invalid_argument("Simulation::collectTabs(): spatial not implemented yet.");
+		//cell.second->collectTabs(tab_list);
+		//throw invalid_argument("Simulation::collectTabs(): spatial not implemented yet.");
 	}
 }
 
 
 void Simulation::print() const {
-	cout << "========= Simulation[" << id << "] =========" << endl;
+	//cout << "========= Simulation[" << id << "] =========" << endl;
 	if(cells.size() > 1)
-		cout << cells.size() << " cells in this simulation object." << endl;
-	for(auto& id_state : cells){
+		cout << cells.size() << " disjoint volumes in this simulation object." << endl;
+	/*for(auto& cell : cells){
 		if(cells.size() > 1)
-		cout << "---" << env.cellIdToString(id_state.first) << "---\n";
-		id_state.second.print();
+			cout << "---" << env.cellIdToString(cell->getId()) << "---\n";
+		cell->print();
+	}*/
+	cout << "Active Injections -> {\n";
+	int i = 0;
+	for(auto& cc : env.getComponents()){
+		i = cc->getId();
+		if(count(i))
+			cout << "\t("<< i <<")\t" << count(i) <<
+			" injs of " << cc->toString(env) << endl;
 	}
+	for(auto& mix : env.getMixtures()){
+		i = mix->getId();
+		matching::InjRandContainer<matching::MixInjection>* injs = nullptr;
+		/*try {
+			injs = nlInjections.at(i);
+		}
+		catch(std::out_of_range& e){ }
+		if(injs && injs->count())
+			cout << "\t("<< i <<")\t" << injs->count() <<
+			" mix-injs of " << mix->toString(env) << endl;*/
+	}
+	cout << "}\nActive Rules -> {\n";
+	for(auto cell : cells){
+		cout << env.cellIdToString(cell->getId()) << "\n";
+		cout << cell->activeRulesStr();
+	}
+
+	cout << "}\n";
+	cout << counter.toString() << endl;
+
 }
 
 } /* namespace state */

@@ -132,6 +132,38 @@ pair<int,FL_TYPE> MyMaskedBinaryRandomTree<Container>::chooseRandom()
 	throw std::invalid_argument("impossible to reach this code!");
 }
 
+//Retorna la id y la probabilidad de una regla del arbol elejida de manera random segun su probabilidad.
+template<template <typename,typename...> class Container>
+pair<int,FL_TYPE> MyMaskedBinaryRandomTree<Container>::choose(FL_TYPE r)
+{
+	//chequeamos en  "inf_list" si hay reglas con probabilidad infinita
+	if(!infList.empty()) {
+		//si las hay, devolvemos la primera regla
+		return pair<int,FL_TYPE>(unmaskId(*infList.begin()),std::numeric_limits<FL_TYPE>::infinity());
+	}
+	update();
+	//obtenemos la probabilidad total
+	FL_TYPE a=wSubtrees[1];
+	//si es nula retornamos error -1
+	if( a == 0.0e0)
+		throw std::invalid_argument("MaskedBinaryTree::chooseRandom(): NotFound");//cout<<"MaskedBinaryTree::chooseRandom(): NotFound"<<endl;
+	//si no es nula, hacemos la busqueda
+	int i=1;//position in the tree
+	do {
+		if(r < wNodes[i])
+			return pair<int,FL_TYPE>(unmask[i],wNodes[i]);
+		r = r-wNodes[i];            //random number respecto al intervalo del hijo izquierdo.
+		i=i*2;                     //indice rama hijo izquierdo.
+		FL_TYPE left = wSubtrees[i];  //longitud total del hijo izquierdo.
+		if( r < wSubtrees[i] )
+			continue;
+		r = r-left;		//random number respecto al intervalo hijo derecho
+		i++;			//indice rama hijo derecho
+	} while(true);
+
+	throw std::invalid_argument("impossible to reach this code!");
+}
+
 template<template <typename,typename...> class Container>
 FL_TYPE MyMaskedBinaryRandomTree<Container>::total()
 {

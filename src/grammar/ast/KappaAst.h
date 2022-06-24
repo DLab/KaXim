@@ -42,6 +42,7 @@ class KappaAst {
 	list<Init> inits;
 	list<const Use*> useExpressions;
 	list<Rule> rules;
+	list<Transport> transports;
 	list<const Pert*> perturbations;
 
 public:
@@ -52,7 +53,8 @@ public:
 	vector<float> evaluateTokens(pattern::Environment &env);
 	void evaluateSignatures(pattern::Environment &env,const SimContext &context);
 	vector<Variable*> evaluateDeclarations(pattern::Environment &env,SimContext &context,bool is_const = false);
-	void evaluateParams(pattern::Environment &env,SimContext &context,const vector<float> &po_params);
+	void evaluateParams(pattern::Environment &env,SimContext &context,
+			const vector<float> &po_params,map<string,float> ka_params);
 	void evaluateCompartments(pattern::Environment &env,const SimContext &context);
 	void evaluateUseExpressions(pattern::Environment &env,const SimContext &context);
 	void evaluateChannels(pattern::Environment &env,const SimContext &context);
@@ -70,6 +72,7 @@ public:
 	void add(const Init &i);
 	void add(const Use *u);
 	void add(const Rule &r);
+	void add(const Transport &t);
 	void add(const Pert *p);
 
 

@@ -13,11 +13,12 @@
 #include <boost/program_options/parsers.hpp>
 #include <boost/program_options/variables_map.hpp>
 #include <vector>
+#include <map>
 
 #include "Counter.h"
 
 namespace simulation {class Results;}
-simulation::Results run(int argc, const char * const argv[]);
+simulation::Results* run(int argc, const char * const argv[],const std::map<std::string,float>& ka_params);
 
 namespace simulation {
 
@@ -35,9 +36,8 @@ using namespace boost::program_options;
  */
 class Parameters {
 	//friend class Counter;
-	friend Results (::run)(int argc, const char * const argv[]); ///< Easier manipulation of Parameters from main.
-
-	static Parameters singleton; //!< the singleton instance of the class
+	friend Results* (::run)(int argc, const char * const argv[],
+			const std::map<std::string,float>& ka_params); ///< Easier manipulation of Parameters from main.
 
 	/** Constructor to initialize default parameters.
 	 */
@@ -49,9 +49,10 @@ class Parameters {
 	/** \brief Set simulation parameters from arguments vector.
 	 */
 	void evalOptions(int argc, const char * const argv[]);
-public:
+
 	options_description *options;	//!< boost object to manipulate program options. Created on makeOptions() call.
 
+public:
 	string version,usage;
 
 	vector<string> inputFiles;		//!< Kappa files of the the model.
@@ -74,7 +75,7 @@ public:
 	int showNodes;		//!< Showing nodes of graph.
 
 	~Parameters();
-	static const Parameters& get();	//!< Return the singleton instance of the class
+	//static const Parameters& get();	//!< Return the singleton instance of the class
 
 };
 

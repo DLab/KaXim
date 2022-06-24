@@ -48,6 +48,10 @@ public:
 	 */
 	virtual std::pair<int,FL_TYPE> chooseRandom() = 0;
 
+	/** \brief Choose random node from tree with probability = weight/total().
+	 */
+	virtual std::pair<int,FL_TYPE> choose(FL_TYPE sel) = 0;
+
 	/** \brief Check if the rule "i" has an infinity probability.
 	*/
 	virtual bool isInfinite(int i) = 0;

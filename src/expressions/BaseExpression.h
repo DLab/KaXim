@@ -49,6 +49,9 @@ public:
 		std::map<small_id, BaseExpression*> aux_functions;	///< Mapping of (cc-index -> aux-dependent function).
 
 		Reduction();
+		/*~Reduction(){
+			std::cout << "deleting reduction" << std::endl;
+		}*/
 	};
 
 	/** \brief Common binary algebraic operations. */
@@ -74,9 +77,9 @@ public:
 
 	/** \brief Function with no arguments. */
 	enum Nullary {
-		RAND_1,SIM_TIME,CPUTIME,ACTIVITY,		///< FLOAT
-		RUN_ID,SIM_EVENT,NULL_EVENT,PROD_EVENT,	///< INT
-		END_SIM									///< BOOL
+		RAND_1,SIM_TIME,CPUTIME,ACTIVITY,					///< FLOAT
+		RUN_ID,RUNS_COUNT,SIM_EVENT,NULL_EVENT,PROD_EVENT,	///< INT
+		END_SIM												///< BOOL
 	};//check histogram if new bool nullary
 	/** \brief Dependencies that an expression can have. */
 	enum VarDep {

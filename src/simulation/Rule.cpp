@@ -20,7 +20,7 @@
 
 namespace simulation {
 
-Rule::Rule(int _id,const string& nme, Mixture& mix,const yy::location& _loc) : loc(_loc),id(_id),name(nme),
+Rule::Rule(const string& nme, Mixture& mix,const yy::location& _loc) : loc(_loc),id(-1),name(nme),
 		lhs(mix),rhs(nullptr),isRhsDeclared(false),rate(nullptr),matchCount(0),bindCount(0){}
 
 Rule::~Rule() {
@@ -293,8 +293,10 @@ void Rule::checkInfluence(const Environment &env,const SimContext &context) {
 	//we first check all candidates to avoid do complete evaluation of same CC twice
 	CandidateMap candidates;
 	list<Action> changes(script);
+	if(!rhs)
+		return;
 	for(auto& act : changes){//for each action (applied to 1 site)
-		if(act.is_new)
+		if(act.is_new || act.t ==ActionType::TRANSPORT)
 			continue;
 		small_id ag_pos;
 		if(act.t == ActionType::DELETE || act.is_new)
@@ -506,6 +508,7 @@ AuxDepRate::AuxDepRate(const Rule& r,state::State& state) :
 	for(auto& aux_cc__ : rule.getLHS().getAuxMap())
 		aux_ccindex[aux_cc__.first] = aux_cc__.second.cc_pos;
 	base = baseRate->reduceAndFactorize(aux_ccindex,state);
+	//cout << "auxDepRate.base = " << base.factor->getValueSafe(state) << endl;
 }
 
 const BaseExpression* AuxDepRate::getExpression(small_id cc_index) const {
@@ -593,13 +596,15 @@ two<FL_TYPE> SamePtrnRate::evalActivity(const SimContext &context) const {
 two<FL_TYPE> AuxDepRate::evalActivity(const SimContext &context) const {
 	two<FL_TYPE> a;
 	a.first = base.factor->getValue(context).valueAs<FL_TYPE>();
+
+	//cout << a.first << "*";
 	auto& lhs = rule.getLHS();
 	for(unsigned i = 0 ; i < lhs.compsCount() ; i++){
 		auto& cc = lhs.getComponent(i);
 		auto& injs = context.getInjContainer(cc.getId());
 		injs.selectRule(rule.getId(), i);
-		auto pr = injs.partialReactivity();
-
+		auto pr = context.getInjContainer(cc.getId()).partialReactivity();
+		//cout << pr << "*";
 		a.first *= pr;
 	}
 	if(unaryRate.first)
@@ -616,14 +621,14 @@ two<FL_TYPE> SameAuxDepRate::evalActivity(const SimContext &context) const {
 	auto& lhs = rule.getLHS();
 	auto& injs = context.getInjContainer(lhs.getComponent(0).getId());
 	injs.selectRule(rule.getId(), 0);
-	auto ract = injs.partialReactivity();
+	auto ract = context.getInjContainer(lhs.getComponent(0).getId()).partialReactivity();
 	if(ract)
 		for(unsigned i = 0 ; i < lhs.compsCount() ; i++){
 			a.first *= ract;
 		}
 	else
 		return two<FL_TYPE>(0.0,0.0);
-	a.first -= injs.getM2();
+	a.first -= context.getInjContainer(lhs.getComponent(0).getId()).getM2();
 
 	if(unaryRate.first)
 			a.second = unaryRate.first->getValue(context).valueAs<FL_TYPE>() *

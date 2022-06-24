@@ -44,6 +44,7 @@ class State : public SimContext {
 	friend class RateVar;
 	friend class simulation::Rule::Rate;
 	friend class simulation::AuxDepRate;
+	friend class simulation::Simulation;
 	//friend class expressions::SimContext<false>;
 	//friend class expressions::SimContext<true>;
 	friend class Node;
@@ -62,8 +63,8 @@ class State : public SimContext {
 	map<int,matching::InjRandContainer<matching::MixInjection>*> nlInjections;
 
 	//simulation::LocalCounter counter;
-	simulation::Plot& plot;
-	mutable EventInfo ev;
+	simulation::Plot* plot;
+	EventInfo &ev;
 	mutable unordered_map<small_id,simulation::Perturbation> perts;
 	mutable pattern::Dependencies activeDeps;
 	mutable list<small_id> pertIds;//maybe part of event-info?
@@ -93,10 +94,13 @@ public:
 	 */
 	State(int id,simulation::Simulation& sim,
 			const BaseExpression& vol,
-			simulation::Plot& plot);
+			bool by_ev = false);
 	~State();
 
 
+	string getName() const {
+		return env.cellIdToString(id);
+	}
 	//void del(Node* node);
 
 	//const simulation::Counter& getCounter() const;
@@ -109,7 +113,7 @@ public:
 	void setTokens(float n,unsigned tok_id);
 
 	const simulation::Rule::Rate& getRuleRate(int id) const;
-	SomeValue getVarValue(short_id var_id) const;
+	two<FL_TYPE> getRuleActivity(int id) const;
 	//const VarVector& getVars() const{
 	//	return vars;
 	//}
@@ -137,7 +141,17 @@ public:
 	inline void removeNode(Node* n){
 		graph.remove(n);
 	}
+	/*void moveIn(const set<Node*>& nodes,InjSet& new_injs) {
+		graph.moveIn(nodes);
+		for(auto inj : new_injs){
+			auto cc_inj = static_cast<matching::CcInjection*>(inj);
+			injections[inj->pattern().getId()]->insert(cc_inj,*this);
+		}
+	}*/
 
+	int count(int id) const {
+		return injections[id]->count();
+	}
 	UINT_TYPE mixInstances(const pattern::Mixture& mix) const;
 
 	void updateActivity(small_id r_id){
@@ -160,7 +174,9 @@ public:
 
 	void tryPerturbate();
 
-
+	void selectInjection(int rid,two<FL_TYPE> bin_act,two<FL_TYPE> un_act) {
+		selectInjection(env.getRule(rid),bin_act,un_act);
+	}
 	void selectInjection(const simulation::Rule &r,two<FL_TYPE> bin_act,
 			two<FL_TYPE> un_act);
 	const simulation::Rule& drawRule();
@@ -186,6 +202,8 @@ public:
 	/** \brief Print the state for debugging purposes.
 	 **/
 	void print() const;
+	string activeRulesStr() const;
+	string toString() const;
 
 	static const State empty;
 };
@@ -209,23 +227,39 @@ inline FL_TYPE State::getTokenValue(unsigned tok_id) const{
 inline const simulation::Rule::Rate& State::getRuleRate(int _id) const {
 	return *(rates[_id]);
 }
-inline SomeValue State::getVarValue(short_id var_id) const {
-	return vars[var_id]->getValue(*this);
+inline two<FL_TYPE> State::getRuleActivity(int _id) const {
+	return rates[_id]->evalActivity(*this);
 }
 inline FL_TYPE State::getTotalActivity() const {
 	return activityTree->total();
 }
 inline const CcInjRandContainer& State::getInjContainer(int cc_id) const{
+#ifdef DEBUG
+	if(!injections)
+		throw invalid_argument("State::getInjContainer(): injections not initialized.");
+#endif
 	return *(injections[cc_id]);
 }
 inline matching::InjRandContainer<matching::CcInjection>& State::getInjContainer(int cc_id) {
+#ifdef DEBUG
+	if(!injections)
+		throw invalid_argument("State::getInjContainer(): injections not initialized.");
+#endif
 	return *(injections[cc_id]);
 }
 
 inline const MixInjRandContainer& State::getMixInjContainer(int mix_id) const{
+#ifdef DEBUG
+	if(!nlInjections.size())
+		throw invalid_argument("State::getMixInjContainer(): injections not initialized.");
+#endif
 	return *(nlInjections.at(mix_id));
 }
 inline MixInjRandContainer& State::getMixInjContainer(int mix_id) {
+#ifdef DEBUG
+	if(!nlInjections.size())
+		throw invalid_argument("State::getMixInjContainer(): injections not initialized.");
+#endif
 	return *(nlInjections.at(mix_id));
 }
 

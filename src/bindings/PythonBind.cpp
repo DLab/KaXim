@@ -13,29 +13,29 @@ namespace binds {
 
 using namespace std;
 
-simulation::Results run_kappa_model(map<string,string> params){
+simulation::Results& run_kappa_model(map<string,string> args,map<string,float> ka_params){
 	int argc = 1;
 	const char * argv[300];
 	argv[0] = "KaXim-Py";
-	if(params.count("-o"))
-		params["-o"] += ".data";
+	if(args.count("-o"))
+		args["-o"] += ".data";
 	else
-		params["--out"] += ".data";
+		args["--out"] += ".data";
 
-	for(auto& param : params){
-		argv[argc++] = param.first.c_str();
+	for(auto& arg : args){
+		argv[argc++] = arg.first.c_str();
 		size_t i = 0;
-		auto cstr = param.second.c_str();
+		auto cstr = arg.second.c_str();
 		while(true){
 			argv[argc++] = cstr+i;
-			if((i = param.second.find(" ",i)) == string::npos)
+			if((i = arg.second.find(" ",i)) == string::npos)
 				break;
-			param.second[i] = '\0';
+			arg.second[i] = '\0';
 			++i;
 		}
 	}
 
-	return run(argc,argv);
+	return *run(argc,argv,ka_params);
 }
 
 

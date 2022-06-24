@@ -275,6 +275,7 @@ public:
 /** \brief Structure that stores the information related to an event.
  */
 struct EventInfo {
+	int comp_id;
 	pattern::Action act;
 	//map of emb LHS [cc_id][ag_id]
 	vector<Node*>* emb;

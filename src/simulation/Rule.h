@@ -39,6 +39,7 @@ using namespace expressions;
  * trying to apply the rule.
  */
 class Rule {
+	friend class pattern::Environment;
 public:
 	struct CandidateKey {
 		const Mixture::Component* cc;
@@ -65,15 +66,17 @@ public:
 		BaseExpression* baseRate;
 		pair<BaseExpression*,int> unaryRate;
 	public:
+		Rate(const Rule& r) : rule(r),baseRate(nullptr) {};
 		Rate(const Rule& r,state::State& state);
 		virtual ~Rate();
 
-		virtual two<FL_TYPE> evalActivity(const SimContext &context) const = 0;
+		virtual two<FL_TYPE> evalActivity(const SimContext &context) const {
+			return two<FL_TYPE>(.0,.0);
+		}
 		virtual const BaseExpression* getExpression(small_id cc_index = 0) const;
 		//CandidateMap influence;
 	};
 protected:
-	yy::location loc;
 	int id;
 	string name;
 	Mixture &lhs;
@@ -95,11 +98,14 @@ public:
 	 * @param nme Declared kapa label of rule.
 	 * @param mix LHS of the rule.
 	 */
-	Rule(int _id,const string& nme, Mixture& mix,const yy::location& _loc);
+	Rule(const string& nme, Mixture& mix,const yy::location& _loc);
 	~Rule();
 
 	int getId() const;
 	const string& getName() const;
+	/*void setName(string nme) {
+		name = nme;
+	}*/
 	const Mixture& getLHS() const;
 	Mixture& getLHS();
 	const Mixture& getRHS() const;
@@ -152,8 +158,14 @@ public:
 	void checkInfluence(const Environment &env,const SimContext &context);
 	void initialize(const state::State& state,VarVector& vars);
 
+	virtual int getTargetCell(int id) const {
+		return 0;
+	}
+
 
 	string toString(const pattern::Environment& env) const;
+
+	const yy::location loc;
 };
 
 

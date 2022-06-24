@@ -5,6 +5,7 @@
 	#include "../KappaDriver.h"
 	#include "../location.hh"
 	#include "../../util/Exceptions.h"
+	#include <boost/lexical_cast.hpp>
 	
 	#define loc (*(driver.getLocation()))
 	#define yyterminate() Parser::make_END(loc) 
@@ -49,7 +50,7 @@ real		([0-9]+\.[0-9]*|[0-9]*\.[0-9]+)(([eE][+-][0-9]+)|([eE][0-9]+))?
   loc.step ();
 %}
 
-"\\\n"		{loc.step();loc.lines();}
+"\\\n"		{loc.lines();loc.step();}
 "#"+[.]*"\\\n"	{loc.step();loc.lines();}//return Parser::make_NEWLINE(loc);	
 "#"+[.]*[^\n]*	loc.step();//return Parser::make_NEWLINE(loc);
 [\t ]+		{loc.step();}
@@ -57,7 +58,7 @@ real		([0-9]+\.[0-9]*|[0-9]*\.[0-9]+)(([eE][+-][0-9]+)|([eE][0-9]+))?
 				return Parser::make_INT(atoi(yytext),loc); 
 			}
 \-?{real}	{
-				return Parser::make_FLOAT(atof(yytext),loc);
+				return Parser::make_FLOAT(boost::lexical_cast<double>(yytext),loc);//unknown issue with atof() and python libs
 			}
 "%"{id}":"	{
 			if(!strcmp(yytext,"%agent:"))
@@ -183,7 +184,7 @@ real		([0-9]+\.[0-9]*|[0-9]*\.[0-9]+)(([eE][+-][0-9]+)|([eE][0-9]+))?
 	yytext[strlen(yytext)-1] = 0;
 	return Parser::make_STRING(&(yytext[1]),loc); }
 
-[\n]+		loc.lines (yyleng); loc.step ();return Parser::make_NEWLINE(loc);
+[\n]+		{loc.lines (yyleng); loc.step ();return Parser::make_NEWLINE(loc);}
 [\r]+		loc.lines (yyleng); loc.step ();return Parser::make_NEWLINE(loc);
 "'"[^'\\\n]+"'"	{yytext[strlen(yytext)-1] = 0;return Parser::make_LABEL(&(yytext[1]),loc);}
 {id}		{

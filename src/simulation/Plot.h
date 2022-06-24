@@ -21,38 +21,50 @@ using namespace std;
 class Plot {
 protected:
 	//TODO class outputs {op<<()}
+	const SimContext& state;
 	ofstream file;
 	list<list<FL_TYPE>> data;
 public:
-	Plot(const pattern::Environment& env,int run_id = 0);
+	Plot(const SimContext& sim);
 	virtual ~Plot();
 
-	virtual void fill(const state::State& state,const pattern::Environment& env) = 0;
-	virtual void fillBefore(const state::State& state,const pattern::Environment& env) = 0;
+	virtual void fill() = 0;
+	virtual void fillBefore() = 0;
 
 	const list<list<FL_TYPE>>& getData() const {
 		return data;
 	}
+
+	virtual string getType() const = 0;
+
 };
 
 class TimePlot : public Plot {
 	FL_TYPE nextPoint;
 	FL_TYPE dT;
 public:
-	TimePlot(const pattern::Environment& env,int run_id = 0);
+	TimePlot(const SimContext& sim);
 
-	void fill(const state::State& state,const pattern::Environment& env) override;
-	void fillBefore(const state::State& state,const pattern::Environment& env) override;
+	void fill() override;
+	void fillBefore() override;
+
+	virtual string getType() const override {
+		return "Time";
+	}
 };
 
 class EventPlot : public Plot {
 	FL_TYPE nextPoint;
 	FL_TYPE dE;
 public:
-	EventPlot(const pattern::Environment& env,int run_id = 0);
+	EventPlot(const SimContext& sim);
 
-	void fill(const state::State& state,const pattern::Environment& env) override;
-	void fillBefore(const state::State& state,const pattern::Environment& env) override;
+	void fill() override;
+	void fillBefore() override;
+
+	virtual string getType() const override {
+		return "Event";
+	}
 };
 
 } /* namespace simulation */

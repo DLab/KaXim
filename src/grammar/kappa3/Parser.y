@@ -8,6 +8,7 @@
 %define api.token.constructor
 %define parse.error verbose
 %param { grammar::KappaDriver &driver }
+%parse-param {const simulation::SimContext& sim}
 
 %define api.location.type {yy::location}
 %code requires { #include "../location.hh" }
@@ -25,7 +26,7 @@
 	#include "../ast/Statements.h"
 	#include "../location.hh"
 	#include "../../util/Exceptions.h"
-	#include "../../simulation/Parameters.h"
+	#include "../../simulation/SimContext.h"
 	#include <typeinfo>
 	
 	namespace grammar::kappa3 {
@@ -154,8 +155,12 @@ instruction:
  	{this->driver.getAst().add(Channel(@$,Id(@2,$2),$3,$5,$4,$6,$8));}
 | CHANNEL error
 	{error(@2, "Bad channel declaration");}
-| TRANSPORT join LABEL mixture AT alg_expr
- 	{}
+| TRANSPORT join LABEL lhs_rhs rate
+ 	{this->driver.getAst().add(Transport(Id(@3,$3),$4,$5,$2));}
+| TRANSPORT join lhs_rhs comp_expr arrow comp_expr rate
+ 	{this->driver.getAst().add(Transport(new Channel(@$,Id(),$4,$6,$5,nullptr),$3,$7,$2));}
+| TRANSPORT error
+	{error(@2, "Bad transport declaration");}
 | USE MULT
 	{this->driver.getAst().add(new Use(@$));}
 | USE comp_list where_expr
@@ -630,7 +635,7 @@ alg_expr:
 | RUN_ID
 	{$$ = new NullaryOperation(@$,BaseExpression::Nullary::RUN_ID);}
 | RUNS
-	{$$ = new Const(@$,simulation::Parameters::get().runs);}
+	{$$ = new Const(@$,sim.params->runs);}
 | MINUS alg_expr
 	{$$ = new AlgBinaryOperation(@$,new Const(location(),0),$2,BaseExpression::AlgebraicOp::MINUS);}
 | BETA alg_expr alg_expr {
@@ -741,6 +746,8 @@ internal_state:
 	{$$ = SiteState(@$,Id(@2,$2),SiteState::MAX_EQUAL,nullptr,$5);}
 | KAPPA_VALUE ID SMALLER alg_expr CL_CUR
 	{$$ = SiteState(@$,Id(@2,$2),0,nullptr,$4);}
+| KAPPA_VALUE ID DIFF alg_expr CL_CUR
+	{$$ = SiteState(@$,Id(@2,$2),SiteState::DIFF,$4);}
 | KAPPA_VALUE ID EQUAL alg_expr CL_CUR
 	{$$ = SiteState(@$,Id(@2,$2),$4);}
 | KAPPA_VALUE ID CL_CUR

@@ -19,24 +19,31 @@
 namespace matching {
 
 //using Node = state::Node;
+template <typename InjType>
+class InjLazyContainer;
+using BE = expressions::BaseExpression;
 
 template <typename InjType>
 class InjRandContainer {
 	friend class state::InternalState;
+	friend class InjLazyContainer<InjType>;
+	friend class state::State;
 protected:
 	list<InjType*> freeInjs;			///> Empty-object pool to avoid construction
 	const pattern::Pattern& ptrn;	///> Pattern of the injections stored
 
 	/** SUMS */
-	mutable unordered_map<const expressions::BaseExpression*,FL_TYPE&> trackedSums;
-	mutable list<pair<const expressions::BaseExpression*,FL_TYPE>> sumList;
+	mutable unordered_map<const BE*,FL_TYPE&> trackedSums;
+	mutable list<pair<const BE*,FL_TYPE>> sumList;
 
 	/** \brief introduce a new injection in the container. */
-	virtual void insert(InjType* inj,const state::State& state) = 0;
+	virtual list<pair<const BE*,FL_TYPE>>& insert(InjType* inj,const state::State& state) = 0;
 	/** \brief deletes the injection from the container. */
 	virtual void del(Injection* inj) = 0;
 	/** @returns a new empty injection (not from the pool). */
 	virtual InjType* newInj() const = 0;
+
+	InjType* selectInj(const state::State& state);
 
 public:
 
@@ -49,29 +56,22 @@ public:
 
 	template <typename... Args>
 	InjType* emplace(const state::State& state, Args&... args){
-		InjType* inj;
-		if(freeInjs.empty()){
-			inj = newInj();
-			if(inj == nullptr)
-				return nullptr;
-		}
-		else {
-			inj = freeInjs.front();
-			freeInjs.pop_front();
-		}
-		CcEmbMap<expressions::Auxiliar,FL_TYPE,Node> cc_map(*inj->getEmbedding());
-		state.setAuxMap(&cc_map);
+		auto inj = selectInj(state);
+#ifdef DEBUG
+		if(inj == nullptr) throw invalid_argument("InjRandContainer::emplace(): null inj to reuse.");
+#endif
 		if(inj->reuse(state,args...) == false)
 			return nullptr;
-		insert(inj,state);
-
-		for(auto& s : sumList)
+		auto sum_list = insert(inj,state);
+		//this may have been deleted from here
+		for(auto& s : sum_list) //replacing sumList because this may be deleted
 			s.second += inj->evalAuxExpr(state,s.first);
 
 		return inj;
 	}
 	virtual InjType* emplace(Injection* base_inj,map<Node*,Node*>& mask,
 			const state::State& state);
+
 	inline virtual void erase(Injection* inj,const simulation::SimContext& context);
 	//inline virtual void erase(unsigned address,const simulation::SimContext& context);
 	virtual void clear() = 0;
@@ -93,7 +93,7 @@ class InjRandSet : public InjRandContainer<InjType> {
 	size_t counter;
 	size_t multiCount;
 	vector<InjType*> container;
-	void insert(InjType* inj,const state::State& state) override;
+	list<pair<const BE*,FL_TYPE>>& insert(InjType* inj,const state::State& state) override;
 	virtual InjType* newInj() const override;
 public:
 	InjRandSet(const pattern::Pattern& _cc);
@@ -124,7 +124,7 @@ class InjRandSet<MixInjection> : public InjRandContainer<MixInjection> {
 	size_t multiCount;
 	vector<MixInjection*> container;
 	int radius;				///> max-radius this container can store
-	void insert(MixInjection* inj,const state::State& state) override;
+	list<pair<const BE*,FL_TYPE>>& insert(MixInjection* inj,const state::State& state) override;
 	virtual MixInjection* newInj() const override;
 public:
 	InjRandSet(const pattern::Mixture& mix,InjRandSet<MixInjection>* nxt = nullptr);
@@ -176,7 +176,7 @@ class InjRandTree : public InjRandContainer<InjType> {
 
 	mutable pair<int,small_id> selected_root;
 
-	void insert(InjType *inj,const state::State& state) override;
+	list<pair<const BE*,FL_TYPE>>& insert(InjType *inj,const state::State& state) override;
 	virtual InjType* newInj() const override;
 
 public:
@@ -210,9 +210,10 @@ class InjLazyContainer : public InjRandContainer<InjType> {
 	mutable bool loaded;
 
 	void loadContainer() const;
+	void loadEmptyContainer() const;
 
 
-	virtual void insert(InjType* inj,const state::State& state) override;
+	list<pair<const BE*,FL_TYPE>>& insert(InjType* inj,const state::State& state) override;
 	virtual InjType* newInj() const override;
 
 public:
@@ -248,7 +249,7 @@ inline void InjRandContainer<InjType>::erase(Injection* inj,const simulation::Si
 	for(auto& s : sumList)
 		s.second -= inj->evalAuxExpr(context,s.first);
 	del(inj);
-	//freeInjs.push_back(static_cast<InjType*>(inj));
+	//freeInjs.push_back(static_cast<InjType*>(inj));//TODO repair this!!!!
 	inj->dealloc();//dealloc
 }
 

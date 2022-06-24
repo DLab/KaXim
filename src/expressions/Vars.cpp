@@ -156,7 +156,7 @@ R VarLabel<R>::evaluate(const SimContext& context) const {
 template<typename R>
 R VarLabel<R>::evaluateSafe(const SimContext& context) const {
 	//throw std::invalid_argument("This should never been used");
-	return context.getVars()[varId]->getValue(context).valueAs<R>();
+	return context.getVars()[varId]->getValueSafe(context).valueAs<R>();
 }
 
 template<typename R>

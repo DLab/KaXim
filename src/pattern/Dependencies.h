@@ -20,14 +20,29 @@ using namespace std;
 
 struct Dependency {
 	enum Dep {TIME,EVENT,KAPPA,TOK,VAR,RULE,PERT,AUX,NONE};
+	static const string NAMES[];
 	Dep type;
 	//union{
 		big_id id;
 		string aux;
+		//FL_TYPE dt;
 	//};
 	Dependency(Dep d = Dep::NONE,unsigned i = 0);
+	//Dependency(FL_TYPE f);
 	Dependency(string _aux);
 	bool operator<(const Dependency& d) const;
+
+	string toString(){
+		switch(type){
+		case TIME:case EVENT:case NONE:
+			return NAMES[type];
+		case KAPPA:case TOK:case VAR:case RULE:case PERT:
+			return NAMES[type] + "(" +to_string(id) + ")";
+		case AUX:
+			return NAMES[type] + "(" + aux + ")";
+		}
+		throw invalid_argument("invalid dependency");
+	}
 };
 
 class Dependencies {
@@ -49,6 +64,7 @@ public:
 	void erase(Dependency key,Dependency trigger);
 	void eraseTimePerts(multimap<float,Dependency>::const_iterator first,
 			multimap<float,Dependency>::const_iterator last);
+	void eraseTimePert(float time,Dependency key);
 };
 
 typedef set<Dependency> DepSet;

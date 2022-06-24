@@ -18,13 +18,13 @@
 #include "../expressions/Vars.h"
 #include "../data_structs/ValueMap.h"
 
-namespace pattern {
+namespace spatial {
 
 typedef NamesMap<expressions::Auxiliar,int> AuxNames;
 
 //template <short dims>
 class Compartment {
-	static unsigned int TOTAL_CELLS;
+	//static unsigned int TOTAL_CELLS;
 	std::string name;
 	std::vector<short> dimensions;//[dims];
 	int cellsCount;
@@ -36,7 +36,7 @@ public:
 	Compartment(const std::string &name);
 	~Compartment();
 
-	void setDimensions(const std::vector<short> &dims);
+	int setDimensions(const std::vector<short> &dims,int first);
 	void setVolume(const expressions::BaseExpression* vol);
 
 	const std::string& getName() const;
@@ -51,7 +51,7 @@ public:
 	bool nextCell(std::vector<short>& cell) const;
 	const std::vector<short>& getDimensions() const;
 
-	static unsigned int getTotalCells();
+	//static unsigned int getTotalCells();
 
 
 	//DEBUG methods
@@ -119,7 +119,8 @@ class UseExpression : public std::vector<CompartmentExpr> {
 	bool isComplete;
 	static std::set<int> ALL_CELLS;
 public:
-	UseExpression(size_t comps_count,const expressions::BaseExpression* where = nullptr);
+	UseExpression(size_t comps_count,const expressions::BaseExpression* where);
+	UseExpression(size_t total_cell);
 	~UseExpression();
 
 

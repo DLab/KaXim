@@ -75,7 +75,7 @@ public:
 		EXPR	///< An algebraic expression to set/match the site value.
 	} type;
 	/** \brief Used for catch inequations in patterns that use auxiliary vars. */
-	enum {MIN_EQUAL=1,MAX_EQUAL=2};
+	enum {EQUAL,MIN_EQUAL,MAX_EQUAL,DIFF};
 	//union {
 		list<Id> labels;
 		Id aux;
@@ -279,7 +279,7 @@ protected:
 };
 
 /** \brief The AST of the rate(s) of a rule. */
-class Rate : Node {
+class Rate : public Node {
 	const Expression *base;		///< The base rate of the rule.
 	const Expression *reverse;	///< The rate for the backward rule.
 	bool volFixed;				///< do not depend on volume

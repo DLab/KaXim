@@ -66,6 +66,10 @@ public:
 	 */
 	std::pair<int, FL_TYPE> chooseRandom() override;
 
+	/** \brief Choose random node from tree with probability = weight/total().
+	 */
+	std::pair<int, FL_TYPE> choose(FL_TYPE sel) override;
+
 	/** \brief Check if the rule "i" has an infinity probability.
 	 */
 	bool isInfinite(int i) override;

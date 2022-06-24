@@ -30,6 +30,7 @@ protected:
 	const std::string name;//TODO &??
 	bool isObservable;
 	bool updated;
+	bool reduced;
 
 public:
 	Variable(const short id, const std::string &nme,const bool is_obs = false);

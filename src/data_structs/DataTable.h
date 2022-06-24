@@ -59,7 +59,9 @@ struct DataTable {
 		return data;
 	}
 
-
+	std::string toString() const {
+		return "";
+	}
 
 };
 

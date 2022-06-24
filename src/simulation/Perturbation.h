@@ -20,6 +20,8 @@ namespace data_structs { class DataTable; }
 
 namespace simulation {
 
+class Simulation;
+
 using namespace expressions;
 using namespace pattern;
 
@@ -28,9 +30,12 @@ public:
 	class Effect {
 	public:
 		virtual ~Effect();
-		virtual void apply(state::State &state) const = 0;
+		virtual void apply(Simulation &state) const = 0;
 		virtual int addInfluences(int current,Rule::CandidateMap& map,
 				const SimContext &context,const Environment &env) const;
+		virtual string toString(const SimContext& context) const {
+			return "Unk. Effect";
+		};
 	};
 	friend class pattern::Environment;
 protected:
@@ -55,9 +60,9 @@ public:
 	int getId() const;
 
 	bool test(const SimContext& context) const;
-	FL_TYPE timeTest(const SimContext& context) const;
+	FL_TYPE timeTest(const SimContext& context,FL_TYPE dt = 0.0) const;
 	bool testAbort(const SimContext& context,bool just_applied);
-	void apply(state::State &state) const;
+	void apply(Simulation &state) const;
 
 	void addEffect(Effect* eff,const simulation::SimContext &context,const Environment& env);
 
@@ -66,7 +71,7 @@ public:
 
 	float nextStopTime() const;
 
-	string toString(const state::State& state) const;
+	string toString(const SimContext& state) const;
 };
 
 
@@ -79,9 +84,10 @@ public:
 	Intro(const BaseExpression* n,const pattern::Mixture* mix);
 	~Intro();
 
-	void apply(state::State &state) const override;
+	void apply(Simulation &state) const override;
 	int addInfluences(int current,Rule::CandidateMap& map,const simulation::SimContext &context,
 			const Environment &env) const override;
+	string toString(const SimContext& context) const override;
 };
 
 class Delete : public Perturbation::Effect {
@@ -92,7 +98,8 @@ public:
 	Delete(const BaseExpression* n,const pattern::Mixture& mix);
 	~Delete();
 
-	void apply(state::State &state) const override;
+	void apply(Simulation &state) const override;
+	string toString(const SimContext& context) const override;
 };
 
 class Update : public Perturbation::Effect {
@@ -104,8 +111,9 @@ public:
 	//Update(unsigned var_id,pattern::Mixture* _var);
 	~Update();
 
-	void apply(state::State &state) const override;
+	void apply(Simulation &state) const override;
 	void setValueUpdate();
+	string toString(const SimContext& context) const override;
 };
 
 class UpdateToken : public Perturbation::Effect {
@@ -116,7 +124,8 @@ public:
 	UpdateToken(unsigned var_id,expressions::BaseExpression* val);
 	~UpdateToken();
 
-	void apply(state::State &state) const override;
+	void apply(Simulation &state) const override;
+	string toString(const SimContext& context) const override;
 };
 
 class ApplyRule : public Perturbation::Effect {
@@ -127,7 +136,8 @@ public:
 	ApplyRule(const Rule& r,expressions::BaseExpression* expr);
 	~ApplyRule();
 
-	void apply(state::State &state) const override;
+	void apply(Simulation &state) const override;
+	string toString(const SimContext& context) const override;
 };
 
 class Histogram : public Perturbation::Effect {
@@ -144,16 +154,18 @@ class Histogram : public Perturbation::Effect {
 	mutable map<string,list<vector<FL_TYPE>>> rawData;
 
 public:
-	Histogram(const Environment& env,int _bins,string file_name,
+	Histogram(const SimContext& sim,int _bins,string file_name,
 			list<const state::KappaVar*> k_vars,BaseExpression* f = nullptr);
 	~Histogram();
 
-	void apply(state::State& state) const override;
+	void apply(Simulation& state) const override;
 
 	void setPoints() const;
 	void tag(FL_TYPE val) const;
 
 	void printHeader(ofstream &file,const string& kappa) const;
+
+	string toString(const SimContext& context) const override;
 
 };
 

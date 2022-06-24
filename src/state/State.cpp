@@ -24,16 +24,22 @@ using Deps = pattern::Dependency::Dep;
 using namespace matching;
 
 State::State(int id,simulation::Simulation& _sim,
-	const BaseExpression& vol,simulation::Plot& _plot) :
+	const BaseExpression& vol,bool by_events) :
 		simulation::SimContext(id,&_sim),
 		volume(vol),rates(env.size<simulation::Rule>()),
 		tokens (new FL_TYPE[env.size<state::TokenVar>()]()),activityTree(nullptr),
-		injections(nullptr),ev(),plot(_plot),activeDeps(env.getDependencies()) {
+		injections(nullptr),ev(_sim.ev),activeDeps(env.getDependencies()),
+		pertIds(),timePerts(){
+	if(by_events)
+		plot = new simulation::EventPlot(*this);
+	else
+		plot = new simulation::TimePlot(*this);
 	for(unsigned i = 0; i < vars.size(); i++){
 		vars[i] = dynamic_cast<Variable*>(vars[i]->clone());
 		vars[i]->reduce(*this);//vars are simplified for every state
 	}
-	for(auto& rule : env.getRules()){
+	for(auto rule_ptr : env.getRules()){
+		auto& rule = *rule_ptr;
 		int i = rule.getId();
 		auto& lhs = rule.getLHS();
 		auto lhs_comps = lhs.compsCount();
@@ -44,6 +50,10 @@ State::State(int id,simulation::Simulation& _sim,
 			else
 				same_ptrn = true;
 
+		if(rule.getTargetCell(id) == -1){
+			rates[i] = new simulation::Rule::Rate(rule);
+			continue;
+		}
 		if(rule.getRate().getVarDeps() & BaseExpression::AUX){
 			if(same_ptrn){
 				try{
@@ -104,11 +114,11 @@ void State::addNodes(unsigned n,const pattern::Mixture& mix){
 
 UINT_TYPE State::mixInstances(const pattern::Mixture& mix) const{
 	//auto& mix = env.getMixtures().front();
-	UINT_TYPE  count = 1;
+	UINT_TYPE  countr = 1;
 	for(const auto cc : mix){
-		count *= injections[cc->getId()]->count();
+		countr *= count(cc->getId());
 	}
-	return count;
+	return countr;
 }
 
 
@@ -122,12 +132,7 @@ void State::apply(const simulation::Rule& r){
 		graph.allocate(node);
 		ev.emb[ev.cc_count][i] = node;
 		i++;
-#ifdef DEBUG
-		if(simulation::Parameters::get().verbose > 2){
-			//auto& ag_sign = state.getEnv().getSignature(n->getId());
-			cout << "[create] " << n->toString(env) << endl;//ag_sign.getName() << "()\n";
-		}
-#endif
+		IF_DEBUG_LVL(3,log_msg += "\t[create] " + n->toString(env) + "\n");
 	}
 	ev.new_cc.clear();
 	for(auto& act : r.getScript()){
@@ -149,6 +154,25 @@ void State::apply(const simulation::Rule& r){
 		case pattern::ActionType::DELETE:
 			node->removeFrom(*this);
 			break;
+		case pattern::ActionType::TRANSPORT:{
+			map<int,list<Node*>> nbh;
+			nbh[0].push_back(node);
+			set<Node*> cc;
+			graph.neighborhood(nbh,cc);//move-join
+			InjSet injs;
+			graph.moveOut(cc,injs);
+			ev.act.trgt_st = r.getTargetCell(id);
+			auto& dest = static_cast<simulation::Simulation*>(parent)->getCell(ev.act.trgt_st);
+			for(auto inj : injs){
+				auto cc_inj = static_cast<matching::CcInjection*>(inj);
+				injections[inj->pattern().getId()]->erase(inj,*this);//TODO this will stop working when injs are reused again
+				dest.injections[inj->pattern().getId()]->insert(cc_inj,dest);
+				ev.to_update.emplace(&inj->pattern());
+			}
+			dest.graph.moveIn(cc);
+			IF_DEBUG_LVL(3,log_msg += "\t[move-join] " + node->toString(env) + " -> "+ env.cellIdToString(ev.act.trgt_st) +"\n");
+			break;
+		}
 		}
 		//ev.emb[act.trgt_ag.first][act.trgt_ag.second]->applyAction(*this);
 	}
@@ -189,16 +213,14 @@ void State::positiveUpdate(const Rule::CandidateMap& wake_up){
 				emplace(*this,node,port_list,key.match_root.first);
 
 		if(inj_p){
-#ifdef DEBUG
-			if(simulation::Parameters::get().verbose > 3){
+			IF_DEBUG_LVL(4,
 				if(ev.new_injs.size() == 0)
-					cout << "New injections found:\n";
-				cout << "\tPattern " << inj_p->pattern().toString(env) << " matches with agents IDs ";
+					log_msg += "New injections found:\n";
+				log_msg += "\tPattern " + inj_p->pattern().toString(env) + " matches with agents IDs ";
 				for(auto& node : *inj_p->getEmbedding())
-					cout << node->getAddress() << ",";
-				cout << endl;
-			}
-#endif
+					log_msg += to_string(node->getAddress()) + ",";
+				log_msg += "\n";
+			)
 			ev.new_injs.push_back(inj_p);
 			for(;nulls.first != nulls.second;++nulls.first)
 				port_list.erase(nulls.first->second);
@@ -211,7 +233,7 @@ void State::positiveUpdate(const Rule::CandidateMap& wake_up){
 			updateDeps(pattern::Dependency(Deps::KAPPA,key.cc->getId()));
 		}
 	}
-	/*for(auto side_eff : ev.side_effects){//trying to create injection for side-effects
+	for(auto side_eff : ev.side_effects){//trying to create injection for side-effects
 		for(auto& cc_ag : env.getFreeSiteCC(side_eff.first->getId(),side_eff.second)){
 			map<int,matching::InjSet*> port_list;
 			auto inj_p = injections[cc_ag.first->getId()]->emplace(*this,side_eff.first,port_list,cc_ag.second);
@@ -222,7 +244,7 @@ void State::positiveUpdate(const Rule::CandidateMap& wake_up){
 				ev.to_update.emplace(cc_ag.first);
 			}
 		}
-	}*/
+	}
 }
 
 void State::nonLocalUpdate(const simulation::Rule& rule,
@@ -275,10 +297,11 @@ void State::nonLocalUpdate(const simulation::Rule& rule,
 						continue;
 					auto mix_id = umix.front().second;
 					auto mix = env.getMixtures()[mix_id];
-					IF_DEBUG_LVL(2,cout << "New unary injection of "
-							<< mix->toString(env) <<" found: "
-							<< inj1->getEmbedding()[0][0]->getAddress() << ","
-							<< inj2->getEmbedding()[0][0]->getAddress() << endl;)
+					IF_DEBUG_LVL(2,log_msg += "New unary injection of "
+							+ mix->toString(env) + " found: "
+							+ to_string(inj1->getEmbedding()[0][0]->getAddress()) + ","
+							+ to_string(inj2->getEmbedding()[0][0]->getAddress()) + "\n"
+					);
 					if(inj1->pattern().getId() < inj2->pattern().getId())
 						nlInjections.at(mix_id)->emplace(*this,inj1,inj2,dist);
 					else
@@ -318,10 +341,11 @@ void State::nonLocalUpdate(const simulation::Rule& rule,
 				if(inj2 == new_inj)
 					continue;
 				auto mix = env.getMixtures()[inj_dist_rid.second.second];
-				IF_DEBUG_LVL(2,cout << "New unary injection of "
-						<< mix->toString(env) <<" found: "
-						<< new_inj->getEmbedding()[0][0]->getAddress() << ","
-						<< inj2->getEmbedding()[0][0]->getAddress() << endl;)
+				IF_DEBUG_LVL(2,log_msg += "New unary injection of "
+						+ mix->toString(env) + " found: "
+						+ to_string(new_inj->getEmbedding()[0][0]->getAddress()) + ","
+						+ to_string(inj2->getEmbedding()[0][0]->getAddress()) + "\n";
+				)
 				if(new_inj->pattern().getId() < inj2->pattern().getId())
 					nlInjections.at(inj_dist_rid.second.second)->emplace(*this,new_inj,inj2,inj_dist_rid.second.first);
 				else
@@ -339,13 +363,21 @@ void State::activityUpdate(){
 	for(auto ptrn : ev.to_update){
 		for(auto r_id : ptrn->includedIn())
 			ev.rule_ids.emplace(r_id);
+		updateDeps(pattern::Dependency(pattern::Dependency::KAPPA,ptrn->getId()));
 	}
 	//total update
 	//cout << "rules to update: ";
-	for(auto r_id : ev.rule_ids){
-		//cout << env.getRules()[r_id].getName() << ", ";
-		updateActivity(r_id);
+	if(ev.act.t == ActionType::TRANSPORT){
+		auto& dest = static_cast<simulation::Simulation*>(parent)->getCell(ev.act.trgt_st);
+		for(auto r_id : ev.rule_ids){
+			//cout << env.getRules()[r_id].getName() << ", ";
+			updateActivity(r_id);
+			dest.updateActivity(r_id);
+		}
 	}
+	else
+		for(auto r_id : ev.rule_ids)
+			updateActivity(r_id);
 	//cout << endl;
 	counter.incNullActions(ev.null_actions.size());
 
@@ -354,31 +386,45 @@ void State::activityUpdate(){
 
 void State::advanceUntil(FL_TYPE sync_t,UINT_TYPE max_e) {
 	counter.next_sync_at = sync_t;
-	plot.fill(*this,env);
+	plot->fill();
 	while(counter.getTime() < sync_t && counter.getEvent() < max_e){
 		try{
 			const NullEvent ex(event());//next-event
 			if(ex.error){
 				counter.incNullEvents(ex.error);
-				IF_DEBUG_LVL(2,	cout << "  | Null-Event (" << ex.what() << ")" << endl;)
+				IF_DEBUG_LVL(2,	log_msg = "Null-"+log_msg + "\n---"+ex.what()+"---\n\n");
 			}
 			else
 				counter.incEvents();
 		}
 		catch(const NullEvent &ex){
-			IF_DEBUG_LVL(2,cout << "  | Null-Event (" << ex.what() << ")" << endl;)
+			IF_DEBUG_LVL(2,log_msg = "Null-"+log_msg+"\n---"+ ex.what()+ "---\n");
 			counter.incNullEvents(ex.error);
+		}
+		catch(const exception &e){
+			std::cout << "[" << log_msg << e.what() << std::endl;
+			exit(1);
 		}
 		activityUpdate();
 #ifdef DEBUG
-		if((counter.getEvent()+counter.getNullEvent()) % 10 == 0 && simulation::Parameters::get().verbose > 3){
-			cout << "---------------------------------------------\n";
-			this->print();
-			cout << "---------------------------------------------\n";
+		if((counter.getEvent()+counter.getNullEvent()) % 100 == 0 && params->verbose > 4){
+			log_msg += "---------------------------------------------\n";
+			log_msg += this->toString();
+			log_msg += "\n---------------------------------------------\n";
 		}
+		size_t pos = 0;
+		auto sim_str = "[Sim " + to_string(parent->getId()) + "]: ";
+		if(log_msg != "" && params->runs > 1){
+			log_msg = sim_str + log_msg;
+			while((pos = log_msg.find("\n",pos+1)) != string::npos)
+				if(log_msg[pos+1] != '\n' && log_msg[pos+1] != '\0')
+					log_msg.insert(pos+1,sim_str);
+		}
+		std::cout << "[" << log_msg << std::endl;
+		log_msg = "";
 #endif
 		WarningStack::getStack().show(false);
-		plot.fill(*this,env);
+		plot->fill();
 	}
 }
 
@@ -389,22 +435,17 @@ void State::selectBinaryInj(const simulation::Rule& r,bool clsh_if_un) const {
 	//ev->emb = new Node**[mix.compsCount()];
 	auto& mix = r.getLHS();
 	ev.cc_count = mix.compsCount();
-#ifdef DEBUG
-	if(simulation::Parameters::get().verbose > 1)
-		cout << " (binary) | Root-nodes: ";
-#endif
+	IF_DEBUG_LVL(2,log_msg += " (binary) | Root-nodes: ");
+
 	for(unsigned i = 0 ; i < mix.compsCount() ; i++){
 		auto& cc = mix.getComponent(i);
 		injections[cc.getId()]->selectRule(r.getId(), i);
 		auto& inj = injections[cc.getId()]->chooseRandom(rng);
-#ifdef DEBUG
-		if(simulation::Parameters::get().verbose > 1)
-			cout << inj.getEmbedding()[0][0]->getAddress() << ",";
-#endif
+		IF_DEBUG_LVL(2,log_msg += to_string(inj.getEmbedding()[0][0]->getAddress()) + ",";)
 		if(inj.codomain(&ev.emb[i],total_cod))
 			throw NullEvent(3);//overlapped codomains
 	}
-	IF_DEBUG_LVL(2,cout << endl)
+	IF_DEBUG_LVL(2,log_msg += "\n");
 	if(clsh_if_un && graph.areConnected(ev.emb[0],ev.emb[1],r.getUnaryRate().second)){
 		throw NullEvent(2);//selected instance is not binary
 	}
@@ -423,14 +464,10 @@ void State::selectUnaryInj(const simulation::Rule& rule) const {
 	auto& inj = nlInjections.at(mix.getId())->chooseRandom(rng);
 	set<Node*> total_cod;
 
-#ifdef DEBUG
-	if(simulation::Parameters::get().verbose > 1){
-		cout << " (unary)  | Root-nodes: " <<
-			 inj.getEmbedding()[0][0]->getAddress() << "," <<
-			 inj.getEmbedding()[1][0]->getAddress() << endl;
+	IF_DEBUG_LVL(2,log_msg +=
+		" (unary)  | Root-nodes: " + to_string(inj.getEmbedding()[0][0]->getAddress())
+		+ "," + to_string(inj.getEmbedding()[1][0]->getAddress()) + "\n";)
 
-	}
-#endif
 
 	if(inj.codomain(ev.emb,total_cod)){
 		nlInjections.at(mix.getId())->erase(&inj,*this);
@@ -484,12 +521,12 @@ void State::selectInjection(const simulation::Rule& r,two<FL_TYPE> bin_act,
 
 const simulation::Rule& State::drawRule(){
 	auto rid_alpha = activityTree->chooseRandom();
-	auto& rule = env.getRules()[rid_alpha.first];
+	auto& rule = env.getRule(rid_alpha.first);
 
-#ifdef DEBUG
-	if(simulation::Parameters::get().verbose > 1)
-		printf( "  | Rule: %-11.11s",rule.getName().c_str());
-#endif
+	IF_DEBUG_LVL(2,char buf[200];
+		sprintf(buf,"|| Rule: %-11.11s ||",rule.getName().c_str());
+		log_msg += buf;
+	)
 
 	auto a1a2 = rates[rid_alpha.first]->evalActivity(*this);
 	auto alpha = a1a2.first + a1a2.second;
@@ -521,57 +558,81 @@ int State::event() {
 	//			<< endl;
 	FL_TYPE dt,act;
 	act = activityTree->total();
+	IF_DEBUG_LVL(2,
+		char buf[300];
+		sprintf(buf,"Event %3lu | Time %.4f | Reactivity = %.4f]\n",
+				counter.getEvent(),counter.getTime(),act);
+		log_msg += buf;
+	)
+	IF_DEBUG_LVL(4,
+		log_msg += activeRulesStr() + "\n";
+	)
 	if(act < 0.)
 		throw invalid_argument("Activity falls below zero.");
 	auto exp_distr = exponential_distribution<FL_TYPE>(act);
 	dt = exp_distr(rng);
 
+	//cout << "advance time" << dt << endl;
 	counter.advanceTime(dt);
 	if(act == 0 || std::isinf(dt))
 		return 0;
-	updateDeps(pattern::Dependency(pattern::Dependency::TIME));
 	//timePerts = pertIds;
 	//pertIds.clear();
 	FL_TYPE stop_t = 0.0;
+#ifdef DEBUG
+	if(params->verbose > 1){
+		char buf[35];
+		sprintf(buf,"|| Time Step: %.4f ||\n",dt);
+		log_msg += buf;
+	}
+#endif
+	updateDeps(pattern::Dependency(pattern::Dependency::TIME));
 	for(auto& time_dPert : timePerts){//fixed-time-perts
+		//cout << "checking time-perts" << endl;
 		if(time_dPert.first > counter.getTime())
 			break;
 		auto p_id = time_dPert.second.id;
 		bool abort = false;
 		auto& pert = perts.at(p_id);
 		stop_t = pert.timeTest(*this);
+		IF_DEBUG_LVL(2,dt = stop_t - counter.getTime() + dt;)
 		//if(stop_t){
-			counter.time = (stop_t > 0) ? stop_t : counter.time;
-			plot.fillBefore(*this,env);
-			pert.apply(*this);
-			counter.time = std::nextafter(counter.time,counter.time + 1.0);//TODO inf?
+			counter.setTime( (stop_t > 0) ? stop_t : counter.getTime());
+			plot->fillBefore();
+			//TODO HERE   pert.apply(*this);
+			counter.setTime( std::nextafter(counter.getTime(),counter.getTime() + 1.0));//TODO inf?
 			abort = pert.testAbort(*this,true);
 		//}
 		//if(!abort)
 		//	abort = pert.testAbort(*this,false);
-		if(abort)
-			perts.erase(p_id);
-		else
+		if(!abort)
+		//	activeDeps.eraseTimePert(time_dPert.first,time_dPert.second);
+		//else
 			activeDeps.addTimePertDependency(p_id, pert.nextStopTime());
+#ifdef DEBUG
+		if(params->verbose > 1){
+			char buf[35];
+			sprintf(buf,"|| Corrected Time Step: %.4f ||\n",dt);
+			log_msg += buf;
+		}
+#endif
 	}
 	timePerts.clear();
+	//cout << "trying to perturbate" << endl;
 	tryPerturbate();//trying no-fixed-time perturbations
 
-#ifdef DEBUG
-	if(simulation::Parameters::get().verbose > 1)
-		printf("Event %3lu | Time %.4f | act = %.4f",
-				counter.getEvent(),counter.getTime(),act);
-#endif
 	//EventInfo* ev = nullptr;
-	if(stop_t)
+	if(stop_t){
 		return 6;//NullEvent caused by perturbation
+	}
+	//cout << "draw-rule" << endl;
 	auto& rule = drawRule();
-	plot.fillBefore(*this,env);
+	plot->fillBefore();
 
+	//cout << "apply rule" << endl;
 	apply(rule);
 	positiveUpdate(rule.getInfluences());
 	//nonLocalUpdate(rule,ev.new_injs);
-
 	return 0;
 }
 
@@ -584,25 +645,16 @@ void State::tryPerturbate() {
 			auto& pert = perts.at(p_id);
 			auto trigger = pert.test(*this);
 			if(trigger){
-				pert.apply(*this);
+				//TODO here pert.apply(*this);
 				abort = pert.testAbort(*this,true);
 			}
 			if(!abort)
 				abort = pert.testAbort(*this,false);
-			if(abort)
-				perts.erase(p_id);
+			//if(abort)
+			//	perts.erase(p_id);
 
 		}
 	}
-}
-
-void State::updateVar(const Variable& var,bool by_value){
-	//delete vars[var.getId()];
-	if(by_value)
-		vars[var.getId()]->update(var.getValue(*this));
-	else
-		vars[var.getId()]->update(var);
-	updateDeps(pattern::Dependency(Deps::VAR,var.getId()));
 }
 
 void State::updateDeps(const pattern::Dependency& d){
@@ -612,18 +664,14 @@ void State::updateDeps(const pattern::Dependency& d){
 	auto dep_it = deps.begin();
 	while(!deps.empty()){
 		//auto& dep = *deps.begin();
+		IF_DEBUG_LVL(5,log_msg += "\t#Triggering updates from " + dep_it->toString() + " Dependency.\n";)
 		switch(dep_it->type){
 		case Deps::RULE:
-#ifdef DEBUG
-			if(simulation::Parameters::get().verbose > 0)
-				cout << "Updating '" << env.getRules()[dep_it->id].getName() << "' rule's rate." << endl;
-#endif
+			IF_DEBUG_LVL(4,log_msg += "Updating '"+env.getRule(dep_it->id).getName()+"' rule's rate.\n";)
 			ev.rule_ids.emplace(dep_it->id);
 			break;
 		case Deps::KAPPA:
 			break;
-			//auto act = evalActivity(env.getRules()[dep.id]);
-			//activityTree->add(dep.id,act.first+act.second);
 		case Deps::VAR:
 			break;
 		case Deps::PERT:
@@ -634,7 +682,7 @@ void State::updateDeps(const pattern::Dependency& d){
 			break;
 		case Deps::TIME:{
 			auto& deps = activeDeps.getDependencies(*dep_it).ordered_deps;
-			if(deps.size() && deps.begin()->first <= counter.time ){
+			if(deps.size() && deps.begin()->first <= counter.getTime() ){
 				auto nextDeps = deps.equal_range(deps.begin()->first);
 				timePerts.insert(timePerts.begin(),nextDeps.first,nextDeps.second);
 				activeDeps.eraseTimePerts(nextDeps.first,nextDeps.second);
@@ -767,13 +815,15 @@ void State::initActTree() {
 	//else
 	//	activityTree = new data_structs::SimpleTree(rule_count);
 	list<const simulation::Rule*> rules;
-	for(auto& rule : env.getRules())
-		rules.emplace_back(&rule);
+	for(auto rule : env.getRules())
+		rules.emplace_back(rule);
+	//Sorting because ...
 	rules.sort([](const simulation::Rule * a, const simulation::Rule* b) { return a->getName() < b->getName(); });
 	for(auto rule_p : rules){
 		auto& rule = *rule_p;
 		auto act_pr = rates[rule.getId()]->evalActivity(*this);
 		activityTree->add(rule.getId(),act_pr.first+act_pr.second);
+		//cout << "rule " << rule_p->getName() << "->" << (act_pr.first+act_pr.second) << endl;
 	}
 /*#ifdef DEBUG
 	if(simulation::Parameters::get().verbose <= 0)
@@ -790,11 +840,11 @@ void State::initActTree() {
 }
 
 void State::plotOut() const {
-	plot.fill(*this,env);
+	plot->fill();
 }
 
 data_structs::DataTable* State::getTrajectory() const {
-	auto tab = new data_structs::DataTable(plot.getData(),true);
+	auto tab = new data_structs::DataTable(plot->getData(),true);
 	//tab->col_names.emplace_back("Time");
 	for(auto var : env.getObservables())
 		tab->col_names.emplace_back(var->toString());
@@ -802,7 +852,7 @@ data_structs::DataTable* State::getTrajectory() const {
 }
 
 void State::collectRawData(map<string,list<const vector<FL_TYPE>*>> &raw_list) const {
-	for(auto pert : perts)
+	for(auto& pert : perts)
 		pert.second.collectRawData(raw_list);
 }
 void State::collectTabs(map<string,list<const data_structs::DataTable*>> &tab_list) const {
@@ -815,13 +865,13 @@ void State::print() const {
 	cout << "Active Injections -> {\n";
 	int i = 0;
 	for(auto& cc : env.getComponents()){
-		int i = cc->getId();
+		i = cc->getId();
 		if(injections[i]->count())
 			cout << "\t("<< i <<")\t" << injections[i]->count() <<
 			" injs of " << cc->toString(env) << endl;
 	}
 	for(auto& mix : env.getMixtures()){
-		int i = mix->getId();
+		i = mix->getId();
 		matching::InjRandContainer<matching::MixInjection>* injs = nullptr;
 		try {
 			injs = nlInjections.at(i);
@@ -833,13 +883,60 @@ void State::print() const {
 	}
 	cout << "}\nActive Rules -> {\n";
 	for(auto& r : env.getRules()){
-		auto act = rates[r.getId()]->evalActivity(*this);
+		auto act = rates[r->getId()]->evalActivity(*this);
 		if(act.first || act.second)
-			cout << "\t(" << r.getId() << ")\t" << r.getName() << "\t("
+			cout << "\t(" << r->getId() << ")\t" << r->getName() << "\t("
 				<< act.first << " , " << act.second << ")" << endl;
 	}
+
 	cout << "}\n";
 	cout << counter.toString() << endl;
+}
+
+string State::activeRulesStr() const {
+	string ret;// = "Active Rules -> {\n";
+	for(auto r : env.getRules()){
+		auto act = rates[r->getId()]->evalActivity(*this);
+		auto sim = static_cast<const simulation::Simulation*>(parent);
+		auto tree_act = sim->activityTree->find(sim->maskSpatialRule(id,r->getId()));
+		if(act.first || act.second || tree_act)
+			ret += "\t(" + to_string(r->getId()) + ")\t" + r->getName() + "\t("
+				+ to_string(act.first) + " , " + to_string(act.second) +
+				") |" + to_string(tree_act)+"\n"; //checking tree_act problems
+	}
+	return ret;// + "}";
+}
+
+string State::toString() const {
+	string ret = graph.toString(env);
+	ret += "Active Injections -> {\n";
+	int i = 0;
+	for(auto& cc : env.getComponents()){
+		i = cc->getId();
+		if(injections[i]->count())
+			ret += "\t("+ to_string(i) +")\t" + to_string(injections[i]->count()) +
+			" injs of " + cc->toString(env) + "\n";
+	}
+	for(auto& mix : env.getMixtures()){
+		i = mix->getId();
+		matching::InjRandContainer<matching::MixInjection>* injs = nullptr;
+		try {
+			injs = nlInjections.at(i);
+		}
+		catch(std::out_of_range& e){ }
+		if(injs && injs->count())
+			ret += "\t(" + to_string(i) +")\t" + to_string(injs->count()) +
+			" mix-injs of " + mix->toString(env) + "\n";
+	}
+	ret += "}\nActive Rules -> {\n";
+	for(auto& r : env.getRules()){
+		auto act = rates[r->getId()]->evalActivity(*this);
+		if(act.first || act.second)
+			ret += "\t(" + to_string(r->getId()) + ")\t" + r->getName() + "\t("
+				+ to_string(act.first) + " , " + to_string(act.second) + ")\n" ;
+	}
+	ret += "}\n" + counter.toString();
+	return ret;
 }
 
 } /* namespace ast */

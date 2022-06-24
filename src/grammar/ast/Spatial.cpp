@@ -59,18 +59,18 @@ const Id& CompExpression::evalName(const pattern::Environment &env,bool declare)
 	return name;
 }
 list<const BaseExpression*> CompExpression::evalExpression(const pattern::Environment &env,
-			small_id comp_id,const SimContext &context) const {
+			small_id comp_id,const SimContext &context,char flags) const {
 	list<const state::BaseExpression*> ret;
 	auto& dims = env.getCompartment(comp_id).getDimensions();
 	int i = 0;
 	for(auto index : indexList){
-		auto expr = index->eval(env,context,nullptr,Expression::AUX_ALLOW);
+		auto expr = index->eval(env,context,nullptr,flags);
 		try{//TODO check if vars is only consts
 			int d = expr->getValueSafe(context).valueAs<int>();
 			if(d < 0 || d >= dims[i])
 				throw SemanticError("Index out of limits for compartments expression.",index->loc);
 		}
-		catch(std::out_of_range &e){
+		catch(std::out_of_range &e){//an aux value in index->eval()
 			//DO NOTHING
 		}
 		ret.push_back(expr);
@@ -87,14 +87,13 @@ Compartment::Compartment(const location& l,const CompExpression& comp_exp,
 		Expression* exp) : Node(l), comp(comp_exp), volume(exp) {}
 
 //TODO
-void Compartment::eval(pattern::Environment &env,const SimContext &context){
+unsigned Compartment::eval(pattern::Environment &env,const SimContext &context){
 	const Id& name = comp.evalName(env,true);
 	pattern::Compartment& c = env.declareCompartment(name);
 	vector<short> dims = comp.evalDimensions(env,context);
 	BaseExpression* vol = volume->eval(env,context,nullptr,Expression::CONST);
-	c.setDimensions(dims);
 	c.setVolume(vol);
-	return;
+	return c.setDimensions(dims,env.getCellCount());;
 }
 
 
@@ -140,8 +139,53 @@ void Channel::eval(pattern::Environment &env,
 	channel.setCompExpressions(c_exp_src,c_exp_trgt);
 	if(filter)
 		channel.setFilter(filter->eval(env,context));
-	channel.setDelay(delay->eval(env,context));
+	if(delay)
+		channel.setDelay(delay->eval(env,context));
+	else
+		channel.setDelay(new expressions::Constant<FL_TYPE>(0.0));
 	return;
+}
+
+tuple<int,int,bool> Channel::evalLink(pattern::Environment &env,const SimContext &context) const{
+	int src_id,trgt_id;
+
+	src_id = env.getCompartmentId(source.evalName(env,false).getString());
+	trgt_id = env.getCompartmentId(target.evalName(env,false).getString());
+
+	list<const BaseExpression*> src_index,trgt_index;
+	src_index = source.evalExpression(env,src_id,context,0);
+	trgt_index = target.evalExpression(env,trgt_id,context,0);
+
+	pattern::CompartmentExpr *c_exp_src,*c_exp_trgt;
+	try{
+		c_exp_src = new pattern::CompartmentExpr(env.getCompartment(src_id),src_index);
+	}catch(std::invalid_argument &e){
+		throw SemanticError(e.what(),source.loc);
+	}
+	try{
+		c_exp_trgt = new pattern::CompartmentExpr(env.getCompartment(trgt_id),trgt_index);
+	}catch(std::invalid_argument &e){
+		throw SemanticError(e.what(),target.loc);
+	}
+	try{
+		c_exp_src->setEquation();
+		if(bidirectional)
+			c_exp_trgt->setEquation();
+	}catch(std::invalid_argument &e){
+		throw SemanticError(e.what(),loc);
+	}
+	AuxNames aux_values;
+	auto source = c_exp_src->getCells(aux_values,context);
+	auto trgt = c_exp_trgt->getCells(aux_values,context);
+
+
+	if(source.size() != 1 || trgt.size() != 1)
+		throw SemanticError("Explicit connection in %transport can only be 1 cell to 1 cell",loc);
+	auto src_cellid = source.front();
+	auto trgt_cellid = trgt.front();
+	delete c_exp_src;
+	delete c_exp_trgt;
+	return make_tuple(src_cellid,trgt_cellid,bidirectional);
 }
 
 
@@ -183,6 +227,43 @@ void Use::eval(pattern::Environment &env, const SimContext &context) const {
 	}
 }
 
+
+
+/******* class Transport ********/
+
+void Transport::eval(SimContext& context) const {
+	auto& env = context.getEnv();
+	auto mix = lhs.agents.eval(env,context,
+			Expression::PATTERN + Expression::LHS + Expression::AUX_ALLOW);
+	if(mix->compsCount() > 1)
+		throw SemanticError("Transport rules can only move connected agents.",loc);
+	string name("Transport of "+mix->getComponent(0).toString(env));
+	simulation::Rule* transport;
+	if(channel){
+		auto lnk = channel->evalLink(env,context);
+		transport = new spatial::LinkTransport(lnk,name,*mix,loc);
+	}
+	else {
+		auto id = env.getChannelId(link.getString());
+		//auto& sp_channel = env.getChannel(id);
+		//name += "through "+sp_channel.getName();
+		//TIDI
+	}
+
+	env.declareRule(transport,true);
+	two<pattern::DepSet> deps;
+	auto rrate = rate.eval(env,*transport,context,deps);
+	mix->addInclude(transport->getId());
+	for(auto dep : deps.first){
+		if(dep.type == pattern::Dependency::AUX){
+			auto cc_id = mix->getAuxMap().at(dep.aux).cc_pos;
+			mix->getComponent(cc_id).addRateDep(*transport,cc_id);
+		}
+		//else if(dep.type == Deps::VAR){
+	}
+	for(auto& dep : deps.first)
+		env.addDependency(dep,pattern::Dependency::RULE,transport->getId());
+}
 
 
 

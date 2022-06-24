@@ -123,11 +123,13 @@ Variable* Declaration::evalVar(pattern::Environment &env,
 			//if(op == BaseExpression::SUMATORY && ) //TODO maybe make DistrVar<int> if expr is int?
 			var = new state::DistributionVar<FL_TYPE>(id,eval_name,observable,*mix,make_pair(op,b_expr));
 		}
-
+		env.addDependency(pattern::Dependency(pattern::Dependency::KAPPA,mix->getId()),
+				pattern::Dependency::VAR,id);
 	}
 	else {
 		char flag = constant ? Expression::CONST : 0;
-		BaseExpression* b_expr = expr->eval(env,context,nullptr,flag);
+		pattern::DepSet deps;
+		BaseExpression* b_expr = expr->eval(env,context,&deps,flag);
 		switch(b_expr->getType()){
 		case FLOAT:
 			var = new state::AlgebraicVar<FL_TYPE>(id,eval_name,observable,
@@ -144,6 +146,8 @@ Variable* Declaration::evalVar(pattern::Environment &env,
 		case NONE:default:
 			throw invalid_argument("Declaration::evalVar(): Cannot return None value.");
 		}
+		for(auto dep : deps)
+			env.addDependency(dep,pattern::Dependency::VAR,id);
 	}
 	return var;
 }

@@ -13,14 +13,13 @@
 
 namespace simulation {
 
-Parameters Parameters::singleton;
 
 Parameters::Parameters() : options(nullptr),outputFile("sim"),outputFileType("tsv"),
 		outputDirectory("."),maxEvent(std::numeric_limits<UINT_TYPE>::max()),
 		maxTime(std::numeric_limits<FL_TYPE>::infinity()),points(0),seed(0),
 		useMultiNode(false),runs(1),verbose(0),showNodes(0){
 #ifdef DEBUG
-	verbose = 3;
+	verbose = 2;
 #endif
 }
 
@@ -163,9 +162,9 @@ Parameters::~Parameters() {
 }
 
 
-const Parameters& Parameters::get(){
+/*const Parameters& Parameters::get(){
 	return singleton;
-}
+}*/
 
 /*
 UINT_TYPE Parameters::limitEvent() const{

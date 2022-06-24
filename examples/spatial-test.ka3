@@ -1,0 +1,23 @@
+
+%compartment: 'comps'[3][3] 1.0
+#%channel: 'conn' 'comps'[x][y] <-> 'comps'[x+1][y]
+#%channel: 'conn' 'comps'[x][y] <-> 'comps'[x][y+1]
+
+%agent: A()
+%agent: B()
+
+
+#%transport: 'conn' A() @ 1.0
+
+%transport: A() 'comps'[0][0] <-> 'comps'[1][1] @ 1.0 
+%transport: A() 'comps'[2][2] <-> 'comps'[1][1] @ 1.0
+
+%obs: 'A' A()
+%obs: 'B' B()
+
+
+%use: 'comps'[0][0]
+%init: 100 A()
+
+%use: 'comps'[2][2]
+%init: 100 B()

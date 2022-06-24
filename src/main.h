@@ -27,7 +27,7 @@
 #include <time.h>
 
 
-simulation::Results run(int argc, const char * const argv[]);
+simulation::Results* run(int argc, const char * const argv[],const map<string,float>& ka_params);
 
 
 

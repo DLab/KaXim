@@ -329,9 +329,11 @@ pattern::Mixture::Site* Site::eval(pattern::Environment &env,
 		try{
 			//cout << agent.toString(env) << " loc = " << loc << endl;
 			auto val = values[1]->getValueSafe(context);
-			if(! site_sign.isPossibleValue(val))
+			//cout << context.getAuxMap().toString() << endl;
+			if(! site_sign.isPossibleValue(val)){
 				throw SemanticError("The value "+val.toString()+
 						" is out of the site's bounds.",loc);
+			}
 		}
 		catch(out_of_range &e){/* value can not be obtained */}//TODO check which exceptions
 		mix_site->setValuePattern(values);
@@ -433,7 +435,8 @@ pattern::Mixture* Mixture::eval(pattern::Environment &env,
 		const SimContext &context,char ptrn_flag) const{
 	pattern::Mixture* mix = new pattern::Mixture(agents.size());
 	for(auto& ag_ast : agents){
-		auto agent = ag_ast.eval(env,context,*mix,ptrn_flag);
+		//auto agent =
+		ag_ast.eval(env,context,*mix,ptrn_flag);
 	}
 	mix->setComponents();
 	if(ptrn_flag & Mixture::Info::PATTERN){
@@ -594,7 +597,7 @@ simulation::Perturbation::Effect* Effect::eval(pattern::Environment& env,
 			file += se.evalConst(env, context);
 		simulation::Histogram* eff;
 		try{
-			eff = new simulation::Histogram(env,bins,file,k_vars,aux_func);
+			eff = new simulation::Histogram(context,bins,file,k_vars,aux_func);
 		}
 		catch(exception &e){
 			throw SemanticError(e.what(),loc);
@@ -863,16 +866,24 @@ void Rule::eval(pattern::Environment& env,
 	//TODO eval name...
 	auto& lhs_mix = *lhs.agents.eval(env,context,
 			Expression::PATTERN + Expression::LHS + Expression::AUX_ALLOW);//TODO do not allow aux?
-	auto& rule = env.declareRule(label,lhs_mix,loc);
-
+	auto rule_ptr = new simulation::Rule(label.getString(),lhs_mix,loc);//env.declareRule(label,lhs_mix,loc);
+	env.declareRule(rule_ptr);
+	auto& rule = *rule_ptr;
 	lhs_mix.addInclude(rule.getId());//TODO check if only addinclude in mix on unary rules
 	two<pattern::DepSet> deps;//first-> | second<-
-	rate.eval(env,rule,context,deps,bi);
+	try {
+		rate.eval(env,rule,context,deps,bi);
+	}
+	catch (std::invalid_argument& ex) {
+		throw SemanticError(string(ex.what()) + " Is not matching any LHS site.",rate.loc);
+	}
+
 	for(auto dep : deps.first){
 		if(dep.type == Deps::AUX){
 			auto cc_id = lhs_mix.getAuxMap().at(dep.aux).cc_pos;
 			lhs_mix.getComponent(cc_id).addRateDep(rule,cc_id);
 		}
+		//else if(dep.type == Deps::VAR){
 	}
 
 	auto rhs_mix_p = rhs.agents.eval(env,context,

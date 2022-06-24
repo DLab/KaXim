@@ -419,10 +419,10 @@ std::string BinaryOperation<R,T1,T2>::toString() const {
 		return exp1->toString() + AlgOpChar[op] + exp2->toString();
 }
 
-/*template<bool, typename T1, typename T2>
-std::string BinaryOperation<bool,T1,T2>::toString() const {
-	return exp1->toString() + BoolOpChar[op] + exp2->toString();
-}*/
+template<> std::string BinaryOperation<bool,int,int>::toString() const { return exp1->toString() + BoolOpChar[op] + exp2->toString();}
+template<> std::string BinaryOperation<bool,int,FL_TYPE>::toString() const { return exp1->toString() + BoolOpChar[op] + exp2->toString();}
+template<> std::string BinaryOperation<bool,FL_TYPE,int>::toString() const { return exp1->toString() + BoolOpChar[op] + exp2->toString();}
+template<> std::string BinaryOperation<bool,FL_TYPE,FL_TYPE>::toString() const { return exp1->toString() + BoolOpChar[op] + exp2->toString();}
 
 template class BinaryOperation<int, int, int> ;
 template class BinaryOperation<int, bool, int> ;

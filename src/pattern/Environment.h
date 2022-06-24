@@ -18,6 +18,7 @@
 #include "../simulation/Rule.h"
 #include "../spatial/Channel.h"
 #include "../spatial/Compartment.h"
+#include "../spatial/Transport.h"
 //#include "../state/AlgExpression.h"
 //#include "../grammar/ast/Basics.h"
 #include "../util/Exceptions.h"
@@ -25,6 +26,7 @@
 namespace grammar {
 namespace ast {
 class Id;
+class KappaAst;
 }
 }
 
@@ -39,6 +41,7 @@ class Perturbation;
 namespace pattern {
 
 using namespace std;
+using namespace spatial;
 
 using AstId = grammar::ast::Id;
 
@@ -51,6 +54,7 @@ typedef unsigned short short_id;
  * to broadcast the global environment among MPI processes.
  */
 class Environment {
+	friend class grammar::ast::KappaAst;
 protected:
 	typedef unordered_map<string,short> IdMap;
 	//static Environment env;
@@ -63,11 +67,12 @@ protected:
 	vector<Signature> signatures;
 	vector<Compartment> compartments;
 	vector<list<Channel> > channels;
+	//vector<Transport> transports;
 	vector<UseExpression> useExpressions;
 	vector<Mixture*> mixtures;
 	vector<Mixture::Component*> components;
 	vector<list<Mixture::Agent*> > agentPatterns;
-	vector<simulation::Rule> rules;
+	vector<simulation::Rule*> rules;
 	map<int,list<two<int>>> unaryCC;			///> cc_id[0] -> [radius,cc_id[1]]
 	map<two<int>,list<two<int>>> unaryMix;		///> (cc1,cc2) -> [radius,mix_id]
 	int max_radius;
@@ -77,6 +82,7 @@ protected:
 	map<string,tuple<Mixture*,small_id,small_id>> auxTemp;
 	map<const Mixture*,list<expressions::Auxiliar<FL_TYPE>*>> auxExpressions;
 	mutable Dependencies deps;//mutable because [] accessing
+	unsigned cellCount;
 
 	struct Init {
 		int use_id;
@@ -101,6 +107,10 @@ public:
 	Environment();
 	~Environment();
 
+	//environment is unique, cannot be copied
+	Environment(const Environment& env) = delete;
+	Environment& operator=(const Environment& env) = delete;
+
 	unsigned declareToken(const AstId &name);
 	short declareParam(const AstId& name,const expressions::BaseExpression* value);
 
@@ -124,8 +134,9 @@ public:
 	 * will be changed to point to the existing agent.
 	 * @param new_agent a reference to the new Agent pointer.		 */
 	void declareAgentPattern(Mixture::Agent* &new_agent);
-	simulation::Rule& declareRule(const grammar::ast::Id &name,Mixture& mix,
-			const yy::location& loc);
+	//simulation::Rule& declareRule(const grammar::ast::Id &name,Mixture& mix,
+	//		const yy::location& loc);
+	void declareRule(simulation::Rule* rule,bool force = false);
 	void declareUnaryMix(Mixture& mix,int radius);
 	void declarePert(simulation::Perturbation* pert);
 
@@ -149,14 +160,19 @@ public:
 
 	const Signature& getSignature(short id) const;
 	const vector<Signature>& getSignatures() const;
-	const list<Channel>& getChannels(short id) const;
+	const Channel& getChannel(short id) const;
 	const Compartment& getCompartment(short id) const;
 	const UseExpression& getUseExpression(short id) const;
 	//const Mixture& getMixture(small_id id) const;
 	const vector<Mixture*>& getMixtures() const;
 	const vector<Mixture::Component*>& getComponents() const;
 	const list<Mixture::Agent*>& getAgentPatterns(small_id id) const;
-	const vector<simulation::Rule>& getRules() const;
+	const vector<simulation::Rule*>& getRules() const {
+		return rules;
+	}
+	const simulation::Rule& getRule(int id) const {
+		return *rules[id];
+	}
 	/** \brief The list of unary CCs, the radius and the CC pair.
 	 *
 	 * @returns a map of [unary-cc1-id] -> { (radius,cc2-id) }  */
@@ -168,6 +184,12 @@ public:
 	}
 	int getMaxRadius() const {
 		return max_radius;
+	}
+	string getTokenName(int id) const {
+		return tokenNames.at(id);
+	}
+	unsigned getCellCount() const {
+		return cellCount;
 	}
 	const vector<simulation::Perturbation*>& getPerts() const;
 	const list<Init>& getInits() const;

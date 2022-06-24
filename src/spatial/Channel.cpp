@@ -9,35 +9,35 @@
 #include "../expressions/Vars.h"
 
 
-namespace pattern {
+namespace spatial {
 
 Channel::Channel(const std::string &nme)
-	: name(nme),source(nullptr),target(nullptr),filter(nullptr),delay(nullptr) {}
+	: name(nme){}//,source(nullptr),target(nullptr),filter(nullptr),delay(nullptr) {}
 
 Channel::~Channel() {
-	if(source)
+	/*if(source)
 		delete source;
 	if(target)
 		delete target;
 	if(filter)
-		delete filter;
+		delete filter;*/
 }
 
 void Channel::setCompExpressions(const CompartmentExpr* src, const CompartmentExpr* trgt){
-	if(source)
+	/*if(source)
 		delete source;
 	if(target)
 		delete target;
 	source = src;
-	target = trgt;
+	target = trgt;*/
 }
 
 const std::string& Channel::getName() const {
 	return name;
 }
 
-
-std::list< std::list< int > > Channel::getConnections(const simulation::SimContext& context) const{
+/*
+std::list< std::list< int > > Channel::Link::getConnections(const simulation::SimContext& context) const{
 	std::vector<short> cell_index(source->getCompartment().getDimensions().size());
 	AuxNames var_map;
 	std::list< std::list<int> > ret;
@@ -63,16 +63,16 @@ std::list< std::list< int > > Channel::getConnections(const simulation::SimConte
 	}
 	while(source->getCompartment().nextCell(cell_index));
 	return ret;
-}
+}*/
 
 
 void Channel::setFilter(const state::BaseExpression *where){
-	if(filter)
+	/*if(filter)
 		delete filter;
-	filter = dynamic_cast<const state::AlgExpression<bool>* >(where);;
+	filter = dynamic_cast<const state::AlgExpression<bool>* >(where);*/
 }
 void Channel::setDelay(const state::BaseExpression *_delay){
-	delay = _delay;
+	//delay = _delay;
 }
 
 //TODO
@@ -83,17 +83,17 @@ void Channel::setVarValues(std::map<std::string,int*> &var_values){}
 //DEBUG methods
 std::string Channel::toString(bool show_links) const{
 	std::string ret(name);
-	ret += ": from " + source->toString() + " to " + target->toString();
+	//ret += ": from " + source->toString() + " to " + target->toString();
 	return ret;
 }
 
 void Channel::printConnections(const std::list<std::list<int> >& l) const{
-	for(std::list<std::list<int> >::const_iterator l_it = l.cbegin();l_it != l.cend(); l_it++){
+	/*for(std::list<std::list<int> >::const_iterator l_it = l.cbegin();l_it != l.cend(); l_it++){
 		std::cout << source->getCompartment().cellIdToString(l_it->front()) << "  ->\t";
 		for(std::list<int>::const_iterator int_it = ++(l_it->cbegin());int_it != l_it->cend(); int_it++)
 			std::cout << target->getCompartment().cellIdToString(*int_it) << "\t";
 		std::cout << std::endl;
-	}
+	}*/
 }
 
 

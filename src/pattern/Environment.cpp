@@ -19,7 +19,7 @@ namespace pattern {
 using namespace std;
 using namespace grammar::ast;
 
-Environment::Environment() : max_radius(0){
+Environment::Environment() : max_radius(0),cellCount(0){
 	//the empty mixture pattern is only declared once.
 	auto empty_mix = new Mixture(0);
 	empty_mix->setId(0);
@@ -90,7 +90,11 @@ Compartment& Environment::declareCompartment(const Id &name_loc){
 UseExpression& Environment::declareUseExpression(unsigned short id,size_t n){
 	if(useExpressions.size() != id)
 		throw std::invalid_argument("UseExpression id doesn't match.");
-	useExpressions.emplace_back(n);
+	if(n <= 0)
+		useExpressions.emplace_back(cellCount);
+	else
+		useExpressions.emplace_back(n,nullptr);
+
 	return useExpressions[id];
 }
 Channel& Environment::declareChannel(const Id &name_loc) {
@@ -157,18 +161,42 @@ void Environment::declareAgentPattern(Pattern::Agent* &new_ag){
 	agentPatterns[new_ag->getId()].emplace_back(new_ag);
 }
 
-simulation::Rule& Environment::declareRule(const Id &name_loc,Mixture& mix,const yy::location& loc){
+void Environment::declareRule(simulation::Rule* rule,bool force){
 	//if(this->exists(name,algMap) || this->exists(name,kappaMap))
-	const string& name = name_loc.getString();
-	if(this->exists(name,varMap))
-		throw SemanticError("Label "+name+" already defined.",name_loc.loc);
-	small_id id;
+	auto name = rule->getName();
+	if(this->exists(name,varMap)){
+		if(force){
+			int i = 2;
+			while(exists(name+" #"+to_string(i),varMap))
+				i++;
+			if(i)
+				rule->name = name+" #"+to_string(i);
+		}
+		else
+			throw SemanticError("Label "+name+" already defined.",rule->loc);
+	}
+	int id;
 	id = varNames.size();
 	varMap[name] = id;
 	varNames.push_back(name);
-	rules.emplace_back(rules.size(),name_loc.getString(),mix,loc);
-	return rules.back();
+	rule->id = rules.size();
+	rules.emplace_back(rule);
 }
+/*
+spatial::Transport& Environment::declareTransport(spatial::Transport* transport){
+	string name(transport->getName());
+	name += "through "+name_loc.getString();
+	int i = 0;
+	while(exists(name+" #"+to_string(i),varMap))
+		i++;
+	if(i)
+		name += " #"+to_string(i);
+	int id = varNames.size();
+	varMap[name] = id;
+	varNames.push_back(name);
+	auto& channel = channels.at(name_loc.getString());
+	transports.emplace_back(transport.size(),name_loc.getString(),mix,loc);
+}*/
 
 void Environment::declareUnaryMix(Mixture& mix,int radius){
 	//TODO check if new unary mix is in reverse order
@@ -250,7 +278,7 @@ void Environment::declareObservable(state::Variable* var){
 
 void Environment::buildInfluenceMap(const simulation::SimContext &context){
 	for(auto& r : rules)
-		r.checkInfluence(*this,context);
+		r->checkInfluence(*this,context);
 }
 void Environment::buildFreeSiteCC() {
 	for(auto ag_class : agentPatterns){
@@ -310,9 +338,9 @@ unsigned Environment::getTokenId(const string &s) const {
 const Compartment& Environment::getCompartment(short id) const{
 	return compartments[id];
 }
-const list<Channel>& Environment::getChannels(short id) const{
+/*const list<Channel>& Environment::getChannels(short id) const{
 	return channels[id];
-}
+}*/
 const UseExpression& Environment::getUseExpression(short id) const {
 	return useExpressions[id];
 }
@@ -330,9 +358,6 @@ const vector<Mixture::Component*>& Environment::getComponents() const{
 }
 const list<Mixture::Agent*>& Environment::getAgentPatterns(small_id id) const{
 	return agentPatterns[id];
-}
-const vector<simulation::Rule>& Environment::getRules() const {
-	return rules;
 }
 const vector<simulation::Perturbation*>& Environment::getPerts() const {
 	return perts;
@@ -498,7 +523,8 @@ void Environment::show(const simulation::SimContext& context) const {
 		}*/
 		cout << "Rules[" << rules.size() << "]" << endl;
 		i = 0;
-		for(auto& rul : rules){
+		for(auto rule : rules){
+			auto& rul = *rule;
 			cout << "  [" << rul.getId() << "] ";
 			cout << rul.toString(*this);
 			int rhs_ag_pos(-1);
@@ -515,6 +541,12 @@ void Environment::show(const simulation::SimContext& context) const {
 			cout << "\n" << endl;
 			i++;
 		}
+		cout << "Perturbations[" << perts.size() << "]" << endl;
+		i = 0;
+		for(auto pert : perts){
+			cout << "  [" << pert->getId() << "] " << pert->toString(context);
+		}
+
 
 	/*}
 	catch(exception &e){

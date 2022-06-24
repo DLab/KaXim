@@ -44,9 +44,9 @@ int WarningStack::add(int id,const std::string &msg,const yy::location &loc){
 	}
 	else
 		counts[id]++;
-	if(counts[id] < MAX_WARNS-1)
+	if(counts[id] < MAX_WARNS)
 		push_back(Warning(msg,loc));
-	else if(counts[id] == MAX_WARNS-1)
+	else if(counts[id] == MAX_WARNS)
 		push_back(Warning(msg+" (Shutting down this warning).",loc));
 	return id;
 }

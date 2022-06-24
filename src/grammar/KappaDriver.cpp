@@ -10,11 +10,11 @@
 namespace grammar {
 
 using namespace std;
-KappaDriver::KappaDriver():
-		lexer3 (*this),parser3(*this)/*, lexer4(*this), parser4(*this)*/ {}
+KappaDriver::KappaDriver(const simulation::SimContext& context):
+		lexer3 (*this),parser3(*this,context)/*, lexer4(*this), parser4(*this)*/ {}
 
-KappaDriver::KappaDriver(const vector<string> &fls):
-		files(fls),lexer3 (*this), parser3(*this)/*,lexer4(*this),parser4(*this) */{}
+KappaDriver::KappaDriver(const vector<string> &fls,const simulation::SimContext& context):
+		files(fls),lexer3 (*this), parser3(*this,context)/*,lexer4(*this),parser4(*this) */{}
 
 KappaDriver::~KappaDriver() {}
 
@@ -33,8 +33,13 @@ int KappaDriver::parse(){
 				exit (EXIT_FAILURE);
 		    }
 
-
-			string file_type = file.substr(file.find_last_of("."));
+			string file_type;
+			try {
+				file_type = file.substr(file.find_last_of("."));
+			}
+			catch(exception& e){
+				file_type = "ka3";
+			}
 			if(file_type == "ka4"){
 				/*lexer4.switch_streams( &f, NULL);
 				loc.initialize(&file,1,1);

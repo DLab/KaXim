@@ -11,6 +11,7 @@
 #include <string>
 #include <set>
 
+#include "Dynamics.h"
 #include "AlgebraicExpressions.h"
 
 namespace grammar {
@@ -72,7 +73,7 @@ public:
 	 * @return a list of BaseExpression* for each index of compExpression by copy.
 	 */
 	list<const state::BaseExpression*> evalExpression(const pattern::Environment &env,
-			small_id comp_id,const SimContext &context) const;
+			small_id comp_id,const SimContext &context,char flags = Expression::AUX_ALLOW) const;
 
 
 protected:
@@ -87,7 +88,7 @@ class Compartment : public Node {
 public:
 	Compartment(const location& l,const CompExpression& comp_exp,
 			Expression* exp);
-	void eval(pattern::Environment &env,const SimContext &context);
+	unsigned eval(pattern::Environment &env,const SimContext &context);
 };
 
 /** \brief The AST of a channel declaration */
@@ -103,11 +104,14 @@ public:
 			const Expression* delay=nullptr);
 	void eval(pattern::Environment &env,
 			const SimContext &context);
+	tuple<int,int,bool> evalLink(pattern::Environment &env,
+				const SimContext &context) const;
 
 };
 
 /** \brief The AST of the \%use statement. */
 class Use : public Node {
+	friend class KappaAst;
 	static unsigned short count;
 	const unsigned short id;
 	list<CompExpression> compartments;
@@ -123,6 +127,23 @@ public:
 	~Use();
 
 	void eval(pattern::Environment &env,const SimContext &context) const;
+};
+
+class Transport : public Node {
+	friend class KappaAst;
+	Id link;
+	const Channel* channel;
+	RuleSide lhs;
+	Rate rate;
+	bool join;
+
+public:
+	Transport(Id lnk,RuleSide mix,Rate r,bool j = true) :
+		link(lnk),channel(nullptr),lhs(mix),rate(r),join(j){ }
+	Transport(const Channel* chnl,RuleSide mix,Rate r,bool j = true) :
+		channel(chnl),lhs(mix),rate(r),join(j){ }
+
+	void eval(SimContext& context) const;
 };
 
 

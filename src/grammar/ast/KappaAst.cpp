@@ -14,7 +14,7 @@ namespace grammar {
 namespace ast {
 
 KappaAst::KappaAst()  {
-	// TODO Auto-generated constructor stub
+	Use::count = 0;
 	useExpressions.emplace_front(new Use(0));
 }
 
@@ -41,11 +41,12 @@ void KappaAst::evaluateCompartments(pattern::Environment &env,const SimContext &
 	if(compartments.size() == 0){
 		//ADD_WARN("No compartment declared. Declaring default compartment 'volume'.",yy::location());
 		env.declareCompartment(Id(yy::location(),"volume"));
+		env.cellCount = 1;
 		return;
 	}
 	env.reserve<pattern::Compartment>(compartments.size());
 	for(list<Compartment>::iterator it = compartments.begin();it != compartments.end(); it++){
-		it->eval(env,context);
+		env.cellCount += it->eval(env,context);
 	}
 }
 void KappaAst::evaluateUseExpressions(pattern::Environment &env,const SimContext &context){
@@ -86,31 +87,52 @@ vector<Variable*> KappaAst::evaluateDeclarations(pattern::Environment &env,SimCo
  * --params: allows to associate values to model params at command line.
  *     Each float value will be associated to a parameter in the same order that
  *     they were declared in the model. This overwrite every previous value. */
-void KappaAst::evaluateParams(pattern::Environment &env,SimContext &context,const vector<float>& po_params){
+void KappaAst::evaluateParams(pattern::Environment &env,SimContext &context,
+		const vector<float>& po_params,map<string,float> ka_params){
 	if(params.size() < po_params.size())
 		throw invalid_argument("Too many parameters given as command line argument.");
 	unsigned i = 0;
 	auto& vars = context.getVars();
 	for(auto& param : params){
-		if(i < po_params.size()){
-			env.declareParam(param.first,new expressions::Constant<FL_TYPE>(po_params[i]));
-			cout << "%param: '" << param.first.getString() << "' " << po_params[i] << endl;
+		string name(param.first.getString());
+		if(ka_params.count(name)){
+			auto val = ka_params.at(name);
+			ka_params.erase(name);
+			env.declareParam(param.first,new expressions::Constant<FL_TYPE>(val));
+			if(context.params->verbose > 0)
+				cout << "DCT-%param: '" << name << "' " << val << endl;
 		}
-		else
-			if(param.second)
-				env.declareParam(param.first,param.second->eval(env,context));
+		else if(i < po_params.size()){
+			env.declareParam(param.first,new expressions::Constant<FL_TYPE>(po_params[i]));
+			if(context.params->verbose > 0)
+				cout << "CMD-%param: '" << name << "' " << po_params[i] << endl;
+		}
+		else {
+			if(param.second){
+				auto val = param.second->eval(env,context);
+				env.declareParam(param.first,val);
+				if(context.params->verbose > 0)
+					cout << "KAP-%param: '" << name << "' " << val->toString() << endl;
+			}
 			else
 				throw SemanticError("Sim. parameter "+param.first.getString()+" has no value.",param.first.loc);
+		}
 		//if(id == vars.size())
 		//	vars.push_back(nullptr); else
 		//if(id > vars.size())
 		//	throw invalid_argument("Unexpected param id.");
 		i++;
 	}
+	string ignored;
+	for(auto& param : ka_params)
+		ignored += param.first + ", ";
+	if(ignored != "")
+		ADD_WARN_NOLOC("Kappa-model parameters "+ignored+" were ignored.");
 	vars.resize(env.getParams().size(),nullptr);
 	for(auto& param : env.getParams()){
 		int id = env.getVarId(param.first);
 		vars[id] = Variable::makeAlgVar(id,param.first,param.second->clone());
+		//cout << vars[id]->toString() << " = " << vars[id]->getValue(context).toString() << endl;
 	}
 }
 
@@ -121,10 +143,13 @@ void KappaAst::evaluateInits(pattern::Environment &env,simulation::SimContext &s
 }
 
 void KappaAst::evaluateRules(pattern::Environment &env,SimContext &context){
-	env.reserve<simulation::Rule>(Rule::getCount());
+	//env.reserve<simulation::Rule>(Rule::getCount());//not needed now rules store pointers
 	for(auto& r : rules)
 		r.eval(env,context);
+	for(auto& t : transports)
+		t.eval(context);
 }
+
 void KappaAst::evaluatePerts(pattern::Environment &env,SimContext &context){
 	env.reserve<simulation::Perturbation>(perturbations.size());
 	for(auto p : perturbations)
@@ -173,6 +198,9 @@ void KappaAst::add(const Use *u){
 }
 void KappaAst::add(const Rule &r){
 	rules.push_back(r);
+}
+void KappaAst::add(const Transport &t){
+	transports.push_back(t);
 }
 
 void KappaAst::add(const Pert *p){

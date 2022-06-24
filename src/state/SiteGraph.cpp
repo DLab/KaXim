@@ -18,7 +18,7 @@
 namespace state {
 
 SiteGraph::SiteGraph() : fresh(0),nodeCount(0),population(0),subNodeCount(0) {
-	container.reserve(1000);
+	//container.reserve(10);
 }
 
 SiteGraph::~SiteGraph() {
@@ -33,15 +33,17 @@ SiteGraph::~SiteGraph() {
 void SiteGraph::addComponents(unsigned n,const pattern::Mixture::Component& cc,
 		const State &context,vector<Node*>& buff_nodes) {
 	unsigned i = 0;
-	if(!simulation::Parameters::get().useMultiNode || n < MULTINODE_LIM) {//=> n = 1
+	if(!context.params->useMultiNode || n < MULTINODE_LIM) {//=> n = 1
 		for(unsigned j = 0; j < n; j++){
 			i = 0;
 			for(auto p_ag : cc){
 				auto node = new Node(context.getEnv().getSignature(p_ag->getId()));
 				//node->setCount(n);
+				//cout << "A" << endl;
 				for(auto& site : *p_ag)
 					if(site.getValueType() != pattern::Pattern::EMPTY)
 						node->setInternalValue(site.getId(),site.getValue(context));
+				//cout << "B" << endl;
 				this->allocate(node);
 				buff_nodes[i] = node;
 				i++;
@@ -76,6 +78,9 @@ void SiteGraph::allocate(Node* node){
 	}
 	else{
 		node->alloc(container.size());
+		/*if(container.size() == 5){
+			cout << "going to bug" << endl;
+		}*/
 		container.push_back(node);
 	}
 	nodeCount++;
@@ -98,10 +103,27 @@ void SiteGraph::allocate(SubNode* node){
 
 void SiteGraph::remove(Node* node){
 	free.push_back(node->getAddress());
+	if(node->getAddress() > container.size() || node->getAddress() < 0)
+		cout << "\nERRRRRROOOOOOOOOOOOOOOORRRRRRRRRRRRR\n" << endl;
 	container[node->getAddress()] = nullptr;
+	nodeCount--;
 	population--;// -= node->getCount();
 	//delete node;   Do not delete, save nodes for reuse
 }
+
+void SiteGraph::moveIn(set<Node*> nodes){
+	for(auto node : nodes){
+		allocate(node);//could be faster
+	}
+}
+
+void SiteGraph::moveOut(set<Node*> nodes,InjSet& injs){
+	for(auto node : nodes){
+		injs.insert(node->getLifts().begin(),node->getLifts().end());
+		remove(node);//could be faster
+	}
+}
+
 
 void SiteGraph::remove(SubNode* node){
 	subNodeCount--;
@@ -192,7 +214,7 @@ bool SiteGraph::areConnected(list<Node*> &to_visit,
 
 void SiteGraph::print(const pattern::Environment& env) const {
 	cout << "StateGraph[" << getPopulation() << "]";
-	big_id nodes_to_show = std::min<big_id>(simulation::Parameters::get().showNodes,container.size());
+	big_id nodes_to_show = std::min<big_id>(100,container.size());
 
 	if(nodes_to_show)
 		cout << " -> {\n";
@@ -211,6 +233,31 @@ void SiteGraph::print(const pattern::Environment& env) const {
 	}
 	if(nodes_to_show)
 		cout << "}\n";
+}
+
+string SiteGraph::toString(const pattern::Environment& env) const {
+	string ret;
+	ret += "StateGraph[" + to_string(getPopulation()) + "]";
+	big_id nodes_to_show = std::min<big_id>(100,container.size());
+
+	if(nodes_to_show)
+		ret += " -> {\n";
+	else
+		ret += "\n";
+	for(big_id i = 0; i < nodes_to_show; i++){
+		auto node = container[i];
+		if(!node)
+			continue;
+		ret += "  [" + to_string(node->getAddress()) + "] ";
+		if(node->getCount() > 1)
+			ret += to_string(node->getCount()) + " ";
+		ret += node->toString(env,true) +"\n";
+		if(i != node->getAddress())
+			throw std::invalid_argument("bad allocation of node.");
+	}
+	if(nodes_to_show)
+		ret += "}\n";
+	return ret;
 }
 
 

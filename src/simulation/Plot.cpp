@@ -14,9 +14,12 @@ namespace simulation {
 
 using namespace boost::filesystem;
 
-Plot::Plot(const pattern::Environment& env,int run_id) {
-	auto& params = Parameters::get();
+Plot::Plot(const SimContext& sim) : state(sim){
+	auto& params = *sim.params;
+	auto& env = sim.getEnv();
 	//if(params.outputFileType.find("data") != string::npos)
+	if(sim.getEnv().getCellCount() > 1)
+
 	if(params.outputFile == "")
 		return; //no outputfile
 	try {
@@ -27,9 +30,11 @@ Plot::Plot(const pattern::Environment& env,int run_id) {
 			if(!is_directory(p))
 				throw invalid_argument("Cannot create folder "+p.string()+": another file with the same name exists.");
 		if(params.runs > 1){
-			char file_name[400],buff[200];//big chars[] to avoid errors here
+			char file_name[2000],buff[1000];//big chars[] to avoid errors here
 			sprintf(buff,"%s/%%s-%%0%dd.%%s",params.outputDirectory.c_str(),int(log10(params.runs-1))+1);
-			sprintf(file_name,buff,params.outputFile.c_str(),run_id,params.outputFileType.c_str());
+			sprintf(file_name,buff,params.outputFile.c_str(),sim.getId(),params.outputFileType.c_str());
+			if(strlen(file_name) > 1999 || strlen(buff) > 999)
+				throw invalid_argument("Output file name is too long");
 			file.open(file_name,ios::out);
 		}
 		else
@@ -51,18 +56,18 @@ Plot::~Plot() {
 
 
 
-TimePlot::TimePlot(const pattern::Environment& env,int run_id) : Plot(env,run_id), nextPoint(0.){
-	auto& params = Parameters::get();
-	dT = params.maxTime / params.points;
+TimePlot::TimePlot(const SimContext& sim) : Plot(sim), nextPoint(0.){
+	dT = sim.params->maxTime / sim.params->points;
 	//if(dT == 0.0)
 	//	dT = 0.0001;
 }
 
 
-void TimePlot::fill(const state::State& state,const pattern::Environment& env) {
-	auto t = min(state.getCounter().getTime(),state.getCounter().next_sync_at);
+void TimePlot::fill() {
+	auto& env = state.getEnv();
+	auto t = state.getCounter().getTime();
 	//AuxMixEmb aux_map;
-	while(t >= nextPoint){
+	while(t >= nextPoint && t <= state.getParams().maxTime){
 		file << nextPoint;
 		data.emplace_back();
 		data.back().emplace_back(nextPoint);
@@ -79,10 +84,12 @@ void TimePlot::fill(const state::State& state,const pattern::Environment& env) {
 	}
 }
 
-void TimePlot::fillBefore(const state::State& state,const pattern::Environment& env) {
-	auto t = min(std::nextafter(state.getCounter().getTime(),0.),state.getCounter().next_sync_at);
+void TimePlot::fillBefore() {
+	auto& env = state.getEnv();
+	//auto t = min(std::nextafter(state.getCounter().getTime(),0.),state.getCounter().next_sync_at);
+	auto t = std::nextafter(state.getCounter().getTime(),0.);//TODO remember why nexafter
 	//AuxMixEmb aux_map;
-	while(t >= nextPoint){
+	while(t >= nextPoint && t <= state.getParams().maxTime){
 		file << nextPoint;
 		data.emplace_back();
 		data.back().emplace_back(nextPoint);
@@ -99,14 +106,15 @@ void TimePlot::fillBefore(const state::State& state,const pattern::Environment& 
 	}
 }
 
-EventPlot::EventPlot(const pattern::Environment& env,int run_id) : Plot(env,run_id), nextPoint(0.){
-	auto& params = Parameters::get();
-	dE = params.maxEvent / params.points;
+
+EventPlot::EventPlot(const SimContext& sim) : Plot(sim), nextPoint(0.){
+	dE = sim.params->maxEvent / sim.params->points;
 	//if(dT == 0.0)
 	//	dT = 0.0001;
 }
 
-void EventPlot::fill(const state::State& state,const pattern::Environment& env) {
+void EventPlot::fill() {
+	auto& env = state.getEnv();
 	auto e = state.getCounter().getEvent();
 	//AuxMixEmb aux_map;
 	while(e >= nextPoint){
@@ -141,7 +149,8 @@ void EventPlot::fill(const state::State& state,const pattern::Environment& env) 
 	}
 }
 
-void EventPlot::fillBefore(const state::State& state,const pattern::Environment& env) {
+void EventPlot::fillBefore() {
+	//auto& env = state.getEnv();
 
 }
 

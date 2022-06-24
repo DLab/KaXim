@@ -16,11 +16,12 @@
 template <template<typename> class M,typename V>
 class ValueMap {
 public:
-	//virtual ~ValueMap();
+	virtual ~ValueMap() {};
 	virtual V& operator[](const M<V>& a) = 0;
 	virtual V at(const M<V>& a) const = 0;
 	virtual void clear() = 0;
 	virtual size_t size() const = 0;
+	virtual std::string toString() const = 0;
 };
 
 
@@ -45,6 +46,13 @@ public:
 	}
 	size_t size() const {
 		return m.std::unordered_map<int,V>::size();
+	}
+	std::string toString() const {
+		std::string ret("CoordsMap {\n");
+		int n = sizeof(small_id);
+		for(auto& var : m)
+			std::cout << "\t(" << var.first / n << "," << var.first % n << ") -> " << var.second << " ,\n";
+		return ret + "}";
 	}
 };
 
@@ -76,6 +84,14 @@ public:
 	}
 	auto end() const {
 		return m.end();
+	}
+
+	std::string toString() const {
+		std::string ret("NamesMap {\n");
+		int n = sizeof(small_id);
+		for(auto& var : m)
+			std::cout << "\t" << var.first << " -> " << var.second << " ,\n";
+		return ret + "}";
 	}
 };
 
@@ -114,6 +130,13 @@ public:
 	size_t size() const {
 		std::invalid_argument("Cannot call size() on AuxEmb.");
 		return 0;
+	}
+	std::string toString() const {
+		std::string ret("CcEmbMap {\n");
+		int n = sizeof(small_id);
+		//for(auto& var : *emb)
+		//	cout << "\t(" << var.first / n << "," << var.first % n << ") -> " << var.second << " ,\n";
+		return ret + "}";
 	}
 };
 
@@ -158,6 +181,13 @@ public:
 	size_t size() const {
 		std::invalid_argument("Cannot call size() on AuxEmb.");
 		return 0;
+	}
+	std::string toString() const {
+		std::string ret("MixEmbMap {\n");
+		int n = sizeof(small_id);
+		//for(auto& var : m)
+		//	cout << "\t(" << var.first / n << "," << var.first % n << ") -> " << var.second << " ,\n";
+		return ret + "}";
 	}
 };
 

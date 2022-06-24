@@ -17,6 +17,7 @@ namespace state{
 }
 
 namespace simulation {
+class Simulation;
 
 class Plot;
 
@@ -24,11 +25,11 @@ using namespace std;
 
 class Counter {
 	friend class state::State;
+	friend class simulation::Simulation;
 	friend class Plot;
 	friend class TimePlot;
 	friend class EventPlot;
 
-	FL_TYPE time;
 	UINT_TYPE events;
 	UINT_TYPE null_events;
 	UINT_TYPE cons_null_events;
@@ -61,14 +62,16 @@ public:
 	Counter();
 	virtual ~Counter();
 
-	virtual FL_TYPE getTime() const;
-	virtual UINT_TYPE getEvent() const;
-	virtual UINT_TYPE getNullEvent() const;
-	virtual UINT_TYPE getProdEvent() const;
-	virtual void advanceTime(FL_TYPE t);
-	virtual void incEvents();
-	virtual void incNullEvents(unsigned type);
-	virtual void incNullActions(UINT_TYPE n = 1);
+	virtual const FL_TYPE& getTime() const = 0;
+	virtual void setTime(FL_TYPE t) = 0;
+	virtual void advanceTime(FL_TYPE t) = 0;
+	FL_TYPE getNextSync() const {return next_sync_at;}
+	inline UINT_TYPE getEvent() const;
+	inline UINT_TYPE getNullEvent() const;
+	inline UINT_TYPE getProdEvent() const;
+	inline void incEvents();
+	inline void incNullEvents(unsigned type);
+	inline void incNullActions(UINT_TYPE n = 1);
 
 	virtual string toString() const;
 
@@ -76,17 +79,66 @@ public:
 
 
 class LocalCounter : public Counter {
+	const FL_TYPE& time;
 	//friend class State;
 public:
-	LocalCounter();
+	LocalCounter(const Counter& glob_counter);
+	virtual const FL_TYPE& getTime() const {
+		return time;
+	};
+	inline void advanceTime(FL_TYPE t) {
+		throw invalid_argument("Cannot advance LocalCounter time.");
+	}
+	inline void setTime(FL_TYPE t) {
+		throw invalid_argument("Cannot set LocalCounter time.");
+	}
 	//~LocalCounter();
 };
 
 class GlobalCounter : public Counter {
+	FL_TYPE time;
 
 public:
 	GlobalCounter();
+	virtual const FL_TYPE& getTime() const {
+		return time;
+	}
+	inline void advanceTime(FL_TYPE t) {
+		time += t;
+	}
+	inline void setTime(FL_TYPE t) {
+		time = t;
+	}
 };
+
+
+
+UINT_TYPE Counter::getEvent() const{
+	return events;
+}
+UINT_TYPE Counter::getNullEvent() const{
+	return null_events;
+}
+UINT_TYPE Counter::getProdEvent() const{
+	return events - null_events;
+}
+
+void Counter::incEvents(){
+	events++;
+	cons_null_events = 0;
+}
+void Counter::incNullEvents(unsigned type){
+	stat_null[type]++;
+	null_events++;
+	cons_null_events++;
+}
+void Counter::incNullActions(UINT_TYPE n){
+	null_actions += n;
+}
+
+
+
+
 
 
 } /* namespace simulation */
