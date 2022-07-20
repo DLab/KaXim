@@ -36,3 +36,5 @@
 /Debug/
 /Lib/*.so
 /LibDebug/*.so
+/LibDebug/
+/Lib/
