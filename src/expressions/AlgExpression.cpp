@@ -37,7 +37,12 @@ AlgExpression<T>::AlgExpression() {
 template<typename T>
 AlgExpression<T>::~AlgExpression() {}
 
-
+template<typename T>
+void AlgExpression<T>::update(SomeValue val,AlgExpression<T>** _this) {
+	delete this;
+	*_this = new Constant<T>(val.valueAs<T>());
+	//throw std::invalid_argument("invalid call to AlgExpression::update(). Maybe trying to tok-update a normal var?");
+}
 
 
 } /* namespace ast */

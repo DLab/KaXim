@@ -32,7 +32,7 @@ CPP_DEPS += \
 src/grammar/ast/%.o: ../src/grammar/ast/%.cpp
 	@echo 'Building file: $<'
 	@echo 'Invoking: Cross G++ Compiler'
-	g++ -DDEBUG -I/usr/include/eigen3/ -O0 -g3 -Wall -c -fmessage-length=0  -fopenmp -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@)" -o "$@" "$<"
+	g++ -DDEBUG -I/usr/local/include/eigen3/ -O0 -g3 -Wall -c -fmessage-length=0  -fopenmp -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@)" -o "$@" "$<"
 	@echo 'Finished building: $<'
 	@echo ' '
 

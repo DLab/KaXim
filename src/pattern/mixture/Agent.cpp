@@ -36,7 +36,7 @@ const Pattern::Site& Pattern::Agent::getSite(Site* site) {
 }
 const Pattern::Site& Pattern::Agent::getSiteSafe(small_id id) const {
 	static Site empty_site(-1);
-	static Site autofill_site(AUTOFILL);
+	static Site autofill_site(-1,AUTOFILL);
 	auto it = interface.find(id);
 	if(it != interface.end())
 		return *it;

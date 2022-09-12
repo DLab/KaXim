@@ -208,7 +208,7 @@ public:
 		return *interface.find(site);
 	}
 	/** \brief Returns the site of this id.
-	 * If it doesnt exists, returns an empty site or an auto-fill site.	 */
+	 * If it doesnt exists, returns an empty site or an auto-fill site with -1 id.	 */
 	const Site& getSiteSafe(small_id id) const;
 	bool operator==(const Agent& a) const;
 

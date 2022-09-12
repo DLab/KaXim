@@ -54,6 +54,7 @@ protected:
 	mutable NamesMap<expressions::Auxiliar,int> int_map;
 
 	SimContext* parent;
+	vector<SimContext*> subContext;
 
 public:
 	SimContext(pattern::Environment& _env, Parameters* _params) :
@@ -170,17 +171,40 @@ public:
 	virtual const MixInjRandContainer& getMixInjContainer(int cc_id) const {
 		throw invalid_argument("SimContext::getMixInjContainer(): invalid context.");
 	}
-	virtual FL_TYPE getTokenValue(unsigned id) const {
+	/*virtual FL_TYPE getTokenValue(unsigned id) const {
 		throw invalid_argument("SimContext::getTokenValue(): invalid context.");
 	}
 	virtual void setTokenValue(unsigned id,FL_TYPE val) const {
 		throw invalid_argument("SimContext::getTokenValue(): invalid context.");
-	}
+	}*/
 
 
 	const SimContext& getParentContext() const {
 		return *parent;
 	}
+
+	virtual void addNodes(unsigned n,const Mixture& mix) {
+		throw invalid_argument("Invalid call to SimContext::addNodes()");
+	}
+	virtual void clearInstances(const Pattern::Component& cc) {
+		throw invalid_argument("Invalid call to SimContext::clearInstances()");
+	}
+	virtual void removeInstances(unsigned n,const Pattern::Component& cc) {
+		throw invalid_argument("Invalid call to SimContext::removeInstances()");
+	}
+	virtual void updateDeps(const pattern::Dependency& d) {
+		throw invalid_argument("Invalid call to SimContext::updateDeps()");
+	}
+
+	virtual const vector<SimContext*> getSubContext() const {
+		return subContext;
+	}
+
+	virtual void plotOut() const {
+		return;//TODO
+	}
+
+
 
 	mutable string log_msg;
 };

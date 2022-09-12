@@ -45,7 +45,7 @@ public:
 	void safeSet(T val);
 
 	template<typename T>
-	T valueAs() const;
+	inline T valueAs() const;
 
 	bool operator!=(const SomeValue&) const;
 	bool operator==(const SomeValue&) const;

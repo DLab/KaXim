@@ -33,8 +33,6 @@ void KappaAst::evaluateSignatures(pattern::Environment &env,const SimContext &co
 	for(list<Agent>::iterator it = signatures.begin();it != signatures.end(); it++){
 		it->eval(env,context);
 	}
-	for(auto it = tokens.begin();it != tokens.end(); it++)
-		env.declareToken(*it);
 }
 
 void KappaAst::evaluateCompartments(pattern::Environment &env,const SimContext &context){
@@ -77,6 +75,13 @@ vector<Variable*> KappaAst::evaluateDeclarations(pattern::Environment &env,SimCo
 		if(it->isObservable())
 			env.declareObservable(var);
 	}
+	if(is_const)
+		for(auto& tok : tokens){
+			auto eval_name = tok.evalLabel(env,context);
+			int id = env.declareVariable(tok,true);
+			var_vector.push_back(new TokenVar(id,eval_name));
+			//env.declareToken(*it);
+		}
 	return var_vector;
 }
 /** evaluate "%param(s):" kappa statements.

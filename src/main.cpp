@@ -24,7 +24,8 @@ int main(int argc, char* argv[]){;
 	auto comps = res.getSpatialTrajectories(0);
 
 	for(auto tab : comps){
-		cout << tab.second->data << endl;
+		cout << tab.first << endl;
+		cout << tab.second->toString() << endl;
 	}
 
 	delete &res;
@@ -171,12 +172,13 @@ Results* run(int argc, const char * const argv[],const map<string,float>& ka_par
 			}
 		}
 
-		//try{
+		try{
 			sim->run();
-		//}catch(exception &e){
-			//cerr << "An exception found when running simulation[" << i <<"]:\n" << e.what() << endl;
-			//exit(1);
-		//}
+		}catch(exception &e){
+			cerr << "An exception found when running simulation[" << i <<"] events:\n" << sim->log_msg << endl;
+			cerr << e.what() << endl;
+			exit(1);
+		}
 		WarningStack::getStack().show();
 		result->append(sim);
 	}

@@ -37,7 +37,7 @@ bool Environment::exists(const string &name,const Environment::IdMap &map){
 }
 
 
-unsigned Environment::declareToken(const Id &name_loc){
+/*unsigned Environment::declareToken(const Id &name_loc){
 	const string& name = name_loc.getString();
 	if(tokenMap.count(name) || signatureMap.count(name) )
 		throw SemanticError("Name "+name+" already defined for agent or token.",name_loc.loc);
@@ -45,7 +45,7 @@ unsigned Environment::declareToken(const Id &name_loc){
 	tokenMap[name] = id;
 	tokenNames.push_back(name);
 	return id;
-}
+}*/
 
 short Environment::declareParam(const AstId &name_loc,const expressions::BaseExpression* val){
 	auto name  = name_loc.getString();
@@ -60,7 +60,7 @@ short Environment::declareParam(const AstId &name_loc,const expressions::BaseExp
 	return id;
 }
 
-short Environment::declareVariable(const Id &name_loc,bool is_kappa){
+int Environment::declareVariable(const Id &name_loc,bool is_kappa){
 	//if(this->exists(name,algMap) || this->exists(name,kappaMap))
 	const string& name = name_loc.getString();
 	//if var declared and not a param
@@ -70,9 +70,9 @@ short Environment::declareVariable(const Id &name_loc,bool is_kappa){
 				ADD_WARN("Ignoring value for parameter defined in higher level.",name_loc.loc);
 				return -1;
 			}*/
-		throw SemanticError("Label "+name+" already defined.",name_loc.loc);
+		throw SemanticError("Label or token "+name+" already defined.",name_loc.loc);
 	}
-	short id;
+	int id;
 	id = varNames.size();
 	varMap[name] = id;
 	varNames.push_back(name);
@@ -112,8 +112,8 @@ Channel& Environment::declareChannel(const Id &name_loc) {
 }
 Signature& Environment::declareSignature(const Id &name_loc) {
 	const string& name = name_loc.getString();
-	if(tokenMap.count(name) || signatureMap.count(name) )
-		throw SemanticError("Name "+name+" already defined for agent or token.",name_loc.loc);
+	if(signatureMap.count(name) )
+		throw SemanticError("Name "+name+" already defined for agent.",name_loc.loc);
 	short id = signatures.size();
 	signatures.emplace_back(name);
 	signatureMap[name] = id;
@@ -228,9 +228,9 @@ void Environment::declarePert(simulation::Perturbation* pert){
 void Environment::declareMixInit(int use_id,expressions::BaseExpression* n,Mixture* mix){
 	inits.emplace_back(use_id,n,mix,-1);
 }
-void Environment::declareTokInit(int use_id,expressions::BaseExpression* n,int tok_id){
+/*void Environment::declareTokInit(int use_id,expressions::BaseExpression* n,int tok_id){
 	inits.emplace_back(use_id,n,nullptr,tok_id);
-}
+}*/
 
 /*
 void Environment::declareAux(const Id& name,Mixture& mix,small_id site_id){
@@ -331,7 +331,7 @@ short Environment::getSignatureId(const string &s) const {
 	return signatureMap.at(s);
 }
 unsigned Environment::getTokenId(const string &s) const {
-	return tokenMap.at(s);
+	return varMap.at(s);
 }
 
 
@@ -394,10 +394,10 @@ template <>
 size_t Environment::size<Channel>() const {
 	return channels.size();
 }
-template <>
+/*template <>
 size_t Environment::size<state::TokenVar>() const {
 	return tokenNames.size();
-}
+}*/
 template <>
 size_t Environment::size<simulation::Rule>() const {
 	return rules.size();
@@ -420,10 +420,10 @@ template <>
 void Environment::reserve<Channel>(size_t count) {
 	channels.reserve(count);
 }
-template <>
+/*template <>
 void Environment::reserve<state::TokenVar>(size_t count) {
 	tokenNames.reserve(count);
-}
+}*/
 template <>
 void Environment::reserve<UseExpression>(size_t count) {
 	useExpressions.reserve(count);

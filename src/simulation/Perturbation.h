@@ -28,9 +28,12 @@ using namespace pattern;
 class Perturbation {
 public:
 	class Effect {
+		friend class Perturbation;
+		int compId;
 	public:
+		Effect() : compId(-1){}
 		virtual ~Effect();
-		virtual void apply(Simulation &state) const = 0;
+		virtual void apply(SimContext &state) const = 0;
 		virtual int addInfluences(int current,Rule::CandidateMap& map,
 				const SimContext &context,const Environment &env) const;
 		virtual string toString(const SimContext& context) const {
@@ -44,6 +47,7 @@ protected:
 	BaseExpression* until;
 	list<Effect*> effects;
 	Rule::CandidateMap influence;
+	int sourceComp;
 	int introCount;
 	float nextStop;
 	float incStep;
@@ -84,7 +88,7 @@ public:
 	Intro(const BaseExpression* n,const pattern::Mixture* mix);
 	~Intro();
 
-	void apply(Simulation &state) const override;
+	void apply(SimContext &state) const override;
 	int addInfluences(int current,Rule::CandidateMap& map,const simulation::SimContext &context,
 			const Environment &env) const override;
 	string toString(const SimContext& context) const override;
@@ -98,7 +102,7 @@ public:
 	Delete(const BaseExpression* n,const pattern::Mixture& mix);
 	~Delete();
 
-	void apply(Simulation &state) const override;
+	void apply(SimContext &state) const override;
 	string toString(const SimContext& context) const override;
 };
 
@@ -111,7 +115,7 @@ public:
 	//Update(unsigned var_id,pattern::Mixture* _var);
 	~Update();
 
-	void apply(Simulation &state) const override;
+	void apply(SimContext &state) const override;
 	void setValueUpdate();
 	string toString(const SimContext& context) const override;
 };
@@ -124,7 +128,7 @@ public:
 	UpdateToken(unsigned var_id,expressions::BaseExpression* val);
 	~UpdateToken();
 
-	void apply(Simulation &state) const override;
+	void apply(SimContext &state) const override;
 	string toString(const SimContext& context) const override;
 };
 
@@ -136,7 +140,7 @@ public:
 	ApplyRule(const Rule& r,expressions::BaseExpression* expr);
 	~ApplyRule();
 
-	void apply(Simulation &state) const override;
+	void apply(SimContext &state) const override;
 	string toString(const SimContext& context) const override;
 };
 
@@ -158,7 +162,7 @@ public:
 			list<const state::KappaVar*> k_vars,BaseExpression* f = nullptr);
 	~Histogram();
 
-	void apply(Simulation& state) const override;
+	void apply(SimContext& state) const override;
 
 	void setPoints() const;
 	void tag(FL_TYPE val) const;

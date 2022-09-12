@@ -89,36 +89,36 @@ public:
 	}
 
 
-	void addNodes(int n,const Mixture& mix){
+	void addNodes(unsigned n,const Mixture& mix){
 		auto allocs = allocAgents1(cells.size(),n);
 		auto alloc_it = allocs.begin();
 		for(auto cell : cells)
 			cell->addNodes(*(alloc_it++),mix);
 	}
-	pair<int,matching::Injection*> chooseInstance(const Mixture& mix,int sel){
+	pair<int,matching::Injection*> chooseInstance(const Pattern::Component& cc,int sel){
 		for(auto cell : cells){
-			auto& inj_cont =  cell->getInjContainer(mix.getId());
+			auto& inj_cont =  cell->getInjContainer(cc.getId());
 			if(sel < inj_cont.count())
 				return make_pair(int(cell->getId()),&inj_cont.choose(sel));
 			sel -= inj_cont.count();
 		}
 		throw invalid_argument("Simulation::chooseInstance(): not found.");
 	}
-	void removeInstances(int n, const Mixture& mix){
+	void removeInstances(unsigned n, const Pattern::Component& cc){
 		auto distr = uniform_int_distribution<unsigned>(0,n);
 		for(size_t i = 0; i < n; i++){
 			auto choose = distr(rng);
-			auto comp_inj = chooseInstance(mix,choose);
+			auto comp_inj = chooseInstance(cc,choose);
 			for(auto node : *comp_inj.second->getEmbedding()){
 				node->removeFrom(*cells[comp_inj.first]);
 			}
 		}
 	}
-	void clearInstances(const Mixture& mix){
+	void clearInstances(const Pattern::Component& cc){
 		for(auto cell : cells)
-			cell->getInjContainer(mix.getId()).clear();
+			cell->getInjContainer(cc.getId()).clear();
 	}
-	virtual FL_TYPE getTokenValue(unsigned id) const {
+	/*virtual FL_TYPE getTokenValue(unsigned id) const {
 		FL_TYPE val = 0;
 		for(auto cell : cells)
 			val += cell->getTokenValue(id);
@@ -127,7 +127,7 @@ public:
 	virtual void setTokenValue(unsigned id,FL_TYPE val) const {
 		for(auto cell : cells)
 			cell->setTokens(val/cells.size(),id);
-	}
+	}*/
 
 	//void initialize(const vector<list<unsigned int>>& _cells,grammar::ast::KappaAst&);
 	void initialize();
@@ -136,8 +136,8 @@ public:
 	FL_TYPE advanceTime();
 	pair<int,int> drawRule();
 	void positiveUpdate(const Rule::CandidateMap& wake_up){
-		cells[ev.comp_id]->positiveUpdate(wake_up);
-
+		if(ev.comp_id >= 0)
+			cells[ev.comp_id]->positiveUpdate(wake_up);
 	}
 
 	void tryPerturbate();
@@ -158,8 +158,8 @@ public:
 
 	int getId() const;
 
-	template <template <typename,typename...> class Range,typename... Args>
-	void addTokens(const Range<int,Args...> &cell_ids,float count,short token_id);
+	//template <template <typename,typename...> class Range,typename... Args>
+	//void addTokens(const Range<int,Args...> &cell_ids,float count,short token_id);
 
 	template <template <typename,typename...> class Range,typename... Args>
 	void addAgents(const Range<int,Args...> &cell_ids,unsigned count,const pattern::Mixture& mix);

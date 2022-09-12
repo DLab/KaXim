@@ -29,7 +29,7 @@ namespace simulation {
 
 Perturbation::Perturbation(BaseExpression* cond,BaseExpression* unt,
 		const yy::location& loc,const simulation::SimContext &context) : id(-1),
-		condition(cond),until(unt),introCount(0),nextStop(-1.0),incStep(0.0),applies(0),isCopy(false){
+		condition(cond),until(unt),sourceComp(-1),introCount(0),nextStop(-1.0),incStep(0.0),applies(0),isCopy(false){
 #ifdef DEBUG
 	if(condition == nullptr)
 		throw invalid_argument("Perturbation: condition cannot be null.");
@@ -90,7 +90,7 @@ Perturbation::Perturbation(BaseExpression* cond,BaseExpression* unt,
 }
 
 Perturbation::Perturbation(const Perturbation& p) : id(p.id),condition(p.condition),
-		until(p.until),influence(p.influence),introCount(0),
+		until(p.until),influence(p.influence),sourceComp(p.sourceComp),introCount(0),
 		nextStop(p.nextStop),incStep(p.incStep),applies(0),isCopy(true) {
 	//cloning state-dependent effects
 	for(auto eff : p.effects){
@@ -139,8 +139,17 @@ void Perturbation::apply(Simulation& state) const {
 	auto params = state.params;
 	IF_DEBUG_LVL(2,state.log_msg += "|| Applying perturbation ["
 			+ to_string(id) + "] at time " + to_string(state.getCounter().getTime()) + " ||\n");
-	for(auto eff : effects)
-		eff->apply(state);
+	//state.plotOut(); TODO
+	for(auto eff : effects){
+		if(eff->compId != -1){
+			auto& cell = state.getCell(eff->compId);
+			cell.plotOut();//TODO ->fillBefore();
+			eff->apply(cell);
+		}
+		else
+			eff->apply(state);
+
+	}
 	state.positiveUpdate(influence);
 	applies++;
 }
@@ -224,7 +233,7 @@ Intro::~Intro(){
 	delete mix;
 }
 
-void Intro::apply(Simulation& state) const {
+void Intro::apply(SimContext& state) const {
 	auto nn = n->getValue(state).valueAs<int>();
 	if(nn < 0)
 		throw invalid_argument("A perturbation is trying to add a negative number of Agents.");
@@ -265,9 +274,10 @@ Delete::~Delete(){
 	delete n;
 }
 
-void Delete::apply(Simulation& state) const {
+void Delete::apply(SimContext& state) const {
 	//auto& inj_cont = state.getInjContainer(mix.getId());
-	auto total = state.count(mix.getId());
+	auto& cc = mix.getComponent(0);
+	auto total = state.count(cc.getId());
 	auto some_del = n->getValue(state);
 	size_t del;
 	if(some_del.t == Type::FLOAT){
@@ -283,17 +293,18 @@ void Delete::apply(Simulation& state) const {
 
 	if(some_del.valueAs<FL_TYPE>() < 0)
 		throw invalid_argument("A perturbation is trying to delete a negative number ("+
-			to_string(del)+") of instances of "+mix.getComponent(0).toString(state.getEnv()));
+			to_string(del)+") of instances of "+cc.toString(state.getEnv()));
+
 	if(total <= del){
-		state.clearInstances(mix);
+		state.clearInstances(cc);
 		if(total < del && del != numeric_limits<size_t>::max())
 			ADD_WARN_NOLOC("Trying to delete "+to_string(del)+" instances of "+
-				mix.getComponent(0).toString(state.getEnv())+" but there are "+
+				cc.toString(state.getEnv())+" but there are "+
 				to_string(total)+" available. Deleting all.");
 		return;
 	}
 
-	state.removeInstances(del,mix);
+	state.removeInstances(del,cc);
 
 
 }
@@ -312,7 +323,7 @@ Update::~Update(){
 	delete var;
 }
 
-void Update::apply(Simulation &state) const {
+void Update::apply(SimContext &state) const {
 	//cout << "updating var " << var->toString() << " to value " << var->getValue(state) << endl;
 	state.updateVar(*var,byValue);
 	state.updateDeps(pattern::Dependency(pattern::Dependency::VAR,var->getId()));
@@ -334,8 +345,10 @@ UpdateToken::UpdateToken(unsigned tok_id,expressions::BaseExpression* val) :
 UpdateToken::~UpdateToken(){
 	delete value;
 }
-void UpdateToken::apply(Simulation &state) const {
-	state.setTokenValue(value->getValue(state).valueAs<FL_TYPE>(),tokId);
+void UpdateToken::apply(SimContext &state) const {
+	for(auto cell : state.getSubContext())
+		cell->plotOut();
+	state.getVars()[tokId]->update(value->getValue(state));
 	state.updateDeps(pattern::Dependency(pattern::Dependency::Dep::TOK,tokId));
 }
 
@@ -433,11 +446,11 @@ Histogram::~Histogram(){
 }
 
 
-void Histogram::apply(Simulation& context) const {
+void Histogram::apply(SimContext& state) const {
 	char file_name[2000];
 	FL_TYPE sum(0.0);
 	int comp_id = 0;
-	auto& state = context.getCell(comp_id);//TODO for every cell
+	//auto& state = context.getCell(comp_id);//TODO for every cell
 	auto& params = *state.params;
 
 	ofstream file;

@@ -103,7 +103,6 @@ Declaration::~Declaration(){
 Variable* Declaration::evalVar(pattern::Environment &env,
 		SimContext &context) const{
 	Variable* var = nullptr;
-	auto& vars = context.getVars();
 	auto eval_name = name.evalLabel(env,context);
 	short id = env.declareVariable(Id(name.loc,eval_name),type);
 	//if(id == -1)//var was declared before as a param. DEPRECATED
@@ -252,17 +251,16 @@ Init& Init::operator=(const Init &init) {
 void Init::eval(pattern::Environment &env,simulation::SimContext &sim){
 	auto& use_expr = env.getUseExpression(this->getUseId());
 	auto &cells = use_expr.getCells();//cells to distribute tokens/agents
+	if(alg == nullptr)
+		throw std::invalid_argument("Null value for init.");
 	if(type){ //TOKEN
 		short tok_id;
-		if(alg == nullptr)
-			throw std::invalid_argument("Null value for token init.");
 		auto expr = alg->eval(env,sim,nullptr,Expression::CONST);
 		tok_id = env.getTokenId(token.getString());
-		env.declareTokInit(this->getUseId(),expr,tok_id);
+		//env.declareTokInit(this->getUseId(),expr,tok_id);
+		sim.getVars()[tok_id]->update(expr->getValue(sim));
 	}
 	else { //MIX
-		if(alg == nullptr)
-			throw std::invalid_argument("Null value for mix init.");
 		auto expr = alg->eval(env,sim,nullptr,Expression::CONST);
 		auto mix = mixture.eval(env,sim,false);
 		env.declareMixInit(this->getUseId(),expr,mix);

@@ -19,16 +19,21 @@ namespace state {
 
 using namespace expressions;
 using namespace std;
-/** \brief Declared variables using '%var:' in Kappa
+/** \brief Declared variables using '%var:' (or %token:) in Kappa.
  *
- *
- *
+ * Variable extends from BaseExpression as they can be evaluated.
+ * An observable Variable will be plot out in KaXim output.
+ * isTok will be used as a replace for (deprecated) Tokens.
+ * updated is on develop. TODO
+ * reduced means that reduce() has been called to obtain this var
+ *  and it is the minimal expression of the Variable.
  */
 class Variable : public virtual BaseExpression {
 protected:
 	const short id;
 	const std::string name;//TODO &??
 	bool isObservable;
+	bool isTok;
 	bool updated;
 	bool reduced;
 
@@ -37,9 +42,13 @@ public:
 	virtual ~Variable() = 0;
 
 	virtual bool isConst() const;
+	bool isToken() const {
+		return isTok;
+	}
 
 	virtual void update(SomeValue val);
-	virtual void update(const Variable& var) = 0;
+	virtual void update(const Variable& var);
+	virtual void add(SomeValue val);
 
 	short getId() const;
 
@@ -59,6 +68,7 @@ public:
 
 template <typename T>
 class AlgebraicVar : public Variable, public AlgExpression<T> {
+	//friend class state::UpdateToken;
 	AlgExpression<T>* expression;
 public:
 	AlgebraicVar(const short var_id, const std::string &nme,const bool is_obs,
@@ -66,6 +76,7 @@ public:
 	virtual ~AlgebraicVar();
 	void update(SomeValue val) override;
 	void update(const Variable& var) override;
+	void add(SomeValue val) override;
 
 	virtual FL_TYPE auxFactors(std::unordered_map<std::string,FL_TYPE> &factor) const override;
 
@@ -73,8 +84,12 @@ public:
 	BaseExpression* reduce(SimContext& context) override;
 	BaseExpression* clone() const override;
 
-	virtual T evaluate(const SimContext& args) const override;
-	virtual T evaluateSafe(const SimContext& args) const override;
+	virtual T evaluate(const SimContext& args) const override {
+		return expression->evaluate(args);
+	}
+	virtual T evaluateSafe(const SimContext& args) const override {
+		return expression->evaluateSafe(args);
+	}
 
 	BaseExpression* makeVarLabel() const override;
 
@@ -106,7 +121,6 @@ class KappaVar : public AlgExpression<int>, public Variable {
 public:
 	KappaVar(const short var_id, const std::string &nme,const bool is_obs,
 			const pattern::Mixture &kappa);
-	void update(const Variable& var);
 
 	FL_TYPE auxFactors(std::unordered_map<std::string,FL_TYPE> &factor) const override;
 
@@ -137,7 +151,6 @@ public:
 	DistributionVar(const short var_id, const std::string &nme,const bool is_obs,
 				const pattern::Mixture &kappa,const pair<N_ary,const BaseExpression*>& exp);
 	~DistributionVar();
-	void update(const Variable& var);
 
 	FL_TYPE auxFactors(std::unordered_map<std::string,FL_TYPE> &factor) const override;
 
@@ -173,10 +186,11 @@ public:
 	virtual bool operator==(const BaseExpression& exp) const override;
 };
 */
-class TokenVar: public AlgExpression<FL_TYPE> {
-	unsigned id;
+class TokenVar: public Variable,public AlgExpression<FL_TYPE> {
+	FL_TYPE vol;
+	vector<pair<Constant<FL_TYPE>*,FL_TYPE>> subToks;
 public:
-	TokenVar(unsigned _id);
+	TokenVar(unsigned _id,string name);
 	FL_TYPE evaluate(const SimContext& args) const override;
 	FL_TYPE evaluateSafe(const SimContext& args) const override;
 	FL_TYPE auxFactors(std::unordered_map<std::string, FL_TYPE> &factor) const
@@ -184,9 +198,23 @@ public:
 
 	bool operator==(const BaseExpression& exp) const override;
 
+	void update(SomeValue val) override {
+		auto v = val.valueAs<FL_TYPE>()/vol;
+		for(auto st : subToks)
+			st.first->update(st.second*v,nullptr);
+	}
+	void add(SomeValue val) override {
+		auto v = val.valueAs<FL_TYPE>()/vol;
+		for(auto st : subToks)
+			st.first->add(st.second*v);
+	}
+
 	BaseExpression::Reduction factorize(const std::map<std::string,small_id> &aux_cc) const override;
 	BaseExpression* reduce(SimContext& context) override;
 	BaseExpression* clone() const override;
+	BaseExpression* makeVarLabel() const override;
+
+	Constant<FL_TYPE>* addSubTok(FL_TYPE v);
 
 	//virtual void getNeutralAuxMap(
 	//		std::unordered_map<std::string, FL_TYPE>& aux_map) const;

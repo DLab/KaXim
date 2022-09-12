@@ -17,7 +17,8 @@ namespace state {
 
 Variable::Variable
 	(const short var_id, const std::string &nme,const bool is_obs):
-		id(var_id),name(nme),isObservable(is_obs),updated(false){}
+		id(var_id),name(nme),isObservable(is_obs),isTok(false),
+		reduced(false),updated(false){}
 Variable::~Variable(){}
 
 bool Variable::isConst() const {
@@ -29,7 +30,13 @@ short Variable::getId() const {
 }
 
 void Variable::update(SomeValue val){
-	throw std::invalid_argument("update(SomeValue) can only be called in AlebraicVar");
+	throw std::invalid_argument("update(SomeValue) can only be called in Algebraic or Token Var.");
+}
+void Variable::update(const Variable& var) {
+	throw invalid_argument("Variable::update() can only be called on an Algebraic Var.");;
+}
+void Variable::add(SomeValue val) {
+	throw invalid_argument("Variable::add() can only be called on an Algebraic or Token Var.");
 }
 
 Variable* Variable::makeAlgVar(short id, const string& name, BaseExpression *expr){
@@ -85,10 +92,14 @@ void AlgebraicVar<T>::update(const Variable& var){
 
 template <typename T>
 void AlgebraicVar<T>::update(SomeValue val){
-	delete expression; //TODO
-	expression = new Constant<T>(val.valueAs<T>());
+	expression->update(val,&expression); //TODO
+}
+template <typename T>
+void AlgebraicVar<T>::add(SomeValue val){
+	expression->add(val);
 }
 
+/*
 template <typename T>
 T AlgebraicVar<T>::evaluate(const SimContext& context) const{
 	return expression->evaluate(context);
@@ -96,7 +107,7 @@ T AlgebraicVar<T>::evaluate(const SimContext& context) const{
 template <typename T>
 T AlgebraicVar<T>::evaluateSafe(const SimContext& context) const{
 	return expression->evaluateSafe(context);
-}
+}*/
 template <typename T>
 FL_TYPE AlgebraicVar<T>::auxFactors(std::unordered_map<std::string,FL_TYPE> &aux_values) const{
 	return expression->auxFactors(aux_values);
@@ -116,6 +127,7 @@ BaseExpression* AlgebraicVar<T>::reduce(SimContext& context) {
 			delete expression;
 		expression = dynamic_cast<AlgExpression<T>*>(r);
 	}
+	reduced = true;
 	return this;
 }
 
@@ -204,7 +216,7 @@ KappaVar::KappaVar(const short id,const std::string &nme,const bool is_obs,
 				mixture(&kappa) {}
 
 
-void KappaVar::update(const Variable& var){
+/*void KappaVar::update(const Variable& var){
 	try{
 		auto kappa_var = dynamic_cast<const KappaVar&>(var);
 		mixture = kappa_var.mixture;
@@ -212,7 +224,7 @@ void KappaVar::update(const Variable& var){
 	catch(bad_cast &ex){
 		throw invalid_argument("Cannot update a KappaVar to another type of var.");
 	}
-}
+}*/
 
 //TODO
 FL_TYPE KappaVar::auxFactors(std::unordered_map<std::string,FL_TYPE> &factor) const {
@@ -285,7 +297,7 @@ DistributionVar<T>::~DistributionVar(){
 	//else todo***
 }
 
-template <typename T>
+/*template <typename T>
 void DistributionVar<T>::update(const Variable& var){
 	try{
 		auto distr_var = dynamic_cast<const DistributionVar<T>&>(var);
@@ -296,7 +308,7 @@ void DistributionVar<T>::update(const Variable& var){
 	catch(bad_cast &ex){
 		throw invalid_argument("Cannot update an AlgebraicVar to another type of expression (try to change to Int/Float).");
 	}
-}
+}*/
 
 template <typename T>
 FL_TYPE DistributionVar<T>::auxFactors(std::unordered_map<std::string,FL_TYPE> &factor) const {
@@ -395,15 +407,22 @@ bool RateVar::operator ==(const BaseExpression& exp) const {
 /****** class Token *******/
 /**************************/
 
-TokenVar::TokenVar(unsigned _id) :
-		id(_id) {
+TokenVar::TokenVar(unsigned _id,string name) : Variable(_id,name,false),
+		vol(0.0) {
+	isTok = true;
 }
 FL_TYPE TokenVar::evaluate(const SimContext& args) const {
 	//throw invalid_argument("todo: TokenVar::evaluate");
-	return args.getTokenValue(id);
+	int ret = 0.0;
+	for(auto tok : subToks)
+		ret += tok.first->evaluate(args);
+	return ret;
 }
 FL_TYPE TokenVar::evaluateSafe(const SimContext& args) const {
-	return args.getTokenValue(id);
+	int ret = 0.0;
+	for(auto tok : subToks)
+		ret += tok.first->evaluate(args);
+	return ret;
 	//throw invalid_argument("todo: TokenVar::evaluate");
 }
 FL_TYPE TokenVar::auxFactors(
@@ -420,6 +439,14 @@ bool TokenVar::operator==(const BaseExpression& exp) const {
 	return false;
 }
 
+
+Constant<FL_TYPE>* TokenVar::addSubTok(FL_TYPE v) {
+	auto sub_t = new Constant<FL_TYPE>(0.0);
+	subToks.push_back(make_pair(sub_t,v));
+	vol += v;
+	return sub_t;
+}
+
 BaseExpression::Reduction TokenVar::factorize(const std::map<std::string,small_id> &aux_cc) const {
 	BaseExpression::Reduction r;
 	r.factor = this->clone();
@@ -432,6 +459,10 @@ BaseExpression* TokenVar::reduce(SimContext& context) {
 
 BaseExpression* TokenVar::clone() const {
 	return new TokenVar(*this);
+}
+
+BaseExpression* TokenVar::makeVarLabel() const{
+	return new VarLabel<FL_TYPE>(id,name);
 }
 
 } /* namespace state */

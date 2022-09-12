@@ -296,7 +296,7 @@ BaseExpression* Var::eval(const pattern::Environment& env,
 			auto id = env.getTokenId(name.getString());
 			if(deps)
 				deps->emplace(pattern::Dependency::TOK,id);
-			expr = new state::TokenVar(id);
+			expr = vars[id]->makeVarLabel();
 		}
 		catch(const std::out_of_range &e){
 			throw SemanticError("Token '"+name.getString()+

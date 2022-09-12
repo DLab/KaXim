@@ -60,10 +60,10 @@ protected:
 	//static Environment env;
 	//IdMap algMap, kappaMap;
 	IdMap varMap, compartmentMap, channelMap, signatureMap;
-	unordered_map<string,unsigned> tokenMap;
+	//unordered_map<string,unsigned> tokenMap;
 	map<string,const expressions::BaseExpression*> paramVars;
 	//vector<string> algNames, kappaNames;
-	vector<string> varNames, tokenNames, compartmentNames;
+	vector<string> varNames, /*tokenNames,*/ compartmentNames;
 	vector<Signature> signatures;
 	vector<Compartment> compartments;
 	vector<list<Channel> > channels;
@@ -119,7 +119,7 @@ public:
 	 * @returns the id associated to the new name or -1 if a
 	 * model param was declared with the same name. Throws if the
 	 * name was already used. */
-	short declareVariable(const AstId &name,bool isKappa);
+	int declareVariable(const AstId &name,bool isKappa);
 	Signature& declareSignature(const AstId& sign);
 	Compartment& declareCompartment(const AstId& comp);
 	UseExpression& declareUseExpression(unsigned short id,size_t n);
@@ -141,7 +141,7 @@ public:
 	void declarePert(simulation::Perturbation* pert);
 
 	void declareMixInit(int use_id,expressions::BaseExpression* n,Mixture* mix);
-	void declareTokInit(int use_id,expressions::BaseExpression* n,int tok_id);
+	//void declareTokInit(int use_id,expressions::BaseExpression* n,int tok_id);
 
 	void declareObservable(state::Variable* obs);
 
@@ -186,7 +186,7 @@ public:
 		return max_radius;
 	}
 	string getTokenName(int id) const {
-		return tokenNames.at(id);
+		return varNames.at(id);
 	}
 	unsigned getCellCount() const {
 		return cellCount;

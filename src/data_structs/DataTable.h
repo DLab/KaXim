@@ -60,7 +60,17 @@ struct DataTable {
 	}
 
 	std::string toString() const {
-		return "";
+		std::string ret("Time");
+		for(auto& col : col_names)
+			ret += "\t" + col;
+		ret += "\n";
+		int i = 0;
+		for(auto& row : row_names){
+			std::stringstream ss;
+			ss << data(i++,Eigen::indexing::all);
+			ret += row +"\t"+ ss.str() + "\n";
+		}
+		return ret;
 	}
 
 };

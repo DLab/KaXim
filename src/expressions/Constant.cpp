@@ -20,14 +20,14 @@ Constant<T>::Constant(T v) :
 template <typename T>
 Constant<T>::~Constant(){}
 
-template<typename T>
+/*template<typename T>
 T Constant<T>::evaluate(const SimContext& args) const {
 	return val;
 }
 template<typename T>
 T Constant<T>::evaluateSafe(const SimContext& args) const {
 	return val;
-}
+}*/
 //TODO
 template<typename T>
 FL_TYPE Constant<T>::auxFactors(

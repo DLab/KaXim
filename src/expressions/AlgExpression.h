@@ -17,6 +17,7 @@
 //#include "../util/params.h"
 
 /** \brief The family of classes to evaluate algebraic and boolean expressions. */
+
 namespace expressions {
 
 template<typename T>
@@ -31,6 +32,11 @@ public:
 	inline virtual SomeValue getValue(const SimContext& context) const override;
 	inline virtual SomeValue getValueSafe(const SimContext& context) const override;
 	virtual bool operator==(const BaseExpression& exp) const override = 0;
+
+	virtual void update(SomeValue val,AlgExpression<T>** _this);
+	virtual void add(SomeValue val) {
+		throw std::invalid_argument("invalid call to AlgExpression::add(). Maybe trying to tok-update a normal var?");
+	}
 
 	//virtual void getNeutralAuxMap(
 	//		std::unordered_map<std::string, FL_TYPE>& aux_map) const = 0;

@@ -33,7 +33,7 @@ void Parameters::makeOptions(const string &v,const string &u,const string &msg){
 		("input-file,i",value<vector <string> >(),"Kappa files to read model (for backward compatibility with KaSim/PISKa)")
 		("runs,r",value<int>(),"Produce several trajectories, and make some statistical analysis at the end")
 		("events,e",value<int>(),"Stop simulation at 'arg' events")// (negative for unbounded)")
-		("time,t",value<float>(),"Stop simulation at time 'arg' (arbitrary time unit)")
+		("time,t",value<double>(),"Stop simulation at time 'arg' (arbitrary time unit)")
 		("points,p",value<int>(),"Number of points in plot files")
 		("out,o",value<string>(),"File names of data outputs. It can include a dot '.' to separate prefix and file type.")
 		("dir,d",value<string>(),"Specifies directory where output files should be stored")
@@ -97,7 +97,7 @@ void Parameters::evalOptions(int argc, const char * const argv[]){
 	}
 
 	if(vm.count("time")){
-		maxTime = vm["time"].as<float>();
+		maxTime = vm["time"].as<double>();
 		if(vm.count("events")){
 			maxEvent = vm["events"].as<int>();
 			ADD_WARN_NOLOC("Max-Time option will be used to plot output points instead of Max-Events.");

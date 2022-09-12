@@ -21,7 +21,8 @@ namespace simulation {
 
 Simulation::Simulation(SimContext& context,int _id) :
 		SimContext(_id,&context,&counter),activityTree(nullptr),
-		ccInjections(nullptr),mixInjections(nullptr),done(false){
+		ccInjections(nullptr),mixInjections(nullptr),
+		activeDeps(env.getDependencies()),done(false){
 	if(params->maxTime >= std::numeric_limits<FL_TYPE>::infinity())
 		if(params->maxEvent == std::numeric_limits<UINT_TYPE>::infinity())
 			throw invalid_argument("No limit to stop or control simulation.");
@@ -29,6 +30,11 @@ Simulation::Simulation(SimContext& context,int _id) :
 			plot = new EventPlot(*this);
 	else
 		plot = new TimePlot(*this);
+
+	for(unsigned i = 0; i < vars.size(); i++){
+		vars[i] = dynamic_cast<state::Variable*>(vars[i]->clone());
+		vars[i]->reduce(*this);//vars are simplified for every state
+	}
 
 	for(auto pert : env.getPerts()){
 		perts.emplace(pert->getId(),*pert);
@@ -68,6 +74,7 @@ void Simulation::initialize(){
 				env.getCompartmentByCellId(cell_id).getVolume(),*plot));*/
 		cells.push_back(new state::State(i,*this,env.getCompartmentByCellId(i).getVolume(),
 				/**new expressions::Constant<int>(1)*/plot->getType() == "Event"));
+		subContext.push_back(cells.back());
 	}
 	IF_DEBUG_LVL(4,cout << "[Sim "+to_string(id)+ "]: Agent Initialization" << endl);
 	for(auto& init : env.getInits()){
@@ -89,7 +96,7 @@ void Simulation::initialize(){
 			addAgents(cells,n,*init.mix);
 		}
 		else {
-			addTokens(cells,n_value.valueAs<FL_TYPE>(),init.tok_id);
+			vars[init.tok_id]->update(n_value);
 		}
 	}
 	IF_DEBUG_LVL(4,cout << "[Sim "+to_string(id)+ "]: Activity Tree Initialization" << endl);
@@ -163,13 +170,15 @@ void Simulation::run(){
 		}
 		size_t pos = 0;
 		auto sim_str = "[Sim " + to_string(parent->getId()) + "]: ";
-		if(log_msg != "" && params->runs > 1){
-			log_msg = sim_str + log_msg;
-			while((pos = log_msg.find("\n",pos+1)) != string::npos)
-				if(log_msg[pos+1] != '\n' && log_msg[pos+1] != '\0')
-					log_msg.insert(pos+1,sim_str);
+		if(log_msg != ""){
+			if(params->runs > 1){
+				log_msg = sim_str + log_msg;
+				while((pos = log_msg.find("\n",pos+1)) != string::npos)
+					if(log_msg[pos+1] != '\n' && log_msg[pos+1] != '\0')
+						log_msg.insert(pos+1,sim_str);
+			}
+			std::cout << "[" << log_msg << std::endl;
 		}
-		std::cout << "[" << log_msg << std::endl;
 		log_msg = "";
 #endif
 		WarningStack::getStack().show(false);
@@ -182,6 +191,7 @@ void Simulation::run(){
 		cell->tryPerturbate();
 		cell->plotOut();
 	}
+	plot->fill();
 	#pragma omp critical
 	if(params->verbose > 0 && id == 0){
 		if(params->runs > 1)
@@ -237,7 +247,6 @@ FL_TYPE Simulation::advanceTime() {
 		IF_DEBUG_LVL(2,dt = stop_t - counter.getTime() + dt;)
 		counter.setTime( (stop_t > 0) ? stop_t : counter.getTime());
 		plot->fillBefore();
-		cells[ev.comp_id]->plot->fillBefore();
 		pert.apply(*this);
 		counter.setTime( std::nextafter(counter.getTime(),counter.getTime() + 1.0));//TODO inf?
 		abort = pert.testAbort(*this,true);
@@ -477,7 +486,7 @@ vector<unsigned> Simulation::allocAgents2(unsigned cells, unsigned ag_counts, co
 	return allocs;
 }
 
-template <template<typename,typename...> class Range,typename... Args>
+/*template <template<typename,typename...> class Range,typename... Args>
 void Simulation::addTokens(const Range<int,Args...> &cell_ids,float count,short token_id){
 	//list<float> per_cell = allocAgents2(cell_ids.size(),count);
 	//auto ids_it = cell_ids.begin();
@@ -491,7 +500,7 @@ void Simulation::addTokens(const Range<int,Args...> &cell_ids,float count,short 
 	}
 }
 template void Simulation::addTokens(const set<int> &cell_ids,float count,short token_id);
-
+*/
 
 template <template<typename,typename...> class Range,typename... Args>
 void Simulation::addAgents(const Range<int,Args...> &cell_ids,unsigned count,const pattern::Mixture &mix){

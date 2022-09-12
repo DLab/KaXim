@@ -53,10 +53,11 @@ class State : public SimContext {
 
 	//const pattern::Environment& env;
 	SiteGraph graph;
-	const state::BaseExpression& volume;
+	//const state::BaseExpression& volume;
+	FL_TYPE volume;
 	//std::vector<Variable*> vars;
 	vector<simulation::Rule::Rate*> rates;
-	FL_TYPE* tokens;
+	//FL_TYPE* tokens;
 
 	data_structs::RandomTree* activityTree;
 	CcInjRandContainer** injections;
@@ -93,7 +94,7 @@ public:
 	 * @param vol the volume of this state.
 	 */
 	State(int id,simulation::Simulation& sim,
-			const BaseExpression& vol,
+			const BaseExpression* vol,
 			bool by_ev = false);
 	~State();
 
@@ -109,8 +110,8 @@ public:
 	 * @param n count of tokens (can be negative).
 	 * @param tok_id token id type to add.
 	 */
-	void addTokens(float n,unsigned tok_id);
-	void setTokens(float n,unsigned tok_id);
+	/*void addTokens(float n,unsigned tok_id);
+	void setTokens(float n,unsigned tok_id);*/
 
 	const simulation::Rule::Rate& getRuleRate(int id) const;
 	two<FL_TYPE> getRuleActivity(int id) const;
@@ -129,17 +130,31 @@ public:
 	const CcInjRandContainer& getInjContainer(int cc_id) const override;
 	MixInjRandContainer& getMixInjContainer(int mix_id) override;
 	const MixInjRandContainer& getMixInjContainer(int mix_id) const override;
-	FL_TYPE getTokenValue(unsigned tok_id) const override;
+//	FL_TYPE getTokenValue(unsigned tok_id) const override;
 
 	/** \brief Add nodes to the SiteGraph using a fully described mixture.
 	 * @param n count of copies of the mixture.
 	 * @param mix a mixture without patterns to create nodes.
 	 * @param env the environment of the simulation.
 	 */
-	void addNodes(unsigned n,const pattern::Mixture& mix);
+	void addNodes(unsigned n,const Mixture& mix);
 	void initNodes(unsigned n,const pattern::Mixture& mix);
 	inline void removeNode(Node* n){
 		graph.remove(n);
+	}
+
+	void removeInstances(unsigned n, const Pattern::Component& cc){
+		auto distr = uniform_int_distribution<unsigned>(0,n);
+		for(size_t i = 0; i < n; i++){
+			auto sel = distr(rng);
+			auto& inj = injections[cc.getId()]->choose(sel);
+			for(auto node : *inj.getEmbedding()){
+				node->removeFrom(*this);
+			}
+		}
+	}
+	void clearInstances(const Pattern::Component& cc){
+		getInjContainer(cc.getId()).clear();
 	}
 	/*void moveIn(const set<Node*>& nodes,InjSet& new_injs) {
 		graph.moveIn(nodes);
@@ -215,15 +230,15 @@ public:
 /*inline const simulation::Counter& State::getCounter() const {
 	return counter;
 }*/
-inline void State::addTokens(float n,unsigned tok_id){
+/*inline void State::addTokens(float n,unsigned tok_id){
 	tokens[tok_id] += n;
 }
 inline void State::setTokens(float n,unsigned tok_id){
 	tokens[tok_id] = n;
-}
-inline FL_TYPE State::getTokenValue(unsigned tok_id) const{
+}*/
+/*inline FL_TYPE State::getTokenValue(unsigned tok_id) const{
 	return tokens[tok_id];
-}
+}*/
 inline const simulation::Rule::Rate& State::getRuleRate(int _id) const {
 	return *(rates[_id]);
 }

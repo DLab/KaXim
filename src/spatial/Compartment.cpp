@@ -47,8 +47,8 @@ void Compartment::setVolume(const state::BaseExpression *vol){
 const std::string& Compartment::getName() const {
 	return name;
 }
-const state::BaseExpression& Compartment::getVolume() const{
-	return *volume;
+const state::BaseExpression* Compartment::getVolume() const{
+	return volume;
 }
 
 void Compartment::getCellIndex(int cell_id,std::vector<short>& index) const{

@@ -67,7 +67,7 @@ void TimePlot::fill() {
 	auto& env = state.getEnv();
 	auto t = state.getCounter().getTime();
 	//AuxMixEmb aux_map;
-	while(t >= nextPoint && t <= state.getParams().maxTime){
+	while(t >= nextPoint && nextPoint <= state.getParams().maxTime){
 		file << nextPoint;
 		data.emplace_back();
 		data.back().emplace_back(nextPoint);
@@ -89,7 +89,7 @@ void TimePlot::fillBefore() {
 	//auto t = min(std::nextafter(state.getCounter().getTime(),0.),state.getCounter().next_sync_at);
 	auto t = std::nextafter(state.getCounter().getTime(),0.);//TODO remember why nexafter
 	//AuxMixEmb aux_map;
-	while(t >= nextPoint && t <= state.getParams().maxTime){
+	while(t >= nextPoint && nextPoint <= state.getParams().maxTime){
 		file << nextPoint;
 		data.emplace_back();
 		data.back().emplace_back(nextPoint);

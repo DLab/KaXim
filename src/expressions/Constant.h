@@ -18,13 +18,24 @@ class Constant: public AlgExpression<T> {
 public:
 	Constant(T v);
 	virtual ~Constant();
-	T evaluate(const SimContext& args) const override;
-	T evaluateSafe(const SimContext& args) const override;
+	T evaluate(const SimContext& args) const override {
+		return val;
+	}
+	T evaluateSafe(const SimContext& args) const override {
+		return val;
+	}
 	FL_TYPE auxFactors(std::unordered_map<std::string, FL_TYPE> &factor) const override;
 	BaseExpression::Reduction factorize(const std::map<std::string,small_id> &aux_cc) const override;
 	virtual BaseExpression* reduce(SimContext& context) override;
 	BaseExpression* clone() const override;
 	bool operator==(const BaseExpression& exp) const override;
+
+	void update(SomeValue v,AlgExpression<T>** _this) override {
+		val = v.valueAs<T>();
+	}
+	void add(SomeValue v) override {
+		val += v.valueAs<T>();
+	}
 
 	std::string toString() const override;
 

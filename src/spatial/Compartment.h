@@ -40,7 +40,7 @@ public:
 	void setVolume(const expressions::BaseExpression* vol);
 
 	const std::string& getName() const;
-	const expressions::BaseExpression& getVolume() const;
+	const expressions::BaseExpression* getVolume() const;
 
 	void getCellIndex(int cell_id,std::vector<short> &index) const;
 	int getCellId(const std::vector<short> &cell_index) const;

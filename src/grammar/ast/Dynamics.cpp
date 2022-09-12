@@ -536,17 +536,25 @@ simulation::Perturbation::Effect* Effect::eval(pattern::Environment& env,
 	switch(action){
 	case INTRO:{
 		auto mixture = mix->eval(env,context,0);
-		for(auto cc : *mixture)
-			for(auto ag : *cc)
-				for(auto st_sign : env.getSignature(ag->getId()).getSites()){
-					auto def_site = new pattern::Pattern::Site(st_sign->getId());
-					def_site->setValue(st_sign->getDefaultValue());
-					ag->getSite(def_site);
-				}
+		if(mixture->compsCount() != 1)
+			throw SemanticError("Perturbation effect [ADD] only accept 1 component mixtures.",mix->loc);
+		auto& cc = mixture->getComponent(0);
+		for(auto ag : cc)
+			for(auto st_sign : env.getSignature(ag->getId()).getSites()){
+				auto& s = ag->getSiteSafe(st_sign->getId());
+				if(s.getId() == -1)
+					continue;
+				auto def_site = new pattern::Pattern::Site(st_sign->getId());
+				def_site->setValue(st_sign->getDefaultValue());
+				ag->getSite(def_site);
+			}
 		return new simulation::Intro(n->eval(env, context, nullptr, 0),mixture);
 	}
 	case DELETE:{
 		auto mixture = mix->eval(env,context,Expression::PATTERN | Expression::AUX_ALLOW);
+		if(mixture->compsCount() != 1)
+			throw SemanticError("Perturbation effect [DEL] only accept 1 component mixtures.",mix->loc);
+		auto& cc = mixture->getComponent(0);
 		return new simulation::Delete(n->eval(env, context, nullptr, 0),*mixture);
 	}
 	case UPDATE:{

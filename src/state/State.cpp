@@ -24,19 +24,23 @@ using Deps = pattern::Dependency::Dep;
 using namespace matching;
 
 State::State(int id,simulation::Simulation& _sim,
-	const BaseExpression& vol,bool by_events) :
+	const BaseExpression* vol,bool by_events) :
 		simulation::SimContext(id,&_sim),
-		volume(vol),rates(env.size<simulation::Rule>()),
-		tokens (new FL_TYPE[env.size<state::TokenVar>()]()),activityTree(nullptr),
+		volume(1.0),rates(env.size<simulation::Rule>()),activityTree(nullptr),
 		injections(nullptr),ev(_sim.ev),activeDeps(env.getDependencies()),
 		pertIds(),timePerts(){
+	if(vol)
+		volume = vol->getValue(*this).valueAs<FL_TYPE>();
 	if(by_events)
 		plot = new simulation::EventPlot(*this);
 	else
 		plot = new simulation::TimePlot(*this);
-	for(unsigned i = 0; i < vars.size(); i++){
-		vars[i] = dynamic_cast<Variable*>(vars[i]->clone());
-		vars[i]->reduce(*this);//vars are simplified for every state
+	for(auto& var : vars){
+		if(var->isToken()){
+			auto tok = dynamic_cast<TokenVar*>(var);
+			//adds a sub token dependence to the TokenVar.
+			var = new AlgebraicVar<FL_TYPE>(tok->getId(),tok->toString(),false,tok->addSubTok(volume));
+		}
 	}
 	for(auto rule_ptr : env.getRules()){
 		auto& rule = *rule_ptr;
@@ -83,7 +87,6 @@ State::State(int id,simulation::Simulation& _sim,
 
 
 State::~State() {
-	delete[] tokens;
 	if(activityTree)
 		delete activityTree;
 	if(injections){
@@ -193,8 +196,9 @@ void State::apply(const simulation::Rule& r){
 	}
 	//apply token changes
 	for(auto& change : r.getTokenChanges()){
-		tokens[change.first] += change.second->getValue(*this).valueAs<FL_TYPE>();
-		updateDeps(pattern::Dependency(Deps::TOK,change.first));
+		//tokens[change.first] += change.second->getValue(*this).valueAs<FL_TYPE>();
+		//updateDeps(pattern::Dependency(Deps::TOK,change.first));
+		vars[change.first]->add(change.second->getValue(*this));
 	}
 }
 
