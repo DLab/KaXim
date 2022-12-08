@@ -11,7 +11,7 @@
 #include <unordered_map>
 #include <vector>
 
-
+namespace data_structs {
 /** \brief Class used to map aux to values in different ways */
 template <template<typename> class M,typename V>
 class ValueMap {
@@ -190,6 +190,9 @@ public:
 		return ret + "}";
 	}
 };
+
+
+}
 
 
 #endif /* SRC_DATA_STRUCTS_VALUEMAP_H_ */

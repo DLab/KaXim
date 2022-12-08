@@ -1,4 +1,4 @@
-
+/** \file */
 
 
 #ifndef MAIN_H_
@@ -26,10 +26,17 @@
 #include <random>
 #include <time.h>
 
-
+/** Parse command-line arguments to produce a simulation.
+ * \param argc count of arguments in **argv**.
+ * \param argv command-line arguments.
+ * \param ka_params kappa-parameters values, only when calling from python.
+ * \return Results object, with all the data collected by the simulation. */
 simulation::Results* run(int argc, const char * const argv[],const map<string,float>& ka_params);
 
-
+/** Parse command-line arguments to produce a simulation.
+ * \param argc count of arguments in **argv**.
+ * \param argv command-line arguments.   */
+int main(int argc, char* argv[]);
 
 
 #endif

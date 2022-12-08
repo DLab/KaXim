@@ -29,17 +29,19 @@ namespace simulation {
 
 namespace data_structs { class DataTable; }
 
+/** The family of classes related with the formal definition of state of the system.
+ *
+ */
 namespace state {
 struct EventInfo;
 
-/** \brief The state of a (set of) compartment(s).
+/** \brief The state of a compartment cell.
  *
  * An object of this class store all the data to define
- * the state of a set of compartments to be run by an MPI
- * process. This class contains the SiteGraph of agents
+ * the state of a compartment's cell to be run in the
+ * simulation. This class contains the SiteGraph of agents
  * and all variables, rules and perturbations declared with
- * Kappa.
- */
+ * Kappa. */
 class State : public SimContext {
 	friend class RateVar;
 	friend class simulation::Rule::Rate;
@@ -99,6 +101,9 @@ public:
 	~State();
 
 
+	/** Returns the name of this State.
+	 * The name of a cell is *comp_name*[*cell_id*].
+	 * \return the name of this cell.	 */
 	string getName() const {
 		return env.cellIdToString(id);
 	}
@@ -167,6 +172,11 @@ public:
 	int count(int id) const {
 		return injections[id]->count();
 	}
+
+	void fold(int id,const function<void (const matching::Injection*)> func) const override {
+		return injections[id]->fold(func);
+	}
+
 	UINT_TYPE mixInstances(const pattern::Mixture& mix) const;
 
 	void updateActivity(small_id r_id){

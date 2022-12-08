@@ -170,9 +170,9 @@ InjType& InjRandSet<InjType>::chooseRandom(RNG& randGen) const{
 
 template <typename InjType>
 InjType& InjRandSet<InjType>::choose(unsigned id) const {
-	if(id < container.size() - multiCount)
+	if(id < container.size() - multiCount)  //The id can be one of the Node injections
 			return *container[id + multiCount];
-	else{
+	else{	// the id has to be in the multi-node injections
 		id -= container.size() - multiCount;
 		auto it = container.begin();
 		while(id > (*it)->count()){
@@ -180,27 +180,25 @@ InjType& InjRandSet<InjType>::choose(unsigned id) const {
 			it++;
 		}
 		return **it;
-	}
+	}	//the id is > that size
+	throw out_of_range("InjRandSet::choose(): Out of bounds.");
 }
 
 template <typename InjType>
 list<pair<const BE*,FL_TYPE>>& InjRandSet<InjType>::insert(InjType* inj,const state::State& state){
 	inj->alloc(container.size());
 	container.push_back(inj);
-	if(inj->count() > 1){
-		counter += inj->count();
+	if(inj->count() > 1)
 		multiCount++;
-	}
-	else
-		counter++;
+	counter += inj->count();
 	return this->sumList;
 }
 
 template <typename InjType>
 void InjRandSet<InjType>::del(Injection* inj){
 #ifdef DEBUG
-	if(container.empty())
-		throw out_of_range("InjRandSet is empty, what injection are you trying to delete?");
+	if(container.empty() || inj->getAddress() > counter )
+		throw out_of_range("InjRandSet::del(): Id out of bounds. What injection are you trying to delete?");
 #endif
 	if(inj->getAddress() < multiCount)
 		multiCount--;
@@ -234,20 +232,6 @@ template <typename InjType>
 FL_TYPE InjRandSet<InjType>::partialReactivity() const {
 	return counter;
 }
-
-/*FL_TYPE InjRandSet::sumInternal(const expressions::BaseExpression* aux_func,
-			const expressions::EvalArgs& _args) const {
-	expressions::AuxCcEmb aux_values;
-	expressions::EvalArgs args(&_args.getState(),&_args.getVars(),&aux_values);
-	auto func = [&](const CcInjection* inj) -> FL_TYPE {
-		aux_values.setEmb(inj->getEmbedding());
-		return aux_func->getValue(args).valueAs<FL_TYPE>();
-	};
-	FL_TYPE sum = 0;
-	for(auto inj : container)
-		sum += func(inj);
-	return sum;
-}*/
 
 template <typename InjType>
 void InjRandSet<InjType>::fold(const function<void (const Injection*)> func) const{
@@ -470,11 +454,6 @@ InjType& InjRandTree<InjType>::chooseRandom(RNG& randGen) const {
 		auto uni = uniform_real_distribution<FL_TYPE>(0,partialReactivity());
 		auto selection = uni(randGen);
 		return tree->choose(selection);
-		/*for(auto& cc_node : roots.at(selected_root.first)){
-		if(selection > cc_node.second->total())
-			selection -= cc_node.second->total();
-		else
-			return cc_node.second->choose(selection);*/
 	}
 	else{
 		auto uni = uniform_int_distribution<unsigned int>(0,count()-1);

@@ -836,6 +836,9 @@ RuleSide::RuleSide() : agents(location(),list<Agent>()){}
 RuleSide::RuleSide(const location &l,const Mixture &agents,const list<Token> &tokens):
 	Node(l), agents(agents), tokens(tokens) {};
 
+RuleSide::RuleSide(const location &l,const string var_name,const list<Token> &_tokens) :
+	Node(l),var(var_name),tokens(_tokens) {}
+
 /****** Class Rule ***************/
 
 size_t Rule::count = 0;

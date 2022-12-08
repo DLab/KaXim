@@ -22,7 +22,13 @@ template <typename T>
 class Node;
 
 
-/** \brief A container tree-structure to store elements sorted by a float value. */
+/** \brief An interface of container tree-structure to store elements sorted by a float value.
+ *
+ * The type to store must have the methods addContainer(),
+ * removeContainer() and count().
+ * \tparam T Type of the element to store. Commonly matching::CcValueInj
+ * associated with a partial reactivity value.
+ * @see matching::Injection */
 template <typename T>
 class DistributionTree {
 	friend class Node<T>;
@@ -30,15 +36,15 @@ protected:
 	Node<T> *parent;	///< The parent node of this tree-element.
 	unsigned level;		///< The distance to the root of the tree.
 	FL_TYPE value;		///< For a Node, is the value of all the elements it contains.
-	FL_TYPE sum;		///< The total sum of value associated with the elements in and behind this node.
+	FL_TYPE sum;		///< The total sum of value associated with the elements in and below this node.
 
 	/** \brief Returns true if this tree-element is unbalanced. */
-	virtual bool testBalance() const = 0;
+	virtual bool isBalanced() const = 0;
 public:
-	static const int MAX_LVL0 = 2;	///< The max amount of elements a leaf with level 0 can have.
+	static const unsigned MAX_LVL0 = 2;	///< The max amount of elements a leaf with level 0 can have.
 	//DistributionTree();
 
-	/** \brief Initialize a new instance of a tree-element.
+	/** \brief Constructs a new instance of a tree-element.
 	 *
 	 * @param leaf The new tree-element will be constructed as a replace for this leaf.
 	 * @param val The value for this new tree-element. 				*/
@@ -48,12 +54,20 @@ public:
 	/** \brief Remove all the elements in this tree and delete the element if it's not stored anywhere else. */
 	virtual void deleteContent() = 0;
 
+	/** Returns the deep level of this node. */
+	unsigned getLevel() const {
+		return level;
+	}
+
 	/** \brief Returns the sum of activity in node and children. */
 	virtual FL_TYPE total() const;
 	/** \brief Decrease element counter 'n' units and sum by n*val. */
 	virtual void decrease(FL_TYPE val,unsigned n = 1) = 0;
 
-	/** \brief Returns an element of the tree corresponding with the value of r. */
+	/** Returns the last i-th element of the tree where *sum_values(0,i)* < **r**.
+	 * The selection has approximations.
+	 * \param r a value between 0 and total().
+	 * \return an element from the container associated with **r**. */
 	virtual T& choose(FL_TYPE r) const = 0;
 	/** \brief Returns the i-th element in the tree. */
 	virtual pair<T*,FL_TYPE> choose(unsigned i) const = 0;
@@ -72,7 +86,7 @@ public:
 	/** \brief Apply func to each element in the tree and sum its results. */
 	virtual FL_TYPE sumInternal(const function<FL_TYPE (const T*)> &func) const = 0;
 	/** \brief Apply func to each element in the tree. */
-	virtual void fold(const function<void (const T*)> func) const = 0;
+	virtual void fold(const function<void (const T*)> &func) const = 0;
 	/** \brief Returns the sum of the squares of each element. */
 	virtual FL_TYPE squares() = 0;
 
@@ -102,7 +116,7 @@ class Node : public DistributionTree<T> {
 
 	/** @deprecated or not complete. */
 	virtual void nodeBalance(DistributionTree<T>*& parent_pointer);
-	virtual bool testBalance() const override;
+	virtual bool isBalanced() const override;
 public:
 	Node(FL_TYPE val = 0.0);
 	/** \brief Constructs a new Node with value 'val', and use 'leaf' as one of its children.
@@ -131,7 +145,7 @@ public:
 	virtual float treeHeight() const override;
 
 	FL_TYPE sumInternal(const function<FL_TYPE (const T*)> &func) const override;
-	virtual void fold(const function<void (const T*)> func) const;
+	virtual void fold(const function<void (const T*)> &func) const;
 	virtual FL_TYPE squares() override;
 };
 
@@ -158,7 +172,7 @@ protected:
 	 * @param revalidate Will update container information of elements if true. */
 	void sort(bool revalidate = false);
 
-	virtual bool testBalance() const override;
+	virtual bool isBalanced() const override;
 public:
 	Leaf(Node<T>* _parent);
 	virtual ~Leaf();
@@ -168,6 +182,7 @@ public:
 	virtual unsigned count() const override;
 
 	virtual void push(T* elem,FL_TYPE val) override;
+	/** Invalid method. */
 	virtual void erase(T* elem) override;
 	virtual T* erase(int address) override;
 	virtual void clear(list<T*> *free) override;
@@ -176,7 +191,7 @@ public:
 	virtual void decrease(FL_TYPE val, unsigned n = 1) override;
 
 	FL_TYPE sumInternal(const function<FL_TYPE (const T*)> &func) const override;
-	virtual void fold(const function<void (const T*)> func) const;
+	virtual void fold(const function<void (const T*)> &func) const;
 	virtual FL_TYPE squares();
 
 

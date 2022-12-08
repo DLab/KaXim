@@ -117,7 +117,7 @@ void Node<T>::push(T* inj,FL_TYPE val){
 template <typename T>
 void Node<T>::erase(T* elem){
 	throw invalid_argument("dont call this method: Node<T>::erase(T* elem).");
-	if(elem->count() != 1){
+	/*if(elem->count() != 1){
 		multi_injs.back()->addContainer(*this,elem->getAddress());
 		multi_injs[elem->getAddress()] = multi_injs.back();
 		multi_injs.pop_back();
@@ -128,7 +128,7 @@ void Node<T>::erase(T* elem){
 		injs.pop_back();
 	}
 	elem->alloc(size_t(-1));
-	this->decrease(this->value*elem->count(),elem->count());
+	this->decrease(this->value*elem->count(),elem->count());*/
 }
 
 template <typename T>
@@ -283,7 +283,7 @@ FL_TYPE Node<T>::sumInternal(const function<FL_TYPE (const T*)> &func) const {
 }
 
 template <typename T>
-void Node<T>:: fold(const function<void (const T*)> func) const {
+void Node<T>:: fold(const function<void (const T*)> &func) const {
 	smaller->fold(func);
 	for(auto& inj : injs)
 		func(inj);
@@ -307,7 +307,7 @@ float Node<T>::treeHeight() const {
 }
 
 template <typename T>
-bool Node<T>::testBalance() const {
+bool Node<T>::isBalanced() const {
 	return smaller->treeHeight() >= 3*greater->treeHeight() ? true :
 			smaller->treeHeight()*3 <= greater->treeHeight()? true : false;
 }
@@ -318,7 +318,7 @@ void Node<T>::treeBalance(DistributionTree<T>*& parent_pointer) {
 	smaller->treeBalance(smaller);
 	greater->treeBalance(greater);
 
-	if(testBalance())
+	if(isBalanced())
 		nodeBalance(parent_pointer);
 }
 
@@ -368,7 +368,9 @@ void Node<T>::nodeBalance(DistributionTree<T>*& parent_pointer) {
 /*********** class InjRandTree::Leaf **********/
 
 template <typename T>
-Leaf<T>::Leaf(Node<T>* _parent) : DistributionTree<T>(_parent) {}
+Leaf<T>::Leaf(Node<T>* _parent) : DistributionTree<T>(_parent) {
+	injs.reserve(this->MAX_LVL0 << this->level);
+}
 
 template <typename T>
 Leaf<T>::~Leaf(){}
@@ -448,15 +450,17 @@ void Leaf<T>::decrease(FL_TYPE val,unsigned n){
 template <typename T>
 void Leaf<T>::erase(T* elem){
 	throw invalid_argument("dont call this method: Leaf<T>::erase(T*).");
-	this->decrease(injs[elem->getAddress()].second);
-	injs.back().first->addContainer(*this,elem->getAddress());
-	injs[elem->getAddress()] = injs.back();
-	injs.pop_back();
+	//this->decrease(injs[elem->getAddress()].second);
+	//injs.back().first->addContainer(*this,elem->getAddress());
+	//injs[elem->getAddress()] = injs.back();
+	//injs.pop_back();
 }
 template <typename T>
 T* Leaf<T>::erase(int address){
-	if(address > injs.size())
+#ifdef DEBUG
+	if(address < 0 || address >= injs.size())
 		throw std::out_of_range("This injection is not here! (Leaf<T>::erase(int))");
+#endif
 	pair<T*,FL_TYPE> elem_val = injs[address];
 	this->decrease(elem_val.second);
 	injs.back().first->addContainer(*this,address);
@@ -477,10 +481,10 @@ void Leaf<T>::clear(list<T*>* free){
 
 template <typename T>
 T& Leaf<T>::choose(FL_TYPE sel) const {
-	/*auto p = injs[int(count() * sel / this->sum)].first;
-	if(p == nullptr){
-		std::cout << "BAD!!!" << std::endl;
-	}*/
+#ifdef DEBUG
+	if(sel >= this->sum)
+		throw out_of_range("Leaf<T>::choose(FL): selection is over the node.");
+#endif
 	return *injs[int(count() * sel / this->sum)].first;
 }
 
@@ -488,7 +492,11 @@ T& Leaf<T>::choose(FL_TYPE sel) const {
 
 template <typename T>
 pair<T*,FL_TYPE> Leaf<T>::choose(unsigned i) const {
+#ifdef DEBUG
+	return injs.at(i);
+#elif
 	return injs[i];
+#endif
 }
 
 template <typename T>
@@ -506,7 +514,7 @@ FL_TYPE Leaf<T>::sumInternal(const function<FL_TYPE (const T*)> &func) const {
 }
 
 template <typename T>
-void Leaf<T>:: fold(const function<void (const T*)> func) const {
+void Leaf<T>:: fold(const function<void (const T*)> &func) const {
 	for(auto& inj : injs)
 		func(inj.first);
 }
@@ -528,7 +536,7 @@ float Leaf<T>::treeHeight() const{
 }
 
 template <typename T>
-bool Leaf<T>::testBalance() const {
+bool Leaf<T>::isBalanced() const {
 	return false;
 }
 

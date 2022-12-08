@@ -22,8 +22,11 @@ class Simulation;
 using namespace std;
 using DataTable = data_structs::DataTable;
 
+/** Contains the methods to extract information from the executed simulation.
+ * Use the getters methods to obtain DataTable object with information about the simulation.
+ * All this info will be stored. This class was made to work in Python environment. */
 class Results {
-	vector<Simulation*> sims;					///> Simulation stored by this Results object (after run_kappa_sim())
+	vector<Simulation*> sims;					///> Simulations stored by this Results object (after run_kappa_sim())
 	mutable multimap<string,DataTable*> tabs;	///> DataTables obtained by this object methods are name-mapped here.
 
 public:

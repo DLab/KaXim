@@ -18,7 +18,9 @@ namespace simulation {
 }
 
 
-
+/** The family of classes related to build Agent-patterns, store them and use them.
+ *
+ */
 namespace pattern {
 //Forward declaration needed for setComponents() and toString()
 class Environment;

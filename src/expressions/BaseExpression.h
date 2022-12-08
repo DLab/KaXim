@@ -30,7 +30,7 @@ class SimContext;
 typedef std::vector<state::Variable*> VarVector;
 
 namespace expressions {
-
+using namespace data_structs;
 template <typename T> class Auxiliar;
 typedef ValueMap<Auxiliar,FL_TYPE> AuxMap;
 typedef ValueMap<Auxiliar,int> AuxIntMap;

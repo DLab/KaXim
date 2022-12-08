@@ -314,9 +314,14 @@ class RuleSide : Node{
 public:
 	Mixture agents;
 	list<Token> tokens;
+	string var;
 public:
 	RuleSide();
 	RuleSide(const location &l,const Mixture &agents,const list<Token> &tokens);
+	RuleSide(const location &l,const string var_name,const list<Token> &tokens);
+
+	pattern::Mixture* eval(pattern::Environment &env,
+			const SimContext &context,char ptrn_flag = 0) const;
 };
 
 

@@ -495,6 +495,8 @@ rule_label:
 lhs_rhs:
   mixture token_expr 
 	{ $$ = RuleSide(@$,$1,$2); }
+| LABEL token_expr
+	{ $$ = RuleSide(@$,$1,$2);}
 ;
 
 

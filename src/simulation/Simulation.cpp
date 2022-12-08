@@ -140,6 +140,7 @@ void Simulation::run(){
 					log_msg += cells[cid_rid.first]->log_msg;
 					cells[cid_rid.first]->log_msg = "";
 					counter.incEvents();
+					activityUpdate();
 				}
 				else {
 					NullEvent ex(cid_rid.second);
@@ -161,7 +162,6 @@ void Simulation::run(){
 			std::cout << "[" << log_msg << e.what() << std::endl;
 			exit(1);
 		}*/
-		activityUpdate();
 #ifdef DEBUG
 		if((counter.getEvent()+counter.getNullEvent()) % 100 == 0 && params->verbose > 4){
 			log_msg += "---------------------------------------------\n";
@@ -187,10 +187,12 @@ void Simulation::run(){
 			cells[ev.comp_id]->plot->fill();
 	}
 	done = true;
+	updateDeps(Dependency());
 	for(auto cell : cells){
 		cell->tryPerturbate();
 		cell->plotOut();
 	}
+	tryPerturbate();
 	plot->fill();
 	#pragma omp critical
 	if(params->verbose > 0 && id == 0){

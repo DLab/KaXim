@@ -25,6 +25,10 @@
 
 namespace data_structs { class DataTable; }
 namespace state { struct EventInfo;}
+
+/** The family of classes that related to the simulation process.
+ *
+ */
 namespace simulation {
 using namespace std;
 
@@ -154,6 +158,10 @@ public:
 		for(auto cell : cells)
 			n += cell->count(cc_id);
 		return n;
+	}
+	void fold(int cc_id,const function<void (const matching::Injection*)> func) const override {
+		for(auto cell : cells)
+			cell->fold(cc_id,func);
 	}
 
 	int getId() const;

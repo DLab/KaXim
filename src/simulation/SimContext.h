@@ -32,35 +32,45 @@ typedef matching::InjRandContainer<matching::MixInjection> MixInjRandContainer;
 namespace simulation {
 
 using namespace std;
+using namespace data_structs;
 
+
+/** \brief Base Context class. Used to call functions that need context to be solved.
+ * Simulation, State (cell) and Compartments are contexts.
+ *
+ */
 class SimContext {
 protected:
-	int id;
+	int id;			///> The id of this contexts among its pairs. Not Unique (Simulation and State can have same id).
 public:
-	const Parameters* params;
+	const Parameters* params;		///> The simulation parameters that rule this context.
 protected:
-	pattern::Environment &env;
-	VarVector vars;
-	Counter& counter;
+	pattern::Environment &env;		///> The simulation environment for the context.
+	VarVector vars;					///> Variables optimized for this context.
+	Counter& counter;				///> Interface for counts of this context.
 	//bool safe;	///< set to true when next evaluation will be safe.
 
 
-	mutable RNG rng;
-	mutable const expressions::AuxMap* auxMap;
+	mutable RNG rng;									///> Random State for this context.
+	mutable const expressions::AuxMap* auxMap;			///> Auxiliary variable values. Must be set before calling evaluate() methods.
 	mutable const expressions::AuxIntMap* auxIntMap;
 
-	mutable CcEmbMap<expressions::Auxiliar,FL_TYPE,state::Node> cc_map;
+	mutable CcEmbMap<expressions::Auxiliar,FL_TYPE,state::Node> cc_map;		///> Local AuxMap with a linked Agent Node.
 
 	mutable NamesMap<expressions::Auxiliar,int> int_map;
 
-	SimContext* parent;
-	vector<SimContext*> subContext;
+	SimContext* parent;							///> The parent context. TODO nullptr or *this
+	vector<SimContext*> subContext;				///> Child contexts. Commonly cells.
 
 public:
+	/** \brief Constructor for the first context.
+	 * Probably called by Simulation constructor. */
 	SimContext(pattern::Environment& _env, Parameters* _params) :
 			id(-1),params(_params),env(_env),counter(*new GlobalCounter()),
 			rng(_params->seed),auxMap(nullptr),
 			auxIntMap(&int_map),parent(nullptr) {	}
+	/** \brief Constructor for SubContext. Set first the parent context.
+	 * Probably called by State class.									 */
 	SimContext(int _id,SimContext* parent_context,Counter* cntr = nullptr) :
 			id(_id),params(parent_context->params),
 			env(parent_context->getEnv()),
@@ -75,7 +85,8 @@ public:
 			throw invalid_argument("SimContext cannot be constructed with a null parent.");
 		auxIntMap = &int_map;
 	}
-	//SimContext(SimContext* parent_context) : parent(parent_context) {}
+
+	/** \brief This destructor only will work in the first top Context.  */
 	virtual ~SimContext() {
 		if(!id && !parent){
 			delete params;
@@ -84,14 +95,17 @@ public:
 		}
 	};
 
+	/** \brief return the (non-unique) id of the context. */
 	inline int getId() const {
 		return id;
 	}
 
+	/** \brief The name in Array format. */
 	virtual string getName() const {
 		return "SimContext["+to_string(id)+"]";
 	}
 
+	/** \brief The simulation parameters */
 	inline auto& getParams() const {
 		return *params;
 	}
@@ -158,6 +172,7 @@ public:
 	virtual int count(int id) const {
 		return 0;
 	}
+	virtual void fold(int id,const function<void (const matching::Injection*)> func) const {	}
 
 	virtual CcInjRandContainer& getInjContainer(int cc_id) {
 		throw invalid_argument("SimContext::getInjContainer(): invalid context.");

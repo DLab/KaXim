@@ -18,8 +18,11 @@
 #include "../expressions/Vars.h"
 #include "../data_structs/ValueMap.h"
 
+/** Family of classes related to the spatiality and transport in the simulation.
+ *
+ */
 namespace spatial {
-
+using namespace data_structs;
 typedef NamesMap<expressions::Auxiliar,int> AuxNames;
 
 //template <short dims>

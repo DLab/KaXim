@@ -34,6 +34,12 @@ namespace state {
 }
 //namespace expressions {class AuxMixEmb;class AuxCcEmb;}
 
+/** Contains the classes needed to match patterns and nodes,
+ * and store them properly.
+ *
+ * Injections are mapping between patterns and nodes from the SiteGraph.
+ * InjRandContainers store these injections in a way that is fast to
+ * return a random selected injection.	 */
 namespace matching {
 
 using namespace std;
@@ -45,23 +51,16 @@ class InjRandContainer;
 template <typename T>
 class InjRandSet;
 
-/*struct try_match {
-	const pattern::Mixture::Component* comp;
-	Node* node;
-	two<list<Internal*> > port_lists;
-	small_id root;
-};*/
-
 class InjSet;
 
 class Injection {
 protected:
 	friend class InjSet;
-	const pattern::Pattern& ptrn;
-	unsigned address;
-	mutable int depCount;///> times this inj has been add to node site deps
+	const pattern::Pattern& ptrn;	///< Matching-pattern for this injection.
+	unsigned address;			///< the position of this Injection in its container.
+	mutable int depCount;		///< times this injection has been added to node site deps.
 #ifdef DEBUG
-	int cc_id;
+	int cc_id;					///> id of the pattern... for debug purposes
 #endif
 public:
 	/** \brief Constructs a new pattern based injection. */
@@ -89,19 +88,26 @@ public:
 	/** \brief Returns the nodes pointed by this Injection. */
 	virtual const vector<Node*>* getEmbedding() const = 0;
 
-	/** \brief Fills injs and cod with the nodes of this injection.
+	/** \brief Fills **injs** and **cod** with the nodes of this injection.
 	 *
 	 * @returns false if a node is already in cod. */
 	virtual bool codomain(vector<Node*>* injs,set<Node*>& cod) const = 0;
 
+	/** Count of the nodes pointed by this injection.
+	 * \return more than 1 only if pointing a multi-node.*/
 	virtual size_t count() const = 0;
-	//bool operator< (const Injection& inj) const;
+
+	/** Compare 2 Injections. Commonly is an error if there are 2 equal injections.
+	 * \return true only if the injections are pointing the same nodes.	 */
 	virtual bool operator==(const Injection& inj) const = 0;
 
 protected:
+	/// increases depCount by 1.
 	void incDeps() const {
 		depCount++;
 	}
+	/** decreases depCount by 1.
+	 *\return the new depCount value.	*/
 	auto decDeps() const {
 		return --depCount;
 	}
@@ -109,11 +115,12 @@ protected:
 };
 
 
-
+/** Injection of a mixture of 2 CC pointing to nodes that are explicitly connected.
+ * The max-distance between these 2 embeddings is set on the pattern. */
 class MixInjection : public Injection {
-	const Injection* ccInjs[2];
-	vector<Node*> emb[2];
-	int distance;//radius
+	const Injection* ccInjs[2];		///< The 2 injections (cc->nodes).
+	vector<Node*> emb[2];			///< Only the nodes of the injections (redundant).
+	int distance;					///< Min distance between the 2 embeddings
 	//bool rev;
 
 public:
@@ -137,19 +144,19 @@ public:
 	}
 	Injection* clone(const map<Node*,Node*>& mask) const;
 	void copy(const MixInjection* inj,const map<Node*,Node*>& mask);
-	const vector<Node*>* getEmbedding() const {
+	const vector<Node*>* getEmbedding() const override {
 		return emb;
 	}
-	bool codomain(vector<Node*>* injs,set<Node*>& cod) const {
+	bool codomain(vector<Node*>* injs,set<Node*>& cod) const override {
 		if(ccInjs[0]->isTrashed() || ccInjs[1]->isTrashed())
 			return 5;//invalid injection
 		return ccInjs[0]->codomain(injs,cod) || ccInjs[1]->codomain(&injs[1],cod);
 	}
 
-	size_t count() const {
+	size_t count() const override {
 		return ccInjs[0]->count();
 	}
-	bool operator==(const Injection& inj) const;
+	bool operator==(const Injection& inj) const override;
 
 	int getDistance() const {
 		return distance;

@@ -15,6 +15,8 @@
 
 #include <iostream>
 
+/** Some unclassified classes that are needed for KaSim.
+ * Most of them can be used globally */
 namespace data_structs {
 
 struct DataTable {

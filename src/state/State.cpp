@@ -22,6 +22,7 @@
 namespace state {
 using Deps = pattern::Dependency::Dep;
 using namespace matching;
+using namespace data_structs;
 
 State::State(int id,simulation::Simulation& _sim,
 	const BaseExpression* vol,bool by_events) :

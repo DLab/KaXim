@@ -484,8 +484,8 @@ void Histogram::apply(SimContext& state) const {
 	for(auto kappa : kappaList){
 		auto& mix = kappa->getMix();
 		auto& cc = mix.getComponent(0);
-		auto count = state.getInjContainer(cc.getId()).count();
-		auto& injs = state.getInjContainer(cc.getId());
+		auto count = state.count(cc.getId());
+		//auto& injs = state.getInjContainer(cc.getId());
 		state.setAuxMap(&cc_map);//Fixing bug with lazy init
 		rawData.at(kappa->toString()).emplace_back(count+1);
 		auto& raw = rawData.at(kappa->toString()).back();
@@ -514,7 +514,7 @@ void Histogram::apply(SimContext& state) const {
 				values[val]++;
 				raw[++i] = val;
 			};
-			injs.fold(f);
+			state.fold(cc.getId(),f);
 			file << "\ttime";
 			for(auto val : values){
 				int vi(val.first);
@@ -531,7 +531,7 @@ void Histogram::apply(SimContext& state) const {
 				//cout << "2) dt.data(" << dt.data.rows()-1 << "," << col << ") = " << val.second << endl;
 				dt.data(dt.data.rows()-1,col++) = val.second;
 			}
-			auto avg = sum / injs.count();
+			auto avg = sum / count;
 			file << "\t" << avg << endl;
 			//cout << "3) dt.data(" << dt.data.rows()-1 << "," << col << ") = " << avg << endl;
 			dt.data(dt.data.rows()-1,col) = avg;
@@ -553,7 +553,7 @@ void Histogram::apply(SimContext& state) const {
 				sum += val;
 				raw[++i] = val;
 			};
-			injs.fold(f);
+			state.fold(cc.getId(),f);
 			bins.assign(bins.size(),0);
 			setPoints();
 			printHeader(file,kappa->toString());
@@ -580,7 +580,7 @@ void Histogram::apply(SimContext& state) const {
 				raw[++i] = val;
 			};
 			bins.assign(bins.size(),0);
-			injs.fold(f);
+			state.fold(cc.getId(),f);
 		}
 		file << kappa->toString() << "\t";
 		file << state.getCounter().getTime() << "\t";
@@ -588,9 +588,9 @@ void Histogram::apply(SimContext& state) const {
 		dt.data.conservativeResize(dt.data.rows()+1,Eigen::NoChange);
 		dt.row_names.emplace_back(to_string(time));
 		if(min == max){
-			file << injs.count() << "\t";
+			file << count << "\t";
 			//cout << "4) dt.data(" << dt.data.rows()-1 << "," << 0 << ") = " << injs.count() << endl;
-			dt.data(dt.data.rows()-1,0) = injs.count();
+			dt.data(dt.data.rows()-1,0) = count;
 		}
 		else
 			for(auto bin : bins) {
@@ -598,9 +598,9 @@ void Histogram::apply(SimContext& state) const {
 				//cout << "5) dt.data(" << dt.data.rows()-1 << "," << col << ") = " << bin << endl;
 				dt.data(dt.data.rows()-1,col++) = bin;
 			}
-		file << sum / injs.count() << "\n";
+		file << sum / count << "\n";
 		//cout << "6) dt.data(" << dt.data.rows()-1 << "," << col << ") = " << sum/injs.count() << endl;
-		dt.data(dt.data.rows()-1,col) = sum / injs.count();
+		dt.data(dt.data.rows()-1,col) = sum / count;
 	}
 	if(kappaList.size() > 1)
 		file << endl;

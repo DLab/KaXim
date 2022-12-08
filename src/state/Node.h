@@ -31,6 +31,7 @@
 namespace matching {
 class CcInjection;
 template <typename T> class InjRandContainer;
+using namespace data_structs;
 
 class InjSet : public std::set<Injection*> {
 public:
